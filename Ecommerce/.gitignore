@@ -1,0 +1,44 @@
+# OSX
+.DS_Store
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Environment (never commit secrets)
+.env
+.env.development
+.env.production
+.env.local
+
+# Android/IntelliJ
+android/build/
+android/app/build/
+android/app/.cxx/
+android/.gradle/
+android/local.properties
+*.iml
+.idea/
+*.hprof
+
+# iOS / Xcode
+ios/build/
+ios/Pods/
+ios/*.xcworkspace/xcuserdata/
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+DerivedData/
+
+# Metro / bundler
+.metro-health-check*
+*.jsbundle
+
+# Testing
+coverage/
+
+# Misc
+.vscode/
+*.log
