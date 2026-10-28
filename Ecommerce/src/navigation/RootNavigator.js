@@ -1,0 +1,151 @@
+import React from 'react';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import BottomTabs from './BottomTabs';
+import SplashScreen from '../features/splash/screens/SplashScreen';
+import OnboardingScreen from '../features/onboarding/screens/OnboardingScreen';
+import LoginScreen from '../features/auth/screens/LoginScreen';
+import SignupScreen from '../features/auth/screens/SignupScreen';
+import OtpVerificationScreen from '../features/auth/screens/OtpVerificationScreen';
+import ForgotPasswordScreen from '../features/auth/screens/ForgotPasswordScreen';
+import ResetPasswordScreen from '../features/auth/screens/ResetPasswordScreen';
+import BrandsScreen from '../features/brands/screens/BrandsScreen';
+import FlashSaleScreen from '../features/flashSale/screens/FlashSaleScreen';
+import RecentlyViewedScreen from '../features/recentlyViewed/screens/RecentlyViewedScreen';
+import NotificationsScreen from '../features/notifications/screens/NotificationsScreen';
+import LanguageScreen from '../features/language/screens/LanguageScreen';
+import ReferralScreen from '../features/referral/screens/ReferralScreen';
+import UpdateRequiredScreen from '../features/appUpdate/screens/UpdateRequiredScreen';
+import MaintenanceScreen from '../features/appUpdate/screens/MaintenanceScreen';
+import CategoryScreen from '../features/category/screens/CategoryScreen';
+import ProductDetailScreen from '../features/product/screens/ProductDetailScreen';
+import SearchScreen from '../features/search/screens/SearchScreen';
+import SearchResultsScreen from '../features/search/screens/SearchResultsScreen';
+import CartScreen from '../features/cart/screens/CartScreen';
+import CheckoutScreen from '../features/checkout/screens/CheckoutScreen';
+import PaymentMethodScreen from '../features/payment/screens/PaymentMethodScreen';
+import OrderPlacedScreen from '../features/orders/screens/OrderPlacedScreen';
+import MyOrdersScreen from '../features/orders/screens/MyOrdersScreen';
+import OrderDetailScreen from '../features/orders/screens/OrderDetailScreen';
+import TrackingScreen from '../features/tracking/screens/TrackingScreen';
+import ProfileScreen from '../features/profile/screens/ProfileScreen';
+import AccountSettingsScreen from '../features/profile/screens/AccountSettingsScreen';
+import EditProfileScreen from '../features/profile/screens/EditProfileScreen';
+import SavedAddressesScreen from '../features/address/screens/SavedAddressesScreen';
+import AddEditAddressScreen from '../features/address/screens/AddEditAddressScreen';
+import SavedCardsScreen from '../features/payment/screens/SavedCardsScreen';
+import AddCardScreen from '../features/payment/screens/AddCardScreen';
+import AddGiftCardScreen from '../features/payment/screens/AddGiftCardScreen';
+import PrivacyCenterScreen from '../features/settings/screens/PrivacyCenterScreen';
+import ManagePermissionsScreen from '../features/settings/screens/ManagePermissionsScreen';
+import AdPreferencesScreen from '../features/settings/screens/AdPreferencesScreen';
+import DownloadDataScreen from '../features/settings/screens/DownloadDataScreen';
+import DeleteAccountScreen from '../features/settings/screens/DeleteAccountScreen';
+import PrivacyPolicyScreen from '../features/settings/screens/PrivacyPolicyScreen';
+import ReviewsScreen from '../features/reviews/screens/ReviewsScreen';
+import WriteReviewScreen from '../features/reviews/screens/WriteReviewScreen';
+import QuestionsAnswersScreen from '../features/reviews/screens/QuestionsAnswersScreen';
+import QuestionDetailScreen from '../features/reviews/screens/QuestionDetailScreen';
+import SellOnFlipkartScreen from '../features/seller/screens/SellOnFlipkartScreen';
+import SellerRegistrationScreen from '../features/seller/screens/SellerRegistrationScreen';
+import RateUsScreen from '../features/settings/screens/RateUsScreen';
+import AboutScreen from '../features/settings/screens/AboutScreen';
+import TermsConditionsScreen from '../features/settings/screens/TermsConditionsScreen';
+import OffersScreen from '../features/offers/screens/OffersScreen';
+import DealDetailScreen from '../features/offers/screens/DealDetailScreen';
+import OfferCategoryScreen from '../features/offers/screens/OfferCategoryScreen';
+import CouponsScreen from '../features/coupons/screens/CouponsScreen';
+import WalletScreen from '../features/wallet/screens/WalletScreen';
+import AddMoneyScreen from '../features/wallet/screens/AddMoneyScreen';
+import WishlistScreen from '../features/wishlist/screens/WishlistScreen';
+import HelpCenterScreen from '../features/support/screens/HelpCenterScreen';
+import HelpCategoryScreen from '../features/support/screens/HelpCategoryScreen';
+import HelpArticleScreen from '../features/support/screens/HelpArticleScreen';
+import OrderHelpScreen from '../features/support/screens/OrderHelpScreen';
+import OrderIssueScreen from '../features/support/screens/OrderIssueScreen';
+import CancelOrderScreen from '../features/support/screens/CancelOrderScreen';
+import ReturnReplaceScreen from '../features/support/screens/ReturnReplaceScreen';
+import RaiseTicketScreen from '../features/support/screens/RaiseTicketScreen';
+import MyTicketsScreen from '../features/support/screens/MyTicketsScreen';
+import TicketDetailScreen from '../features/support/screens/TicketDetailScreen';
+import LiveChatScreen from '../features/support/screens/LiveChatScreen';
+import ContactUsScreen from '../features/support/screens/ContactUsScreen';
+
+const Stack = createNativeStackNavigator();
+
+const RootNavigator = () => {
+  return (
+    <Stack.Navigator initialRouteName="Splash" screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Splash" component={SplashScreen} />
+      <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+      <Stack.Screen name="Login" component={LoginScreen} />
+      <Stack.Screen name="Signup" component={SignupScreen} />
+      <Stack.Screen name="OtpVerification" component={OtpVerificationScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+      <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+      <Stack.Screen name="MainTabs" component={BottomTabs} />
+      <Stack.Screen name="Brands" component={BrandsScreen} />
+      <Stack.Screen name="FlashSale" component={FlashSaleScreen} />
+      <Stack.Screen name="RecentlyViewed" component={RecentlyViewedScreen} />
+      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+      <Stack.Screen name="Language" component={LanguageScreen} />
+      <Stack.Screen name="Referral" component={ReferralScreen} />
+      <Stack.Screen name="UpdateRequired" component={UpdateRequiredScreen} />
+      <Stack.Screen name="Maintenance" component={MaintenanceScreen} />
+      <Stack.Screen name="Category" component={CategoryScreen} />
+      <Stack.Screen name="ProductDetail" component={ProductDetailScreen} />
+      <Stack.Screen name="Search" component={SearchScreen} />
+      <Stack.Screen name="SearchResults" component={SearchResultsScreen} />
+      <Stack.Screen name="Cart" component={CartScreen} />
+      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+      <Stack.Screen name="PaymentMethod" component={PaymentMethodScreen} />
+      <Stack.Screen name="OrderPlaced" component={OrderPlacedScreen} />
+      <Stack.Screen name="MyOrders" component={MyOrdersScreen} />
+      <Stack.Screen name="OrderDetail" component={OrderDetailScreen} />
+      <Stack.Screen name="Tracking" component={TrackingScreen} />
+      <Stack.Screen name="Profile" component={ProfileScreen} />
+      <Stack.Screen name="AccountSettings" component={AccountSettingsScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+      <Stack.Screen name="AddEditAddress" component={AddEditAddressScreen} />
+      <Stack.Screen name="SavedCards" component={SavedCardsScreen} />
+      <Stack.Screen name="AddCard" component={AddCardScreen} />
+      <Stack.Screen name="AddGiftCard" component={AddGiftCardScreen} />
+      <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
+      <Stack.Screen name="ManagePermissions" component={ManagePermissionsScreen} />
+      <Stack.Screen name="AdPreferences" component={AdPreferencesScreen} />
+      <Stack.Screen name="DownloadData" component={DownloadDataScreen} />
+      <Stack.Screen name="DeleteAccount" component={DeleteAccountScreen} />
+      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+      <Stack.Screen name="Reviews" component={ReviewsScreen} />
+      <Stack.Screen name="WriteReview" component={WriteReviewScreen} />
+      <Stack.Screen name="QuestionsAnswers" component={QuestionsAnswersScreen} />
+      <Stack.Screen name="QuestionDetail" component={QuestionDetailScreen} />
+      <Stack.Screen name="SellOnFlipkart" component={SellOnFlipkartScreen} />
+      <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
+      <Stack.Screen name="RateUs" component={RateUsScreen} />
+      <Stack.Screen name="About" component={AboutScreen} />
+      <Stack.Screen name="TermsConditions" component={TermsConditionsScreen} />
+      <Stack.Screen name="Offers" component={OffersScreen} options={{ animation: 'none' }} />
+      <Stack.Screen name="DealDetail" component={DealDetailScreen} options={{ animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="DealCategory" component={OfferCategoryScreen} />
+      <Stack.Screen name="Coupons" component={CouponsScreen} />
+      <Stack.Screen name="Wallet" component={WalletScreen} />
+      <Stack.Screen name="AddMoney" component={AddMoneyScreen} />
+      <Stack.Screen name="Wishlist" component={WishlistScreen} />
+      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+      <Stack.Screen name="HelpCategory" component={HelpCategoryScreen} />
+      <Stack.Screen name="HelpArticle" component={HelpArticleScreen} />
+      <Stack.Screen name="OrderHelp" component={OrderHelpScreen} />
+      <Stack.Screen name="OrderIssue" component={OrderIssueScreen} />
+      <Stack.Screen name="CancelOrder" component={CancelOrderScreen} />
+      <Stack.Screen name="ReturnReplace" component={ReturnReplaceScreen} />
+      <Stack.Screen name="RaiseTicket" component={RaiseTicketScreen} />
+      <Stack.Screen name="MyTickets" component={MyTicketsScreen} />
+      <Stack.Screen name="TicketDetail" component={TicketDetailScreen} />
+      <Stack.Screen name="LiveChat" component={LiveChatScreen} />
+      <Stack.Screen name="ContactUs" component={ContactUsScreen} />
+    </Stack.Navigator>
+  );
+};
+
+export default RootNavigator;

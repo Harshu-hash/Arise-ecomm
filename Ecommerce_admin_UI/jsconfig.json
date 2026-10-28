@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "jsx": "react-jsx",
+    "checkJs": false,
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["src/shared/core/*"],
+      "@ui/*": ["src/shared/ui/*"],
+      "@theme/*": ["src/shared/theme/*"],
+      "@mocks/*": ["src/shared/mocks/*"],
+      "@admin/*": ["src/admin/*"],
+      "@seller/*": ["src/seller/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist"]
+}
