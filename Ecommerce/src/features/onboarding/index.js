@@ -1,1 +1,7 @@
-﻿// Public API of the 'onboarding' feature. Other features may ONLY import from this file.
+export { default as OnboardingScreen } from './screens/OnboardingScreen';
+export { onboardingCompleted, onboardingRestored } from './redux/onboarding.slice';
+export {
+  selectHasCompletedOnboarding,
+  selectOnboarding,
+  selectOnboardingRestored,
+} from './redux/onboarding.selectors';

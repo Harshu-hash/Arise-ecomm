@@ -1,8 +1,10 @@
 # Delivery Partner Daily Workflow
 
+> **Out of scope for Arise v1.** Last-mile is third-party courier later, not an owned rider fleet.
+
 ## What Is This?
 
-This is the day-to-day guide for delivery partners — going online, accepting jobs, picking up orders from shops, navigating to customers, confirming delivery, and handling return pickups. This document covers every step of a rider's working day.
+This historical chapter described a first-party rider working day. Courier pickup, in-transit, and delivery events will come from logistics partners when shipping is integrated.
 
 ---
 

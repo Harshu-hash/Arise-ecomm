@@ -174,15 +174,15 @@ When delivery is confirmed, money is distributed:
 
 ## Order Status Map
 
-| Stage            | Customer sees               | Seller sees           | Rider sees            |
+| Stage            | Customer sees               | Seller sees           | Courier (later)       |
 | ---------------- | --------------------------- | --------------------- | --------------------- |
-| Order placed     | "Pending"                   | "New order — accept!" | —                     |
+| Order placed     | "Pending"                   | "New order"           | —                     |
 | Payment pending  | "Processing payment"        | —                     | —                     |
-| Seller preparing | "Confirmed"                 | "Preparing"           | —                     |
-| Finding rider    | "Finding delivery partner"  | "Waiting for rider"   | Job offer             |
-| Rider assigned   | "Delivery partner assigned" | "Rider on the way"    | "Go to shop"          |
-| Out for delivery | "Out for delivery" + map    | "Being delivered"     | "Deliver to customer" |
-| Delivered        | "Delivered"                 | "Delivered"           | "Completed"           |
+| Seller packing   | "Confirmed" / "Packed"      | "Packing"             | —                     |
+| Shipped          | "Shipped"                   | "Handed to courier"   | Pickup scan           |
+| In transit       | "In transit"                | "In transit"          | Network scan          |
+| Out for delivery | "Out for delivery"          | "Out for delivery"    | Last-mile scan        |
+| Delivered        | "Delivered"                 | "Delivered"           | Delivered             |
 | Cancelled        | "Cancelled" + refund        | "Cancelled"           | —                     |
 
 ---

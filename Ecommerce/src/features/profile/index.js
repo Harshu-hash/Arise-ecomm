@@ -1,1 +1,2 @@
-﻿// Public API of the 'profile' feature. Other features may ONLY import from this file.
+export * from './api/profile.api';
+export * from './api/profile.mapper';

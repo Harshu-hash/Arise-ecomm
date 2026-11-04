@@ -5,7 +5,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager, ProductCard } from '../../../shared/components';
-import { FLASH_SALE_PRODUCTS, FLASH_SALE_DURATION_SECONDS } from '../data/flashSaleData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
+import { useGetCurrentFlashSaleQuery } from '../api/flashSale.api';
 
 const formatTime = (totalSeconds) => {
   const h = Math.floor(totalSeconds / 3600);
@@ -17,7 +20,14 @@ const formatTime = (totalSeconds) => {
 
 const FlashSaleScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [secondsLeft, setSecondsLeft] = useState(FLASH_SALE_DURATION_SECONDS);
+  const { data: sale, isLoading, error, refetch } = useGetCurrentFlashSaleQuery();
+  const [secondsLeft, setSecondsLeft] = useState(0);
+
+  useEffect(() => {
+    setSecondsLeft(
+      sale?.endsAt ? Math.max(0, Math.floor((new Date(sale.endsAt).getTime() - Date.now()) / 1000)) : 0,
+    );
+  }, [sale?.endsAt]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -36,9 +46,14 @@ const FlashSaleScreen = ({ navigation }) => {
 
   const handlePressProduct = (item) => {
     navigation && navigation.navigate('ProductDetail', {
-      product: { ...item, name: item.title },
+      productId: item.productId,
     });
   };
+
+  if (isLoading) return <FullScreenLoader message="Loading flash sale..." />;
+  if (error && !sale) return <ErrorState message={error.message} onRetry={refetch} />;
+  if (!sale?.items.length)
+    return <EmptyState icon="clock" title="No flash sale right now" message="Check back soon." />;
 
   return (
     <View style={styles.container}>
@@ -56,7 +71,7 @@ const FlashSaleScreen = ({ navigation }) => {
       </View>
 
       <FlatList
-        data={FLASH_SALE_PRODUCTS}
+        data={sale.items}
         keyExtractor={(item) => item.id}
         numColumns={2}
         columnWrapperStyle={styles.row}

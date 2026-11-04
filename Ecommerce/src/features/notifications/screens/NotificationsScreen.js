@@ -1,165 +1,156 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, SectionList, TouchableOpacity } from 'react-native';
+import React from 'react';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import EmptyState from '../../../shared/EmptyState/EmptyState';
-import { NOTIFICATIONS } from '../data/notificationsData';
-
-const groupNotifications = (items) => {
-  const groups = {};
-  items.forEach((item) => {
-    if (!groups[item.group]) groups[item.group] = [];
-    groups[item.group].push(item);
-  });
-  return Object.keys(groups).map((title) => ({ title, data: groups[title] }));
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import {
+  useGetNotificationsQuery,
+  useMarkAllNotificationsReadMutation,
+  useMarkNotificationReadMutation,
+} from '../api/notifications.api';
+const destination = {
+  PRODUCT: item => ['ProductDetail', { productId: item.target.entityId }],
+  ORDER: item => ['OrderDetail', { orderId: item.target.entityId }],
+  SHIPMENT: item => ['Tracking', { orderId: item.target.entityId }],
+  TICKET: item => ['TicketDetail', { ticketId: item.target.entityId }],
 };
-
 const NotificationsScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
-
-  const handleBack = () => {
-    if (navigation && navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation && navigation.navigate('MainTabs', { screen: 'Home' });
-    }
+  const insets = useSafeAreaInsets(),
+    query = useGetNotificationsQuery({ limit: 50 }),
+    [markRead] = useMarkNotificationReadMutation(),
+    [markAll, { isLoading: isMarkingAll }] = useMarkAllNotificationsReadMutation();
+  if (query.isLoading) return <FullScreenLoader message="Loading notifications..." />;
+  if (query.error)
+    return (
+      <ErrorState
+        title="Could not load notifications"
+        message={query.error.message}
+        onRetry={query.refetch}
+      />
+    );
+  const items = query.data.items;
+  const open = async item => {
+    if (!item.read) await markRead(item.id);
+    const target = destination[item.target.type]?.(item);
+    if (target && item.target.entityId) navigation.navigate(...target);
   };
-
-  const handlePressItem = (item) => {
-    setNotifications((prev) => prev.map((n) => (n.id === item.id ? { ...n, read: true } : n)));
-  };
-
-  const sections = groupNotifications(notifications);
-
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity
+          onPress={() =>
+            navigation.canGoBack()
+              ? navigation.goBack()
+              : navigation.navigate('MainTabs', { screen: 'Home' })
+          }
+        >
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.backBtn} />
+        <TouchableOpacity onPress={() => navigation.navigate('NotificationPreferences')}>
+          <Icon name="settings" size={19} color={COLORS.textPrimary} />
+        </TouchableOpacity>
       </View>
-
-      {notifications.length === 0 ? (
-        <EmptyState icon="bell" title="No notifications yet" message="We'll let you know when there's something new." />
-      ) : (
-        <SectionList
-          sections={sections}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          showsVerticalScrollIndicator={false}
-          renderSectionHeader={({ section }) => (
-            <Text style={styles.sectionTitle}>{section.title}</Text>
-          )}
-          renderItem={({ item }) => (
-            <TouchableOpacity activeOpacity={0.8} onPress={() => handlePressItem(item)} style={styles.row}>
-              <View style={styles.iconCircle}>
-                <Icon name={item.icon} size={18} color={COLORS.primary} />
-              </View>
-              <View style={styles.rowBody}>
-                <Text style={styles.rowTitle} numberOfLines={1}>{item.title}</Text>
-                <Text style={styles.rowMessage} numberOfLines={2}>{item.message}</Text>
-                <Text style={styles.rowTimestamp}>{item.timestamp}</Text>
-              </View>
-              {!item.read ? <View style={styles.unreadDot} /> : null}
-            </TouchableOpacity>
-          )}
-        />
-      )}
+      {query.data.unreadCount > 0 ? (
+        <View style={styles.toolbar}>
+          <Text style={styles.unread}>{query.data.unreadCount} unread</Text>
+          <TouchableOpacity disabled={isMarkingAll} onPress={() => markAll()}>
+            <Text style={styles.markAll}>{isMarkingAll ? 'Updating...' : 'Mark all read'}</Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <FlatList
+        data={items}
+        keyExtractor={item => item.id}
+        contentContainerStyle={items.length ? styles.list : styles.emptyList}
+        refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={query.refetch} />}
+        ListEmptyComponent={
+          <EmptyState
+            icon="bell"
+            title="No notifications yet"
+            message="Account notifications will appear here."
+          />
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            onPress={() => open(item)}
+            style={[styles.row, !item.read && styles.unreadRow]}
+          >
+            <View style={styles.icon}>
+              <Icon name={item.icon} size={18} color={COLORS.primary} />
+            </View>
+            <View style={styles.body}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.message}>{item.message}</Text>
+              <Text style={styles.time}>{item.timestamp}</Text>
+            </View>
+            {!item.read ? <View style={styles.dot} /> : null}
+          </TouchableOpacity>
+        )}
+      />
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  listContent: {
+  headerTitle: { fontSize: 18, fontWeight: '700', color: COLORS.textPrimary },
+  toolbar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     paddingHorizontal: SPACING.l,
-    paddingBottom: SPACING.xxl,
+    paddingVertical: SPACING.s,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
-  sectionTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: COLORS.textSecondary,
-    backgroundColor: COLORS.background,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.s,
-  },
+  unread: { fontSize: 12, color: COLORS.textSecondary },
+  markAll: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
+  list: { padding: SPACING.l },
+  emptyList: { flexGrow: 1 },
   row: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    padding: SPACING.m,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.m,
-    padding: SPACING.m,
-    marginBottom: SPACING.s,
     backgroundColor: COLORS.surface,
+    marginBottom: SPACING.s,
   },
-  iconCircle: {
+  unreadRow: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  icon: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: COLORS.primaryLight,
+    backgroundColor: COLORS.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: SPACING.m,
   },
-  rowBody: {
-    flex: 1,
-  },
-  rowTitle: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  rowMessage: {
-    fontSize: 12.5,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-    lineHeight: 17,
-  },
-  rowTimestamp: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-    marginTop: SPACING.xs,
-  },
-  unreadDot: {
+  body: { flex: 1 },
+  title: { fontSize: 13.5, fontWeight: '700', color: COLORS.textPrimary },
+  message: { fontSize: 12.5, color: COLORS.textSecondary, lineHeight: 17, marginTop: 2 },
+  time: { fontSize: 10.5, color: COLORS.textTertiary, marginTop: SPACING.s },
+  dot: {
     width: 8,
     height: 8,
     borderRadius: 4,
     backgroundColor: COLORS.primary,
     marginLeft: SPACING.s,
-    marginTop: 4,
   },
 });
-
 export default NotificationsScreen;

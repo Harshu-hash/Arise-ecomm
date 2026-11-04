@@ -14,18 +14,20 @@ const WalletTransactionList = ({ transactions, onSeeAll, onPressTransaction }) =
     </View>
 
     <View style={styles.txnList}>
-      {transactions.map((txn) => (
+      {transactions.map(txn => (
         <TouchableOpacity
           key={txn.id}
           activeOpacity={0.7}
           disabled={!onPressTransaction}
           onPress={() => onPressTransaction && onPressTransaction(txn)}
-          style={styles.txnRow}>
+          style={styles.txnRow}
+        >
           <View
             style={[
               styles.txnIconWrap,
               { backgroundColor: txn.type === 'credit' ? '#EAF7EC' : '#FBE7EC' },
-            ]}>
+            ]}
+          >
             <Icon
               name={txn.type === 'credit' ? 'arrow-down-left' : 'arrow-up-right'}
               size={16}
@@ -41,7 +43,8 @@ const WalletTransactionList = ({ transactions, onSeeAll, onPressTransaction }) =
             style={[
               styles.txnAmount,
               { color: txn.type === 'credit' ? COLORS.success : COLORS.textPrimary },
-            ]}>
+            ]}
+          >
             {txn.type === 'credit' ? '+' : '-'}₹{txn.amount}
           </Text>
         </TouchableOpacity>

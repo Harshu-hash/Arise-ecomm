@@ -1,1 +1,8 @@
-﻿// Public API of the 'search' feature. Other features may ONLY import from this file.
+export { default as SearchScreen } from './screens/SearchScreen';
+export { default as SearchResultsScreen } from './screens/SearchResultsScreen';
+export {
+  useGetSearchSuggestionsQuery,
+  useLazyGetSearchSuggestionsQuery,
+  useLazySearchProductsQuery,
+  useSearchProductsQuery,
+} from './api/search.query';

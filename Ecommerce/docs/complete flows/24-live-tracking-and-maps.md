@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-One of the most important features of quick commerce is knowing where your delivery is. This document explains how live tracking works for customers, riders, sellers, and admins — and how addresses are turned into map locations.
+Customers need to know where a shipment is once a courier is assigned. This document explains how live tracking works for customers, riders, sellers, and admins — and how addresses are turned into map locations.
 
 ---
 

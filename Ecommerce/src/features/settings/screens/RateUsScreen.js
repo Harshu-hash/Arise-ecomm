@@ -25,7 +25,7 @@ const RateUsScreen = ({ navigation }) => {
         <View style={styles.iconCircle}>
           <Icon name="smile" size={34} color={COLORS.primary} />
         </View>
-        <Text style={styles.title}>Enjoying Flipkart?</Text>
+        <Text style={styles.title}>Enjoying Arise?</Text>
         <Text style={styles.subtitle}>
           Let us know how we're doing. Your feedback helps us improve your shopping experience.
         </Text>

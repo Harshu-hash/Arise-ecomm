@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'settings'.
+export { useGetAdPreferencesQuery, useUpdateAdPreferencesMutation } from './settings.api';

@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -7,37 +15,54 @@ import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
 import TextField from '../../../shared/inputs/TextField';
+import { useStartAuthMutation } from '../api/auth.query';
 
-const LoginScreen = ({ navigation }) => {
+const LoginScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [startAuth, { isLoading, error }] = useStartAuthMutation();
+  const returnTo = route?.params?.returnTo;
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (!identifier.trim()) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation && navigation.navigate('OtpVerification', { identifier: identifier.trim(), mode: 'login' });
-    }, 600);
+    try {
+      const challenge = await startAuth({
+        identifier: identifier.trim(),
+        purpose: 'LOGIN',
+      }).unwrap();
+      navigation?.navigate('OtpVerification', {
+        identifier: identifier.trim(),
+        destinationMasked: challenge.destinationMasked,
+        challengeId: challenge.challengeId,
+        resendAvailableAt: challenge.resendAvailableAt,
+        mode: 'login',
+        returnTo,
+      });
+    } catch {
+      // RTK Query exposes the normalized error below the field.
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.background} />
 
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top, 24) }]}
-        keyboardShouldPersistTaps="handled">
+        keyboardShouldPersistTaps="handled"
+      >
         <View style={styles.logoCircle}>
           <Icon name="shopping-bag" size={28} color={COLORS.primary} />
         </View>
 
         <Text style={styles.title}>Login</Text>
-        <Text style={styles.subtitle}>Get access to your orders, wishlist and recommendations.</Text>
+        <Text style={styles.subtitle}>
+          Get access to your orders, wishlist and recommendations.
+        </Text>
 
         <TextField
           label="Mobile number or Email"
@@ -46,18 +71,25 @@ const LoginScreen = ({ navigation }) => {
           placeholder="Enter mobile number or email"
           leftIcon="user"
           autoCapitalize="none"
+          error={error?.fieldErrors?.identifier}
           style={styles.field}
         />
 
         <AppButton
           title="Continue"
           onPress={handleSendOtp}
-          loading={loading}
+          loading={isLoading}
           disabled={!identifier.trim()}
           fullWidth
           size="lg"
           style={styles.cta}
         />
+
+        {error && !error.fieldErrors?.identifier ? (
+          <Text accessibilityRole="alert" style={styles.errorText}>
+            {error.message}
+          </Text>
+        ) : null}
 
         <Text style={styles.terms}>
           By continuing, you agree to Arise's Terms of Use and Privacy Policy.
@@ -65,8 +97,9 @@ const LoginScreen = ({ navigation }) => {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => navigation && navigation.navigate('ForgotPassword')}
-          style={styles.forgotRow}>
+          onPress={() => navigation?.navigate('ForgotPassword', { returnTo })}
+          style={styles.forgotRow}
+        >
           <Text style={styles.signupLink}>Trouble logging in?</Text>
         </TouchableOpacity>
 
@@ -74,8 +107,9 @@ const LoginScreen = ({ navigation }) => {
 
         <TouchableOpacity
           activeOpacity={0.7}
-          onPress={() => navigation && navigation.navigate('Signup')}
-          style={styles.signupRow}>
+          onPress={() => navigation?.navigate('Signup', { returnTo })}
+          style={styles.signupRow}
+        >
           <Text style={styles.signupText}>
             New to Arise? <Text style={styles.signupLink}>Create an account</Text>
           </Text>
@@ -129,6 +163,11 @@ const styles = StyleSheet.create({
     color: COLORS.textTertiary,
     marginTop: SPACING.m,
     lineHeight: 16,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: SPACING.s,
   },
   divider: {
     height: 1,

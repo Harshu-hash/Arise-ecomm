@@ -1,0 +1,413 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Arise Customer API",
+    "version": "1.0.0",
+    "description": "Canonical v1 contract for the Arise customer application. Money is integer paise, timestamps are ISO-8601 UTC, IDs are opaque strings, and mutations documented with Idempotency-Key must return the original result for a repeated key."
+  },
+  "servers": [
+    { "url": "https://api.arise.example/api/customer/v1", "description": "Environment-specific base URL" }
+  ],
+  "security": [{ "bearerAuth": [] }],
+  "tags": [
+    { "name": "Auth" }, { "name": "Discovery" }, { "name": "Cart" },
+    { "name": "Checkout" }, { "name": "Orders" }, { "name": "Payments" },
+    { "name": "Account" }, { "name": "Support" }
+  ],
+  "paths": {
+    "/health": {
+      "get": { "operationId": "getHealth", "security": [], "responses": { "200": { "$ref": "#/components/responses/Health" } } }
+    },
+    "/auth/start": {
+      "post": { "operationId": "startAuthentication", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Command" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/auth/verify-otp": {
+      "post": { "operationId": "verifyAuthenticationOtp", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Session" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/auth/resend-otp": {
+      "post": { "operationId": "resendAuthenticationOtp", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Command" }, "429": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/auth/signup": {
+      "post": { "operationId": "signup", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Session" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/auth/password/verify-otp": {
+      "post": { "operationId": "verifyPasswordResetOtp", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Command" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/auth/password/reset": {
+      "post": { "operationId": "resetPassword", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Command" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/auth/refresh": {
+      "post": { "operationId": "refreshSession", "tags": ["Auth"], "security": [], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Session" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/auth/session": {
+      "get": { "operationId": "getSession", "tags": ["Auth"], "responses": { "200": { "$ref": "#/components/responses/Session" }, "401": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/auth/logout": {
+      "post": { "operationId": "logout", "tags": ["Auth"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/auth/logout-all": {
+      "post": { "operationId": "logoutAll", "tags": ["Auth"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/app-config": {
+      "get": { "operationId": "getAppConfig", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/AppConfig" } } }
+    },
+    "/home": {
+      "get": { "operationId": "getHome", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/categories/tree": {
+      "get": { "operationId": "getCategoryTree", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/categories/{categoryId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CategoryId" }],
+      "get": { "operationId": "getCategory", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/brands": {
+      "get": { "operationId": "listBrands", "tags": ["Discovery"], "security": [], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/search/suggestions": {
+      "get": { "operationId": "getSearchSuggestions", "tags": ["Discovery"], "security": [], "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/search": {
+      "get": { "operationId": "searchProducts", "tags": ["Discovery"], "security": [], "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/products/{productId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ProductId" }],
+      "get": { "operationId": "getProduct", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Product" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/promotions": {
+      "get": { "operationId": "listPromotions", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/promotions/{promotionId}": {
+      "parameters": [{ "$ref": "#/components/parameters/PromotionId" }],
+      "get": { "operationId": "getPromotion", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/promotions/{promotionId}/products": {
+      "parameters": [{ "$ref": "#/components/parameters/PromotionId" }, { "$ref": "#/components/parameters/Cursor" }],
+      "get": { "operationId": "listPromotionProducts", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/flash-sales/current": {
+      "get": { "operationId": "getCurrentFlashSale", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/coupons/available": {
+      "get": { "operationId": "listAvailableCoupons", "tags": ["Discovery"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/me/recently-viewed": {
+      "get": { "operationId": "listRecentlyViewed", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/List" } } },
+      "delete": { "operationId": "clearRecentlyViewed", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/wishlist": {
+      "get": { "operationId": "getWishlist", "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/wishlist/items": {
+      "post": { "operationId": "addWishlistItem", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/wishlist/items/{productId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ProductId" }],
+      "delete": { "operationId": "removeWishlistItem", "responses": { "200": { "$ref": "#/components/responses/Command" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/wishlist/{productId}/move-to-cart": {
+      "parameters": [{ "$ref": "#/components/parameters/ProductId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+      "post": { "operationId": "moveWishlistItemToCart", "responses": { "200": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/cart": {
+      "get": { "operationId": "getCart", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" } } }
+    },
+    "/cart/items": {
+      "post": { "operationId": "addCartItem", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/cart/items/{cartItemId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CartItemId" }],
+      "patch": { "operationId": "updateCartItem", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "409": { "$ref": "#/components/responses/Error" } } },
+      "delete": { "operationId": "removeCartItem", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" } } }
+    },
+    "/cart/coupon": {
+      "put": { "operationId": "applyCartCoupon", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "422": { "$ref": "#/components/responses/ValidationError" } } },
+      "delete": { "operationId": "removeCartCoupon", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" } } }
+    },
+    "/addresses": {
+      "get": { "operationId": "listAddresses", "responses": { "200": { "$ref": "#/components/responses/List" } } },
+      "post": { "operationId": "createAddress", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/addresses/{addressId}": {
+      "parameters": [{ "$ref": "#/components/parameters/AddressId" }],
+      "patch": { "operationId": "updateAddress", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } },
+      "delete": { "operationId": "deleteAddress", "responses": { "200": { "$ref": "#/components/responses/Command" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/addresses/{addressId}/default": {
+      "parameters": [{ "$ref": "#/components/parameters/AddressId" }],
+      "post": { "operationId": "makeDefaultAddress", "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/addresses/validate": {
+      "post": { "operationId": "validateAddress", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/serviceability": {
+      "get": { "operationId": "getServiceability", "parameters": [{ "name": "pincode", "in": "query", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/checkout/sessions": {
+      "post": { "operationId": "createCheckoutSession", "tags": ["Checkout"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/CheckoutSession" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/checkout/sessions/{checkoutSessionId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CheckoutSessionId" }],
+      "get": { "operationId": "getCheckoutSession", "tags": ["Checkout"], "responses": { "200": { "$ref": "#/components/responses/CheckoutSession" }, "410": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/checkout/sessions/{checkoutSessionId}/address": {
+      "parameters": [{ "$ref": "#/components/parameters/CheckoutSessionId" }],
+      "put": { "operationId": "setCheckoutAddress", "tags": ["Checkout"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/CheckoutSession" } } }
+    },
+    "/checkout/sessions/{checkoutSessionId}/payment-method": {
+      "parameters": [{ "$ref": "#/components/parameters/CheckoutSessionId" }],
+      "put": { "operationId": "setCheckoutPaymentMethod", "tags": ["Checkout"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/CheckoutSession" } } }
+    },
+    "/checkout/sessions/{checkoutSessionId}/revalidate": {
+      "parameters": [{ "$ref": "#/components/parameters/CheckoutSessionId" }],
+      "post": { "operationId": "revalidateCheckoutSession", "tags": ["Checkout"], "responses": { "200": { "$ref": "#/components/responses/CheckoutSession" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/checkout/sessions/{checkoutSessionId}/payment-intent": {
+      "parameters": [{ "$ref": "#/components/parameters/CheckoutSessionId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+      "post": { "operationId": "createPaymentIntent", "tags": ["Payments"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Payment" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payments/{paymentId}": {
+      "parameters": [{ "$ref": "#/components/parameters/PaymentId" }],
+      "get": { "operationId": "getPayment", "tags": ["Payments"], "responses": { "200": { "$ref": "#/components/responses/Payment" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payment-methods": {
+      "get": { "operationId": "listPaymentMethods", "tags": ["Payments"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/payment-methods/{paymentMethodId}": {
+      "parameters": [{ "$ref": "#/components/parameters/PaymentMethodId" }],
+      "delete": { "operationId": "deletePaymentMethod", "tags": ["Payments"], "responses": { "200": { "$ref": "#/components/responses/Command" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/payment-methods/setup-sessions": {
+      "post": { "operationId": "createPaymentMethodSetup", "tags": ["Payments"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/orders": {
+      "get": { "operationId": "listOrders", "tags": ["Orders"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } },
+      "post": { "operationId": "createOrder", "tags": ["Orders"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Order" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/orders/{orderId}": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "get": { "operationId": "getOrder", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/Order" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/orders/{orderId}/timeline": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "get": { "operationId": "getOrderTimeline", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/orders/{orderId}/cancel": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+      "post": { "operationId": "cancelOrder", "tags": ["Orders"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Order" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/orders/{orderId}/returnable-items": {
+      "parameters": [{ "$ref": "#/components/parameters/OrderId" }],
+      "get": { "operationId": "getReturnEligibility", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/returns": {
+      "post": { "operationId": "createReturn", "tags": ["Orders"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Return" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/returns/{returnId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ReturnId" }],
+      "get": { "operationId": "getReturn", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/Return" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/returns/{returnId}/cancel": {
+      "parameters": [{ "$ref": "#/components/parameters/ReturnId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+      "post": { "operationId": "cancelReturn", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/Return" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/shipments/{shipmentId}/tracking": {
+      "parameters": [{ "$ref": "#/components/parameters/ShipmentId" }],
+      "get": { "operationId": "getShipmentTracking", "tags": ["Orders"], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/media": {
+      "post": { "operationId": "uploadMedia", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "required": true, "content": { "multipart/form-data": { "schema": { "type": "object", "required": ["purpose", "file"], "properties": { "purpose": { "type": "string", "enum": ["RETURN_EVIDENCE", "REVIEW_MEDIA", "PROFILE_IMAGE", "SUPPORT_ATTACHMENT"] }, "file": { "type": "string", "format": "binary" } } } } } }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "413": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/me": {
+      "get": { "operationId": "getProfile", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "patch": { "operationId": "updateProfile", "tags": ["Account"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/me/communication-preferences": {
+      "get": { "operationId": "getCommunicationPreferences", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "patch": { "operationId": "updateCommunicationPreferences", "tags": ["Account"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/me/ad-preferences": {
+      "get": { "operationId": "getAdPreferences", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "patch": { "operationId": "updateAdPreferences", "tags": ["Account"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/privacy/export-request": {
+      "get": { "operationId": "getPrivacyExport", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "post": { "operationId": "requestPrivacyExport", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "responses": { "202": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/privacy/deletion-eligibility": {
+      "get": { "operationId": "getDeletionEligibility", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/privacy/deletion-request": {
+      "post": { "operationId": "requestAccountDeletion", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "202": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/wallet": {
+      "get": { "operationId": "getWallet", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Wallet" } } }
+    },
+    "/wallet/transactions": {
+      "get": { "operationId": "listWalletTransactions", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/gift-cards/redeem": {
+      "post": { "operationId": "redeemGiftCard", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Wallet" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/referrals/me": {
+      "get": { "operationId": "getReferralProgram", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/notifications": {
+      "get": { "operationId": "listNotifications", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/notifications/{notificationId}/read": {
+      "parameters": [{ "$ref": "#/components/parameters/NotificationId" }],
+      "put": { "operationId": "markNotificationRead", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/notifications/read-all": {
+      "put": { "operationId": "markAllNotificationsRead", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/notifications/preferences": {
+      "get": { "operationId": "getNotificationPreferences", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "patch": { "operationId": "updateNotificationPreferences", "tags": ["Account"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/devices/push-tokens": {
+      "post": { "operationId": "registerPushToken", "tags": ["Account"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/devices/push-tokens/{deviceId}": {
+      "parameters": [{ "$ref": "#/components/parameters/DeviceId" }],
+      "delete": { "operationId": "unregisterPushToken", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/reviews/mine": {
+      "get": { "operationId": "listMyReviews", "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/products/{productId}/reviews": {
+      "parameters": [{ "$ref": "#/components/parameters/ProductId" }, { "$ref": "#/components/parameters/Cursor" }],
+      "get": { "operationId": "listProductReviews", "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/reviews": {
+      "post": { "operationId": "createReview", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/reviews/{reviewId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ReviewId" }],
+      "patch": { "operationId": "updateReview", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" } } },
+      "delete": { "operationId": "deleteReview", "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/questions/mine": {
+      "get": { "operationId": "listMyQuestions", "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/products/{productId}/questions": {
+      "parameters": [{ "$ref": "#/components/parameters/ProductId" }, { "$ref": "#/components/parameters/Cursor" }],
+      "get": { "operationId": "listProductQuestions", "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/questions": {
+      "post": { "operationId": "createQuestion", "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/questions/{questionId}": {
+      "parameters": [{ "$ref": "#/components/parameters/QuestionId" }],
+      "get": { "operationId": "getQuestion", "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/support/channels": {
+      "get": { "operationId": "getSupportChannels", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/support/subjects": {
+      "get": { "operationId": "listSupportSubjects", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/support/tickets": {
+      "get": { "operationId": "listSupportTickets", "tags": ["Support"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } },
+      "post": { "operationId": "createSupportTicket", "tags": ["Support"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/support/tickets/{ticketId}": {
+      "parameters": [{ "$ref": "#/components/parameters/TicketId" }],
+      "get": { "operationId": "getSupportTicket", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/support/tickets/{ticketId}/messages": {
+      "parameters": [{ "$ref": "#/components/parameters/TicketId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
+      "post": { "operationId": "replyToSupportTicket", "tags": ["Support"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/help/categories": {
+      "get": { "operationId": "listHelpCategories", "tags": ["Support"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/help/categories/{categoryId}": {
+      "parameters": [{ "$ref": "#/components/parameters/CategoryId" }],
+      "get": { "operationId": "getHelpCategory", "tags": ["Support"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/help/articles/{articleId}": {
+      "parameters": [{ "$ref": "#/components/parameters/ArticleId" }],
+      "get": { "operationId": "getHelpArticle", "tags": ["Support"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/help/search": {
+      "get": { "operationId": "searchHelp", "tags": ["Support"], "security": [], "parameters": [{ "name": "query", "in": "query", "required": true, "schema": { "type": "string" } }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/seller-leads": {
+      "post": { "operationId": "submitSellerLead", "tags": ["Seller onboarding"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": { "type": "http", "scheme": "bearer", "bearerFormat": "JWT" }
+    },
+    "parameters": {
+      "Cursor": { "name": "cursor", "in": "query", "schema": { "type": ["string", "null"] } },
+      "IdempotencyKey": { "name": "Idempotency-Key", "in": "header", "required": true, "schema": { "type": "string", "minLength": 8, "maxLength": 200 } },
+      "CategoryId": { "name": "categoryId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "ProductId": { "name": "productId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "PromotionId": { "name": "promotionId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "CartItemId": { "name": "cartItemId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "AddressId": { "name": "addressId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "CheckoutSessionId": { "name": "checkoutSessionId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "PaymentId": { "name": "paymentId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "PaymentMethodId": { "name": "paymentMethodId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "OrderId": { "name": "orderId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "ReturnId": { "name": "returnId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "ShipmentId": { "name": "shipmentId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "NotificationId": { "name": "notificationId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "DeviceId": { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "ReviewId": { "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "QuestionId": { "name": "questionId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "TicketId": { "name": "ticketId", "in": "path", "required": true, "schema": { "type": "string" } },
+      "ArticleId": { "name": "articleId", "in": "path", "required": true, "schema": { "type": "string" } }
+    },
+    "requestBodies": {
+      "JsonCommand": { "required": true, "content": { "application/json": { "schema": { "type": "object", "additionalProperties": true } } } }
+    },
+    "schemas": {
+      "Error": {
+        "type": "object",
+        "required": ["code", "message", "requestId"],
+        "properties": {
+          "code": { "type": "string" }, "message": { "type": "string" },
+          "fieldErrors": { "type": ["object", "null"], "additionalProperties": { "type": "string" } },
+          "details": { "type": ["object", "null"], "additionalProperties": true },
+          "requestId": { "type": "string" }, "retryable": { "type": "boolean" }
+        }
+      },
+      "ErrorEnvelope": { "type": "object", "required": ["error"], "properties": { "error": { "$ref": "#/components/schemas/Error" } } },
+      "GenericObject": { "type": "object", "additionalProperties": true },
+      "GenericEnvelope": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/GenericObject" }, "meta": { "type": "object", "additionalProperties": true } } },
+      "GenericListEnvelope": { "type": "object", "required": ["data"], "properties": { "data": { "type": "object", "required": ["items"], "properties": { "items": { "type": "array", "items": { "$ref": "#/components/schemas/GenericObject" } }, "nextCursor": { "type": ["string", "null"] }, "total": { "type": "integer", "minimum": 0 } } } } },
+      "Session": { "type": "object", "required": ["accessToken", "expiresAt", "user"], "properties": { "accessToken": { "type": "string" }, "refreshToken": { "type": ["string", "null"] }, "expiresAt": { "type": "string", "format": "date-time" }, "user": { "$ref": "#/components/schemas/GenericObject" } } },
+      "Money": { "type": "object", "required": ["amountPaise", "currency"], "properties": { "amountPaise": { "type": "integer", "minimum": 0 }, "currency": { "const": "INR" } } },
+      "OrderStatus": { "type": "string", "enum": ["PENDING_PAYMENT", "CONFIRMED", "PROCESSING", "PACKED", "READY_TO_SHIP", "SHIPPED", "IN_TRANSIT", "OUT_FOR_DELIVERY", "DELIVERED", "PAYMENT_FAILED", "DELIVERY_FAILED", "CANCELLED"] },
+      "ReturnStatus": { "type": "string", "enum": ["REQUESTED", "APPROVED", "PICKUP_SCHEDULED", "PICKED_UP", "RECEIVED", "QC_PASSED", "QC_FAILED", "REJECTED", "REFUND_INITIATED", "REFUND_COMPLETED", "REPLACEMENT_SHIPPED", "CANCELLED"] },
+      "RefundStatus": { "type": "string", "enum": ["NOT_REQUIRED", "PENDING", "PROCESSING", "SUCCEEDED", "FAILED"] },
+      "PaymentStatus": { "type": "string", "enum": ["CREATED", "REQUIRES_ACTION", "PROCESSING", "SUCCEEDED", "FAILED", "CANCELLED", "UNKNOWN"] },
+      "Payment": { "type": "object", "required": ["id", "checkoutSessionId", "method", "status", "amountPaise", "currency", "providerAction"], "properties": { "id": { "type": "string" }, "checkoutSessionId": { "type": "string" }, "method": { "type": "string", "enum": ["upi", "card", "cod", "wallet"] }, "status": { "$ref": "#/components/schemas/PaymentStatus" }, "amountPaise": { "type": "integer", "minimum": 0 }, "currency": { "const": "INR" }, "providerAction": { "type": "object", "required": ["type", "url"], "properties": { "type": { "type": "string", "enum": ["NONE", "REDIRECT", "UPI_INTENT", "SDK"] }, "url": { "type": ["string", "null"], "format": "uri" }, "returnUrl": { "type": ["string", "null"] } } } } },
+      "Order": { "type": "object", "required": ["id", "placedAt", "status", "items", "totals", "canCancel", "canReturn"], "properties": { "id": { "type": "string" }, "placedAt": { "type": "string", "format": "date-time" }, "status": { "$ref": "#/components/schemas/OrderStatus" }, "items": { "type": "array", "minItems": 1, "items": { "$ref": "#/components/schemas/GenericObject" } }, "totals": { "$ref": "#/components/schemas/GenericObject" }, "canCancel": { "type": "boolean" }, "canReturn": { "type": "boolean" } } },
+      "Product": { "type": "object", "required": ["id", "name", "brand", "imageUrl", "pricePaise", "mrpPaise", "available"], "properties": { "id": { "type": "string" }, "name": { "type": "string" }, "brand": { "type": "string" }, "imageUrl": { "type": "string", "format": "uri" }, "pricePaise": { "type": "integer", "minimum": 0 }, "mrpPaise": { "type": "integer", "minimum": 1 }, "available": { "type": "boolean" } } },
+      "AppConfig": { "type": "object", "required": ["minimumSupportedVersion", "latestVersion", "maintenance", "storeUrls", "featureFlags"], "properties": { "minimumSupportedVersion": { "type": "string" }, "latestVersion": { "type": "string" }, "maintenance": { "type": "object", "required": ["enabled"], "properties": { "enabled": { "type": "boolean" }, "message": { "type": ["string", "null"] } } }, "storeUrls": { "type": "object", "required": ["android", "ios"], "properties": { "android": { "type": "string" }, "ios": { "type": "string" } } }, "featureFlags": { "type": "object", "additionalProperties": { "type": "boolean" } } } }
+    },
+    "responses": {
+      "Error": { "description": "Normalized API error", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+      "ValidationError": { "description": "Request validation failed", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelope" } } } },
+      "Resource": { "description": "Resource envelope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "Command": { "description": "Command result envelope", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "List": { "description": "Cursor-paginated collection", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericListEnvelope" } } } },
+      "Health": { "description": "Service health", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "Session": { "description": "Authenticated session", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Session" } } } } } },
+      "AppConfig": { "description": "Runtime configuration", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/AppConfig" } } } } } },
+      "Product": { "description": "Product", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Product" } } } } } },
+      "Cart": { "description": "Authoritative cart and totals", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "CheckoutSession": { "description": "Expiring authoritative quote", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "Payment": { "description": "Payment intent", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Payment" } } } } } },
+      "Order": { "description": "Order", "content": { "application/json": { "schema": { "type": "object", "required": ["data"], "properties": { "data": { "$ref": "#/components/schemas/Order" } } } } } },
+      "Return": { "description": "Return request", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } },
+      "Wallet": { "description": "Non-withdrawable store-credit wallet", "content": { "application/json": { "schema": { "$ref": "#/components/schemas/GenericEnvelope" } } } }
+    }
+  }
+}

@@ -1,5 +1,13 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  ActivityIndicator,
+  Linking,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -8,69 +16,104 @@ import { StatusBarManager } from '../../../shared/components';
 import { PAYMENT_METHODS } from '../../orders/constants/ordersData';
 import PressableScale from '../../../shared/ui/PressableScale';
 import { haptics } from '../../../utils/haptics';
-import { useWallet } from '../../../contexts/WalletContext';
+import {
+  useGetCheckoutSessionQuery,
+  useUpdateCheckoutPaymentMethodMutation,
+} from '@features/checkout';
+import {
+  useCreateOrderMutation,
+  useCreatePaymentIntentMutation,
+  useLazyGetPaymentQuery,
+} from '../api/payment.query';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
 
 const PaymentMethodScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const wallet = useWallet();
-  const { items = [], address, priceDetails, purpose } = route?.params || {};
-  const isWalletTopUp = purpose === 'WALLET_TOPUP';
-  const methods = isWalletTopUp ? PAYMENT_METHODS.filter((m) => !['wallet', 'cod'].includes(m.id)) : PAYMENT_METHODS;
-  const [selected, setSelected] = useState(methods[0]?.id ?? 'upi');
+  const { checkoutSessionId } = route?.params || {};
+  const {
+    data: checkoutSession,
+    error: checkoutError,
+    isLoading: isLoadingCheckout,
+    refetch,
+  } = useGetCheckoutSessionQuery(checkoutSessionId, { skip: !checkoutSessionId });
+  const methods = PAYMENT_METHODS.filter(method =>
+    checkoutSession?.allowedPaymentMethods.includes(method.id),
+  );
+  const [selected, setSelected] = useState('upi');
   const [placing, setPlacing] = useState(false);
+  const [placementError, setPlacementError] = useState('');
+  const [updateCheckoutPaymentMethod] = useUpdateCheckoutPaymentMethodMutation();
+  const [createPaymentIntent] = useCreatePaymentIntentMutation();
+  const [getPayment] = useLazyGetPaymentQuery();
+  const [createOrder] = useCreateOrderMutation();
 
-  const grandTotal = priceDetails?.grandTotal ?? 0;
-  const method = methods.find((m) => m.id === selected);
+  const grandTotal = checkoutSession?.totals.payable ?? 0;
+  const method = methods.find(m => m.id === selected);
 
-  const handlePlaceOrder = () => {
+  const handlePlaceOrder = async () => {
     haptics.medium();
+    setPlacementError('');
     setPlacing(true);
-    setTimeout(() => {
+    try {
+      await updateCheckoutPaymentMethod({
+        sessionId: checkoutSession.id,
+        paymentMethod: selected,
+      }).unwrap();
+      const intent = await createPaymentIntent({
+        sessionId: checkoutSession.id,
+        method: selected,
+        idempotencyKey: `payment:${checkoutSession.id}:${selected}`,
+      }).unwrap();
+      let payment = intent;
+      if (intent.status === 'REQUIRES_ACTION') {
+        if (!intent.providerAction.url) {
+          throw new Error('The payment provider did not return a secure action URL.');
+        }
+        if (intent.providerAction.type === 'SDK') {
+          throw new Error('This payment method requires a provider SDK that is not enabled.');
+        }
+        await Linking.openURL(intent.providerAction.url);
+      }
+      for (let attempt = 0; payment.status !== 'SUCCEEDED' && attempt < 20; attempt += 1) {
+        if (['FAILED', 'CANCELLED'].includes(payment.status)) break;
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        payment = await getPayment(intent.id, false).unwrap();
+      }
+      if (payment.status !== 'SUCCEEDED') {
+        throw new Error(
+          payment.status === 'FAILED' || payment.status === 'CANCELLED'
+            ? 'The payment was not completed. Choose a method and try again.'
+            : 'Payment confirmation is still pending. You can safely check again.',
+        );
+      }
+      const order = await createOrder({
+        checkoutSessionId: checkoutSession.id,
+        paymentId: payment.id,
+        idempotencyKey: `order:${checkoutSession.id}`,
+      }).unwrap();
       haptics.success();
-
-      if (isWalletTopUp) {
-        wallet?.addMoney(grandTotal, method?.title || 'UPI');
-        setPlacing(false);
-        navigation && navigation.navigate('Wallet');
-        return;
-      }
-
-      if (selected === 'wallet') {
-        wallet?.debit(grandTotal, 'Paid for Order', 'via Wallet');
-      }
-
-      const placedDate = new Date();
-      const order = {
-        id: `ORD-${Math.floor(10000 + Math.random() * 89999)}`,
-        placedOn: placedDate.toLocaleString('en-IN', {
-          day: '2-digit',
-          month: 'short',
-          year: 'numeric',
-          hour: 'numeric',
-          minute: '2-digit',
-        }),
-        date: placedDate.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-        status: 'Confirmed',
-        currentStep: 1,
-        canCancel: true,
-        canReturn: false,
-        paymentMethod: method?.title || 'UPI',
-        deliveryCode: String(Math.floor(1000 + Math.random() * 9000)),
-        address,
-        items,
-        priceDetails,
-        name: items[0]?.name,
-        image: items[0]?.image,
-        price: priceDetails?.grandTotal,
-      };
       setPlacing(false);
       navigation &&
         navigation.reset({
           index: 1,
           routes: [{ name: 'MainTabs' }, { name: 'OrderPlaced', params: { order } }],
         });
-    }, 1400);
+    } catch (requestError) {
+      haptics.warning();
+      setPlacing(false);
+      setPlacementError(
+        requestError.message || 'Payment could not be completed. Please try again.',
+      );
+    }
   };
+
+  if (isLoadingCheckout) {
+    return <FullScreenLoader message="Loading secure checkout..." />;
+  }
+  if (checkoutError || !checkoutSession) {
+    return <ErrorState message={checkoutError?.message} onRetry={refetch} />;
+  }
 
   if (placing) {
     return (
@@ -96,13 +139,13 @@ const PaymentMethodScreen = ({ navigation, route }) => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>{isWalletTopUp ? 'Amount to Add' : 'Amount Payable'}</Text>
+          <Text style={styles.amountLabel}>Amount Payable</Text>
           <Text style={styles.amountValue}>₹{grandTotal}</Text>
         </View>
 
         <Text style={styles.sectionTitle}>Select a payment method</Text>
 
-        {methods.map((m) => (
+        {methods.map(m => (
           <TouchableOpacity
             key={m.id}
             activeOpacity={0.8}
@@ -110,13 +153,18 @@ const PaymentMethodScreen = ({ navigation, route }) => {
             onPress={() => {
               haptics.selection();
               setSelected(m.id);
-            }}>
+            }}
+          >
             <View style={styles.methodIconCircle}>
               <Icon name={m.icon} size={18} color={COLORS.primary} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.methodTitle}>{m.title}</Text>
-              <Text style={styles.methodSubtitle}>{m.id === 'wallet' ? `Balance: ₹${wallet?.balance ?? 0}` : m.subtitle}</Text>
+              <Text style={styles.methodSubtitle}>
+                {m.id === 'wallet'
+                  ? 'Available store credit will be validated at payment'
+                  : m.subtitle}
+              </Text>
             </View>
             <View style={[styles.radio, selected === m.id && styles.radioActive]}>
               {selected === m.id ? <View style={styles.radioDot} /> : null}
@@ -130,6 +178,7 @@ const PaymentMethodScreen = ({ navigation, route }) => {
             100% safe & secure payments. Your information is encrypted end-to-end.
           </Text>
         </View>
+        {placementError ? <Text style={styles.paymentError}>{placementError}</Text> : null}
       </ScrollView>
 
       <View style={[styles.bottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
@@ -272,6 +321,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textTertiary,
     lineHeight: 16,
+  },
+  paymentError: {
+    color: COLORS.error,
+    fontSize: 12.5,
+    marginTop: SPACING.m,
   },
   bottomBar: {
     paddingHorizontal: SPACING.l,

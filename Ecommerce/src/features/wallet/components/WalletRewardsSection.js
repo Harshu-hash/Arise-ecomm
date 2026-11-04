@@ -6,13 +6,18 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 const WalletRewardsSection = ({ title, cards, onPressCard }) => (
   <>
     <Text style={styles.sectionTitle}>{title}</Text>
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.rewardRow}>
-      {cards.map((card) => (
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={styles.rewardRow}
+    >
+      {cards.map(card => (
         <TouchableOpacity
           key={card.id}
           activeOpacity={0.85}
           onPress={() => onPressCard && onPressCard(card)}
-          style={[styles.rewardCard, { backgroundColor: card.bg }]}>
+          style={[styles.rewardCard, { backgroundColor: card.bg }]}
+        >
           <Text style={styles.rewardEmoji}>{card.emoji}</Text>
           <Text style={styles.rewardTitle}>{card.title}</Text>
           <Text style={[styles.rewardSubtitle, { color: card.accent }]}>{card.subtitle}</Text>

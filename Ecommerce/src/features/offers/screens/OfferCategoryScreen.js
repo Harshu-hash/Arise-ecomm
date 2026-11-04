@@ -6,7 +6,10 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager, GradientBackground, MarketProductCard } from '../../../shared/components';
-import { getDealCategoryProducts } from '../data/dealCategoryProducts';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
+import { useGetPromotionProductsQuery } from '../api/offers.api';
 
 const SORT_OPTIONS = [
   { id: 'popular', label: 'Popularity' },
@@ -22,17 +25,6 @@ const DECO_EMOJIS = {
   grocery: ['🛒', '🥬'],
 };
 
-const sortProducts = (products, sortId) => {
-  const copy = [...products];
-  if (sortId === 'priceLow') return copy.sort((a, b) => a.price - b.price);
-  if (sortId === 'priceHigh') return copy.sort((a, b) => b.price - a.price);
-  if (sortId === 'discount') {
-    const pct = (p) => (p.mrp && p.mrp > p.price ? (p.mrp - p.price) / p.mrp : 0);
-    return copy.sort((a, b) => pct(b) - pct(a));
-  }
-  return copy;
-};
-
 const OfferCategoryScreen = ({ navigation, route }) => {
   const category = (route && route.params && route.params.category) || {
     id: 'rakhiEssentials',
@@ -43,8 +35,12 @@ const OfferCategoryScreen = ({ navigation, route }) => {
   };
 
   const [sortId, setSortId] = useState('popular');
-  const rawProducts = useMemo(() => getDealCategoryProducts(category.id), [category.id]);
-  const products = useMemo(() => sortProducts(rawProducts, sortId), [rawProducts, sortId]);
+  const { data, isLoading, error, refetch } = useGetPromotionProductsQuery({
+    promotionId: category.id,
+    sort: sortId,
+  });
+  const rawProducts = useMemo(() => data?.items || [], [data?.items]);
+  const products = rawProducts;
 
   const maxDiscountPct = useMemo(
     () =>
@@ -69,6 +65,11 @@ const OfferCategoryScreen = ({ navigation, route }) => {
   const handlePressProduct = (product) => {
     navigation && navigation.navigate('ProductDetail', { productId: product.id });
   };
+
+  if (isLoading) return <FullScreenLoader message="Loading promotion..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
+  if (!products.length)
+    return <EmptyState icon="tag" title="No eligible offers" message="This promotion has ended." />;
 
   const ListHeader = (
     <View>

@@ -17,7 +17,7 @@ const SECTIONS = [
   },
   {
     title: '3. Data Sharing',
-    body: 'We share data with delivery partners, payment processors, and sellers only as required to fulfil your orders. We do not sell your personal data to third parties.',
+    body: 'We share data with sellers, payment processors, and third-party courier partners only as required to fulfil your orders. We do not sell your personal data to third parties.',
   },
   {
     title: '4. Data Security',

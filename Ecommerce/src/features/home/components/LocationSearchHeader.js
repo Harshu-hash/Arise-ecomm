@@ -4,16 +4,21 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { GradientBackground, TopBrandTabs, CategoryTabStrip, AnimatedSearchPlaceholder, DribbleFlipImage } from '../../../shared/components';
-import { BRAND_TABS, CATEGORY_TABS, SEARCH_PLACEHOLDERS } from '../data/homeData';
+import {
+  GradientBackground,
+  TopBrandTabs,
+  CategoryTabStrip,
+  AnimatedSearchPlaceholder,
+  DribbleFlipImage,
+} from '../../../shared/components';
 
 const DEFAULT_TOP_PORTION_HEIGHT = 100;
 const DEFAULT_REST_HEIGHT = 132; // search bar + category strip + their margins/padding
 const DEFAULT_GRADIENT = ['#FFCB9D', '#FFFFFF'];
 const GRADIENT_FADE_DURATION = 380;
 
-const getGradientForCategory = (categoryId) =>
-  CATEGORY_TABS.find((tab) => tab.id === categoryId)?.gradient || DEFAULT_GRADIENT;
+const getGradientForCategory = (categoryTabs, categoryId) =>
+  categoryTabs.find(tab => tab.id === categoryId)?.gradient || DEFAULT_GRADIENT;
 
 /**
  * Home top zone: campaign gradient + brand tabs + location row + search bar + category strip.
@@ -32,10 +37,13 @@ const LocationSearchHeader = ({
   onWalletPress,
   activeCategoryId,
   onSelectCategory,
-  activeBrandId = 'flipkart',
+  activeBrandId = 'arise',
   onBrandSelect,
   scrollY,
   onHeaderHeight,
+  brandTabs,
+  categoryTabs,
+  searchPlaceholders,
 }) => {
   const insets = useSafeAreaInsets();
   const topPaddingValue = Math.max(insets.top, 12);
@@ -44,12 +52,14 @@ const LocationSearchHeader = ({
   const measuredTopRef = useRef(false);
   const measuredRestRef = useRef(false);
 
-  const [baseGradient, setBaseGradient] = useState(() => getGradientForCategory(activeCategoryId));
+  const [baseGradient, setBaseGradient] = useState(() =>
+    getGradientForCategory(categoryTabs, activeCategoryId),
+  );
   const [incomingGradient, setIncomingGradient] = useState(null);
   const gradientFade = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const nextGradient = getGradientForCategory(activeCategoryId);
+    const nextGradient = getGradientForCategory(categoryTabs, activeCategoryId);
     if (nextGradient[0] === baseGradient[0] && nextGradient[1] === baseGradient[1]) return;
 
     setIncomingGradient(nextGradient);
@@ -89,13 +99,13 @@ const LocationSearchHeader = ({
     extrapolate: 'clamp',
   });
 
-  const handleTopPortionLayout = (e) => {
+  const handleTopPortionLayout = e => {
     if (measuredTopRef.current) return;
     measuredTopRef.current = true;
     setTopPortionHeight(e.nativeEvent.layout.height);
   };
 
-  const handleRestLayout = (e) => {
+  const handleRestLayout = e => {
     if (measuredRestRef.current) return;
     measuredRestRef.current = true;
     setRestHeight(e.nativeEvent.layout.height);
@@ -112,12 +122,18 @@ const LocationSearchHeader = ({
 
       <View style={{ paddingTop: topPaddingValue }}>
         <Animated.View onLayout={handleTopPortionLayout} style={{ opacity: topPortionOpacity }}>
-          <TopBrandTabs tabs={BRAND_TABS} activeId={activeBrandId} onSelect={onBrandSelect} />
+          <TopBrandTabs tabs={brandTabs} activeId={activeBrandId} onSelect={onBrandSelect} />
 
           <View style={styles.locationRow}>
-            <TouchableOpacity activeOpacity={0.8} onPress={onAddressPress} style={styles.addressBtn}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              onPress={onAddressPress}
+              style={styles.addressBtn}
+            >
               <Icon name="map-pin" size={15} color={COLORS.textPrimary} />
-              <Text style={styles.addressText} numberOfLines={1}>{address}</Text>
+              <Text style={styles.addressText} numberOfLines={1}>
+                {address}
+              </Text>
               <Icon name="chevron-down" size={14} color={COLORS.textPrimary} />
             </TouchableOpacity>
             <TouchableOpacity activeOpacity={0.8} onPress={onCouponPress} style={styles.couponPill}>
@@ -139,14 +155,27 @@ const LocationSearchHeader = ({
 
         <View onLayout={handleRestLayout} style={styles.restBlock}>
           <TouchableOpacity activeOpacity={0.9} onPress={onSearchPress} style={styles.searchBar}>
-            <Icon name="search" size={18} color={COLORS.textSecondary} style={{ marginRight: SPACING.s }} />
-            <AnimatedSearchPlaceholder phrases={SEARCH_PLACEHOLDERS} style={styles.searchPlaceholder} />
-            <Icon name="camera" size={17} color={COLORS.textSecondary} style={{ marginRight: SPACING.s }} />
+            <Icon
+              name="search"
+              size={18}
+              color={COLORS.textSecondary}
+              style={{ marginRight: SPACING.s }}
+            />
+            <AnimatedSearchPlaceholder
+              phrases={searchPlaceholders}
+              style={styles.searchPlaceholder}
+            />
+            <Icon
+              name="camera"
+              size={17}
+              color={COLORS.textSecondary}
+              style={{ marginRight: SPACING.s }}
+            />
             <Icon name="mic" size={17} color={COLORS.textSecondary} />
           </TouchableOpacity>
 
           <CategoryTabStrip
-            tabs={CATEGORY_TABS}
+            tabs={categoryTabs}
             activeId={activeCategoryId}
             onSelect={onSelectCategory}
             style={styles.categoryStrip}

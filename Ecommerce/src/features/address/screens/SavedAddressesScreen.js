@@ -1,41 +1,50 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-
-const ADDRESSES = [
-  {
-    id: 'a1',
-    label: 'Home',
-    isDefault: true,
-    name: 'Harshvardhan Panchal',
-    line: '221B Baker Street, Sector 12, Near City Mall',
-    cityLine: 'Ahmedabad, Gujarat - 380015',
-    phone: '+91 98765 43210',
-  },
-  {
-    id: 'a2',
-    label: 'Work',
-    isDefault: false,
-    name: 'Harshvardhan Panchal',
-    line: '4th Floor, Tech Park One, SG Highway',
-    cityLine: 'Ahmedabad, Gujarat - 380054',
-    phone: '+91 98765 43210',
-  },
-];
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useDeleteAddressMutation,
+  useGetAddressesQuery,
+  useMakeDefaultAddressMutation,
+} from '../api/address.query';
 
 const SavedAddressesScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const selectMode = route?.params?.selectMode;
   const returnScreen = route?.params?.returnScreen || 'Checkout';
+  const toast = useToast();
+  const { data, error, isLoading, isFetching, refetch } = useGetAddressesQuery();
+  const [deleteAddress] = useDeleteAddressMutation();
+  const [makeDefaultAddress] = useMakeDefaultAddressMutation();
+  const addresses = data?.items ?? [];
 
-  const handleSelect = (address) => {
+  const handleSelect = address => {
     if (!navigation) return;
-    navigation.navigate({ name: returnScreen, params: { selectedAddress: address }, merge: true });
+    navigation.navigate({
+      name: returnScreen,
+      params: { selectedAddressId: address.id },
+      merge: true,
+    });
   };
+
+  const runMutation = async (request, successMessage) => {
+    try {
+      await request.unwrap();
+      if (successMessage) toast.show(successMessage);
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not update this address.');
+    }
+  };
+
+  if (isLoading) return <FullScreenLoader message="Loading addresses..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -45,24 +54,47 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{selectMode ? 'Select Delivery Address' : 'Saved Addresses'}</Text>
+        <Text style={styles.headerTitle}>
+          {selectMode ? 'Select Delivery Address' : 'Saved Addresses'}
+        </Text>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetch}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.addBtn}
-          onPress={() => navigation && navigation.navigate('AddEditAddress')}>
+          onPress={() => navigation && navigation.navigate('AddEditAddress')}
+        >
           <Icon name="plus" size={17} color={COLORS.primary} />
           <Text style={styles.addBtnText}>Add New Address</Text>
         </TouchableOpacity>
 
-        {ADDRESSES.map((address) => (
+        {!addresses.length ? (
+          <EmptyState
+            icon="map-pin"
+            title="No saved addresses"
+            message="Add an address to see delivery availability and continue to checkout."
+          />
+        ) : null}
+
+        {addresses.map(address => (
           <TouchableOpacity
             key={address.id}
             activeOpacity={selectMode ? 0.8 : 1}
             style={styles.card}
-            onPress={selectMode ? () => handleSelect(address) : undefined}>
+            onPress={selectMode ? () => handleSelect(address) : undefined}
+          >
             <View style={styles.cardTopRow}>
               <View style={styles.labelPill}>
                 <Text style={styles.labelPillText}>{address.label}</Text>
@@ -83,7 +115,8 @@ const SavedAddressesScreen = ({ navigation, route }) => {
               <TouchableOpacity
                 activeOpacity={0.85}
                 style={styles.deliverHereBtn}
-                onPress={() => handleSelect(address)}>
+                onPress={() => handleSelect(address)}
+              >
                 <Text style={styles.deliverHereText}>Deliver Here</Text>
               </TouchableOpacity>
             ) : (
@@ -91,11 +124,28 @@ const SavedAddressesScreen = ({ navigation, route }) => {
                 <TouchableOpacity
                   activeOpacity={0.7}
                   style={styles.actionBtn}
-                  onPress={() => navigation && navigation.navigate('AddEditAddress', { address })}>
+                  onPress={() => navigation && navigation.navigate('AddEditAddress', { address })}
+                >
                   <Icon name="edit-2" size={14} color={COLORS.primary} />
                   <Text style={styles.actionText}>Edit</Text>
                 </TouchableOpacity>
-                <TouchableOpacity activeOpacity={0.7} style={styles.actionBtn}>
+                {!address.isDefault ? (
+                  <TouchableOpacity
+                    activeOpacity={0.7}
+                    style={styles.actionBtn}
+                    onPress={() =>
+                      runMutation(makeDefaultAddress(address.id), 'Default address updated')
+                    }
+                  >
+                    <Icon name="check-circle" size={14} color={COLORS.success} />
+                    <Text style={[styles.actionText, { color: COLORS.success }]}>Make default</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <TouchableOpacity
+                  activeOpacity={0.7}
+                  style={styles.actionBtn}
+                  onPress={() => runMutation(deleteAddress(address.id), 'Address removed')}
+                >
                   <Icon name="trash-2" size={14} color={COLORS.error} />
                   <Text style={[styles.actionText, { color: COLORS.error }]}>Remove</Text>
                 </TouchableOpacity>

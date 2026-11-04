@@ -5,55 +5,63 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { BottomSheetModal } from '../../../shared/components';
 import { haptics } from '../../../utils/haptics';
-import { useCart } from '../../../contexts/CartContext';
-
-export const COUPONS = [
-  { code: 'FLAT50', desc: 'Flat ₹50 off on orders above ₹500', amount: 50, minOrder: 500 },
-  { code: 'WELCOME10', desc: '10% off up to ₹150 for new customers', amount: 150, minOrder: 300 },
-  { code: 'SAVE20', desc: 'Flat ₹20 off, no minimum order', amount: 20, minOrder: 0 },
-];
+import {
+  useApplyCartCouponMutation,
+  useGetCartQuery,
+  useGetEligibleCouponsQuery,
+  useRemoveCartCouponMutation,
+} from '../api/cart.query';
 
 /**
  * The "Apply Coupon" row + picker sheet, shared by Cart and Checkout so a
- * coupon applied in either screen is visible in both (backed by CartContext).
+ * coupon applied in either screen is visible in both through the cart API cache.
  */
-export default function CouponSection({ itemTotal }) {
-  const { appliedCoupon, applyCoupon, clearCoupon } = useCart();
+export default function CouponSection({ cartId }) {
+  const { data: cart } = useGetCartQuery();
+  const { data: eligibleCoupons = [], isFetching } = useGetEligibleCouponsQuery(cartId, {
+    skip: !cartId,
+  });
+  const [applyCartCoupon, { isLoading: isApplying }] = useApplyCartCouponMutation();
+  const [removeCartCoupon, { isLoading: isRemoving }] = useRemoveCartCouponMutation();
+  const appliedCoupon = cart?.appliedCoupon;
   const [visible, setVisible] = useState(false);
   const [input, setInput] = useState('');
   const [error, setError] = useState('');
 
-  const tryApply = (coupon) => {
-    if (itemTotal < coupon.minOrder) {
+  const tryApply = async coupon => {
+    try {
+      await applyCartCoupon(coupon.code).unwrap();
+      haptics.success();
+      setError('');
+      setVisible(false);
+    } catch (mutationError) {
       haptics.warning();
-      setError(`Add ₹${coupon.minOrder - itemTotal} more to use this coupon`);
-      return;
+      setError(mutationError.message || 'This coupon could not be applied.');
     }
-    haptics.success();
-    applyCoupon(coupon);
-    setError('');
-    setVisible(false);
   };
 
   const applyTyped = () => {
-    const match = COUPONS.find((c) => c.code === input.trim().toUpperCase());
-    if (!match) {
-      setError('Invalid coupon code');
-      return;
-    }
-    tryApply(match);
+    const code = input.trim().toUpperCase();
+    const match = eligibleCoupons.find(coupon => coupon.code === code);
+    tryApply(match || { code });
   };
 
   return (
     <View style={styles.sectionCard}>
-      <TouchableOpacity activeOpacity={0.8} style={styles.couponRow} onPress={() => setVisible(true)}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        style={styles.couponRow}
+        onPress={() => setVisible(true)}
+      >
         <View style={[styles.couponIconCircle, appliedCoupon && styles.couponIconCircleActive]}>
           <Icon name="tag" size={15} color={appliedCoupon ? COLORS.white : COLORS.ratingGreen} />
         </View>
         {appliedCoupon ? (
           <View style={{ flex: 1, marginLeft: SPACING.m }}>
             <Text style={styles.couponApplied}>{`'${appliedCoupon.code}' applied`}</Text>
-            <Text style={styles.couponSavedText}>{`You saved ₹${appliedCoupon.amount} on this order`}</Text>
+            <Text
+              style={styles.couponSavedText}
+            >{`You saved ₹${appliedCoupon.amount} on this order`}</Text>
           </View>
         ) : (
           <View style={{ flex: 1, marginLeft: SPACING.m }}>
@@ -62,7 +70,17 @@ export default function CouponSection({ itemTotal }) {
           </View>
         )}
         {appliedCoupon ? (
-          <TouchableOpacity onPress={() => { clearCoupon(); setError(''); }}>
+          <TouchableOpacity
+            disabled={isRemoving}
+            onPress={async () => {
+              try {
+                await removeCartCoupon().unwrap();
+                setError('');
+              } catch (mutationError) {
+                setError(mutationError.message || 'Could not remove this coupon.');
+              }
+            }}
+          >
             <Text style={styles.couponRemove}>Remove</Text>
           </TouchableOpacity>
         ) : (
@@ -78,12 +96,19 @@ export default function CouponSection({ itemTotal }) {
             <TextInput
               style={styles.couponInput}
               value={input}
-              onChangeText={(t) => { setInput(t); setError(''); }}
+              onChangeText={t => {
+                setInput(t);
+                setError('');
+              }}
               placeholder="Enter coupon code"
               placeholderTextColor={COLORS.textTertiary}
               autoCapitalize="characters"
             />
-            <TouchableOpacity style={styles.couponApplyBtn} onPress={applyTyped}>
+            <TouchableOpacity
+              disabled={isApplying || !input.trim()}
+              style={styles.couponApplyBtn}
+              onPress={applyTyped}
+            >
               <Text style={styles.couponApplyText}>Apply</Text>
             </TouchableOpacity>
           </View>
@@ -94,9 +119,16 @@ export default function CouponSection({ itemTotal }) {
             </View>
           ) : null}
 
-          <Text style={styles.sheetSubtitle}>Available Coupons</Text>
-          {COUPONS.map((coupon) => (
-            <TouchableOpacity key={coupon.code} activeOpacity={0.8} style={styles.couponCard} onPress={() => tryApply(coupon)}>
+          <Text style={styles.sheetSubtitle}>
+            {isFetching ? 'Loading available coupons...' : 'Available Coupons'}
+          </Text>
+          {eligibleCoupons.map(coupon => (
+            <TouchableOpacity
+              key={coupon.code}
+              activeOpacity={0.8}
+              style={styles.couponCard}
+              onPress={() => tryApply(coupon)}
+            >
               <View style={styles.couponCardIconCircle}>
                 <Icon name="tag" size={16} color={COLORS.ratingGreen} />
               </View>

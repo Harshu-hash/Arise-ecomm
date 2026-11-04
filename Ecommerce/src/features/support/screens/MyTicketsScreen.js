@@ -1,176 +1,127 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { FlatList, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { MOCK_TICKETS } from '../constants/helpData';
-
-const STATUS_STYLES = {
-  Open: { bg: COLORS.offerRedLight, text: COLORS.offerRed },
-  'In Progress': { bg: COLORS.primaryLight, text: COLORS.primary },
-  Resolved: { bg: COLORS.ratingGreenBg, text: COLORS.ratingGreen },
-};
-
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
+import { useGetTicketsQuery } from '../api/support.api';
 const MyTicketsScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-
+  const insets = useSafeAreaInsets(),
+    query = useGetTicketsQuery({ limit: 30 });
+  if (query.isLoading) return <FullScreenLoader message="Loading support tickets..." />;
+  if (query.error)
+    return (
+      <ErrorState
+        title="Could not load tickets"
+        message={query.error.message}
+        onRetry={query.refetch}
+      />
+    );
+  const items = query.data.items;
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>My Support Tickets</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {MOCK_TICKETS.length === 0 ? (
-          <View style={styles.emptyBox}>
-            <Icon name="inbox" size={32} color={COLORS.textTertiary} />
-            <Text style={styles.emptyText}>You haven't raised any tickets yet.</Text>
-          </View>
-        ) : (
-          MOCK_TICKETS.map((ticket) => {
-            const statusStyle = STATUS_STYLES[ticket.status] || STATUS_STYLES.Open;
-            return (
-              <TouchableOpacity
-                key={ticket.id}
-                activeOpacity={0.8}
-                style={styles.card}
-                onPress={() => navigation && navigation.navigate('TicketDetail', { ticketId: ticket.id })}>
-                <View style={styles.cardTopRow}>
-                  <Text style={styles.ticketId}>#{ticket.id}</Text>
-                  <View style={[styles.statusPill, { backgroundColor: statusStyle.bg }]}>
-                    <Text style={[styles.statusText, { color: statusStyle.text }]}>{ticket.status}</Text>
-                  </View>
-                </View>
-                <Text style={styles.subject}>{ticket.subject}</Text>
-                <Text style={styles.description} numberOfLines={2}>{ticket.description}</Text>
-                <View style={styles.cardBottomRow}>
-                  <Text style={styles.metaText}>Order {ticket.orderId}</Text>
-                  <Text style={styles.metaText}>{ticket.createdOn}</Text>
-                </View>
-              </TouchableOpacity>
-            );
-          })
+      <FlatList
+        data={items}
+        keyExtractor={item => item.id}
+        contentContainerStyle={items.length ? styles.list : styles.emptyList}
+        refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={query.refetch} />}
+        ListEmptyComponent={
+          <EmptyState
+            icon="inbox"
+            title="No support tickets"
+            message="Tickets you raise will appear here."
+          />
+        }
+        ListFooterComponent={
+          <TouchableOpacity
+            style={styles.newButton}
+            onPress={() => navigation.navigate('RaiseTicket', {})}
+          >
+            <Icon name="plus" size={16} color={COLORS.primary} />
+            <Text style={styles.newText}>Raise a New Ticket</Text>
+          </TouchableOpacity>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
+            style={styles.card}
+            onPress={() => navigation.navigate('TicketDetail', { ticketId: item.id })}
+          >
+            <View style={styles.top}>
+              <Text style={styles.id}>#{item.id}</Text>
+              <Text style={styles.status}>{item.statusLabel}</Text>
+            </View>
+            <Text style={styles.subject}>{item.subjectLabel}</Text>
+            <Text style={styles.description} numberOfLines={2}>
+              {item.description}
+            </Text>
+            <View style={styles.meta}>
+              <Text style={styles.metaText}>
+                {item.orderId ? `Order ${item.orderId}` : 'Account issue'}
+              </Text>
+              <Text style={styles.metaText}>{item.createdOn}</Text>
+            </View>
+          </TouchableOpacity>
         )}
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.newTicketBtn}
-          onPress={() => navigation && navigation.navigate('RaiseTicket', {})}>
-          <Icon name="plus" size={16} color={COLORS.primary} />
-          <Text style={styles.newTicketBtnText}>Raise a New Ticket</Text>
-        </TouchableOpacity>
-      </ScrollView>
+      />
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  emptyBox: {
-    alignItems: 'center',
-    paddingVertical: SPACING.xxxl,
-  },
-  emptyText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.m,
-  },
+  headerTitle: { fontSize: 19, fontWeight: '600', color: COLORS.textPrimary },
+  list: { padding: SPACING.l },
+  emptyList: { flexGrow: 1, padding: SPACING.l },
   card: {
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.m,
     padding: SPACING.l,
-    marginBottom: SPACING.l,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.s,
-  },
-  ticketId: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  statusPill: {
-    borderRadius: RADIUS.xs,
-    paddingHorizontal: SPACING.s,
-    paddingVertical: 3,
-  },
-  statusText: {
-    fontSize: 10.5,
-    fontWeight: '700',
-  },
-  subject: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  description: {
-    fontSize: 12.5,
-    color: COLORS.textSecondary,
-    lineHeight: 17,
     marginBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  cardBottomRow: {
+  top: { flexDirection: 'row', justifyContent: 'space-between' },
+  id: { fontSize: 12, fontWeight: '700', color: COLORS.textPrimary },
+  status: { fontSize: 11, fontWeight: '700', color: COLORS.primary },
+  subject: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.s },
+  description: { fontSize: 12.5, color: COLORS.textSecondary, lineHeight: 17, marginTop: 4 },
+  meta: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
+    marginTop: SPACING.m,
     paddingTop: SPACING.s,
   },
-  metaText: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-  },
-  newTicketBtn: {
+  metaText: { fontSize: 10.5, color: COLORS.textTertiary },
+  newButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: SPACING.s,
     borderWidth: 1,
     borderColor: COLORS.primary,
     borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    gap: SPACING.s,
-    marginTop: SPACING.s,
+    padding: SPACING.m,
   },
-  newTicketBtnText: {
-    fontSize: 13.5,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
+  newText: { color: COLORS.primary, fontWeight: '700' },
 });
-
 export default MyTicketsScreen;

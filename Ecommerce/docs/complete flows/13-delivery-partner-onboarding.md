@@ -1,8 +1,10 @@
 # Delivery Partner Onboarding
 
+> **Out of scope for Arise v1.** Arise is a Flipkart-type marketplace. Last-mile delivery will use third-party courier partners later. A first-party rider app is not part of the product. Keep this chapter only as historical notes.
+
 ## What Is This?
 
-Before someone can deliver orders on the platform, they must sign up, upload required documents, get admin approval, and set up their profile. This document explains the full delivery partner onboarding process.
+This historical chapter described first-party rider sign-up. It is **not** the fulfilment model. Courier onboarding, if needed, will be defined when third-party logistics is integrated.
 
 ---
 

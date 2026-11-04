@@ -1,12 +1,26 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, FlatList, useWindowDimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  useWindowDimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { BottomSheetModal } from '../../../shared/components';
 
-const AddressSelectSheet = ({ visible, onClose, addresses, selectedId, onSelectAddress, onAddNew }) => {
+const AddressSelectSheet = ({
+  visible,
+  onClose,
+  addresses,
+  selectedId,
+  onSelectAddress,
+  onAddNew,
+}) => {
   const insets = useSafeAreaInsets();
   const { height: windowHeight } = useWindowDimensions();
 
@@ -32,7 +46,7 @@ const AddressSelectSheet = ({ visible, onClose, addresses, selectedId, onSelectA
 
       <FlatList
         data={addresses}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         style={{ maxHeight: windowHeight * 0.5 }}
         contentContainerStyle={{ paddingBottom: Math.max(insets.bottom, SPACING.l) }}
         showsVerticalScrollIndicator={false}
@@ -42,14 +56,21 @@ const AddressSelectSheet = ({ visible, onClose, addresses, selectedId, onSelectA
             <TouchableOpacity
               activeOpacity={0.8}
               onPress={() => onSelectAddress(item)}
-              style={[styles.addressRow, isSelected && styles.addressRowSelected]}>
+              style={[styles.addressRow, isSelected && styles.addressRowSelected]}
+            >
               <View style={[styles.addressIcon, isSelected && styles.addressIconSelected]}>
-                <Icon name={item.icon || 'map-pin'} size={16} color={isSelected ? COLORS.white : COLORS.textSecondary} />
+                <Icon
+                  name={item.icon || 'map-pin'}
+                  size={16}
+                  color={isSelected ? COLORS.white : COLORS.textSecondary}
+                />
               </View>
 
               <View style={styles.addressTextBlock}>
                 <Text style={styles.addressLabel}>{item.label}</Text>
-                <Text style={styles.addressLine} numberOfLines={2}>{item.address}</Text>
+                <Text style={styles.addressLine} numberOfLines={2}>
+                  {item.address}
+                </Text>
               </View>
 
               <View style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}>

@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'brands'.
+export { useGetBrandsQuery, useLazyGetBrandsQuery } from './brands.api';

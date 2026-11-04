@@ -1,20 +1,44 @@
 import React, { useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Animated, Easing } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Animated,
+  Easing,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { ORDER_JOURNEY_STEPS, ORDER_STATUS } from '../constants/ordersData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetOrderQuery, useGetOrderTimelineQuery } from '../api/orders.query';
 
 /** Press feedback wrapper: scales down on press-in, springs back on release. */
 const Bouncy = ({ onPress, style, wrapperStyle, children }) => {
   const scale = useRef(new Animated.Value(1)).current;
-  const pressIn = () => Animated.spring(scale, { toValue: 0.92, useNativeDriver: true, speed: 60, bounciness: 0 }).start();
-  const pressOut = () => Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 24, bounciness: 9 }).start();
+  const pressIn = () =>
+    Animated.spring(scale, {
+      toValue: 0.92,
+      useNativeDriver: true,
+      speed: 60,
+      bounciness: 0,
+    }).start();
+  const pressOut = () =>
+    Animated.spring(scale, { toValue: 1, useNativeDriver: true, speed: 24, bounciness: 9 }).start();
   return (
     <Animated.View style={[wrapperStyle, { transform: [{ scale }] }]}>
-      <TouchableOpacity activeOpacity={0.85} onPress={onPress} onPressIn={pressIn} onPressOut={pressOut} style={style}>
+      <TouchableOpacity
+        activeOpacity={0.85}
+        onPress={onPress}
+        onPressIn={pressIn}
+        onPressOut={pressOut}
+        style={style}
+      >
         {children}
       </TouchableOpacity>
     </Animated.View>
@@ -23,54 +47,57 @@ const Bouncy = ({ onPress, style, wrapperStyle, children }) => {
 
 const OrderDetailScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const order = route?.params?.order;
+  const orderId = route?.params?.orderId || route?.params?.order?.id;
+  const { data: order, error, isLoading, refetch } = useGetOrderQuery(orderId, { skip: !orderId });
+  const { data: timeline = [] } = useGetOrderTimelineQuery(orderId, { skip: !orderId });
 
   // Staggered section entrance on mount.
   const cardAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
   // Journey steps cascade in one-by-one, like the timeline drawing itself.
-  const stepAnims = useRef(ORDER_JOURNEY_STEPS.map(() => new Animated.Value(0))).current;
+  const stepAnims = useRef(Array.from({ length: 8 }, () => new Animated.Value(0))).current;
 
   useEffect(() => {
     Animated.stagger(
       90,
-      cardAnims.map((v) =>
-        Animated.timing(v, { toValue: 1, duration: 420, easing: Easing.out(Easing.cubic), useNativeDriver: true })
-      )
+      cardAnims.map(v =>
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 420,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ),
     ).start();
 
     Animated.stagger(
       90,
-      stepAnims.map((v) =>
-        Animated.timing(v, { toValue: 1, duration: 340, delay: 120, easing: Easing.out(Easing.cubic), useNativeDriver: true })
-      )
+      stepAnims.map(v =>
+        Animated.timing(v, {
+          toValue: 1,
+          duration: 340,
+          delay: 120,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ),
     ).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const cardStyle = (v) => ({
+  const cardStyle = v => ({
     opacity: v,
     transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [18, 0] }) }],
   });
-  const stepRowStyle = (v) => ({
+  const stepRowStyle = v => ({
     opacity: v,
     transform: [{ translateX: v.interpolate({ inputRange: [0, 1], outputRange: [-14, 0] }) }],
   });
 
-  if (!order) {
-    return (
-      <View style={styles.container}>
-        <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-        <View style={styles.emptyWrap}>
-          <Icon name="alert-circle" size={40} color={COLORS.border} />
-          <Text style={styles.emptyText}>Order not found</Text>
-        </View>
-      </View>
-    );
-  }
+  if (isLoading) return <FullScreenLoader message="Loading order..." />;
+  if (error || !order)
+    return <ErrorState title="Order not found" message={error?.message} onRetry={refetch} />;
 
-  const isCancelled = order.status === ORDER_STATUS.CANCELLED;
-  const isReturned = order.status === ORDER_STATUS.RETURNED;
-  const currentStep = order.currentStep || 1;
+  const isCancelled = order.statusCode === 'CANCELLED';
   const price = order.priceDetails || {};
 
   return (
@@ -85,7 +112,10 @@ const OrderDetailScreen = ({ navigation, route }) => {
           <Text style={styles.headerTitle}>{order.id}</Text>
           <Text style={styles.headerSubtitle}>{order.placedOn || order.date}</Text>
         </View>
-        <Bouncy onPress={() => navigation && navigation.navigate('OrderIssue', { order })} style={styles.helpBtn}>
+        <Bouncy
+          onPress={() => navigation && navigation.navigate('OrderIssue', { order })}
+          style={styles.helpBtn}
+        >
           <Icon name="help-circle" size={18} color={COLORS.primary} />
           <Text style={styles.helpBtnText}>Help</Text>
         </Bouncy>
@@ -93,25 +123,31 @@ const OrderDetailScreen = ({ navigation, route }) => {
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Status */}
-        {isCancelled || isReturned ? (
+        {isCancelled ? (
           <Animated.View style={[styles.statusBanner, cardStyle(cardAnims[0])]}>
-            <Icon name={isCancelled ? 'x-circle' : 'rotate-ccw'} size={20} color={COLORS.error} />
-            <Text style={styles.statusBannerText}>
-              {isCancelled ? 'This order was cancelled' : 'This order was returned'}
-            </Text>
+            <Icon name="x-circle" size={20} color={COLORS.error} />
+            <Text style={styles.statusBannerText}>This order was cancelled</Text>
           </Animated.View>
         ) : (
           <Animated.View style={[styles.stepperCard, cardStyle(cardAnims[0])]}>
             <Text style={styles.stepperTitle}>Order Journey</Text>
-            {ORDER_JOURNEY_STEPS.map((step, idx) => {
-              const stepNum = idx + 1;
-              const completed = stepNum < currentStep || order.status === ORDER_STATUS.DELIVERED;
-              const active = stepNum === currentStep && order.status !== ORDER_STATUS.DELIVERED;
-              const isLast = idx === ORDER_JOURNEY_STEPS.length - 1;
+            {(timeline.length ? timeline : order.timeline).map((event, idx, events) => {
+              const completed = event.completed;
+              const active = event.active;
+              const isLast = idx === events.length - 1;
               return (
-                <Animated.View key={step} style={[styles.stepItem, stepRowStyle(stepAnims[idx])]}>
+                <Animated.View
+                  key={event.id}
+                  style={[styles.stepItem, stepRowStyle(stepAnims[idx])]}
+                >
                   <View style={styles.stepIndicatorColumn}>
-                    <View style={[styles.stepDot, completed && styles.stepDotCompleted, active && styles.stepDotActive]}>
+                    <View
+                      style={[
+                        styles.stepDot,
+                        completed && styles.stepDotCompleted,
+                        active && styles.stepDotActive,
+                      ]}
+                    >
                       <Icon
                         name={completed ? 'check' : active ? 'zap' : 'circle'}
                         size={11}
@@ -122,17 +158,22 @@ const OrderDetailScreen = ({ navigation, route }) => {
                       <View style={[styles.stepLine, completed && styles.stepLineCompleted]} />
                     ) : null}
                   </View>
-                  <Text style={[styles.stepTitle, (completed || active) && styles.stepTitleHighlighted]}>
-                    {step}
+                  <Text
+                    style={[styles.stepTitle, (completed || active) && styles.stepTitleHighlighted]}
+                  >
+                    {event.label}
                   </Text>
                 </Animated.View>
               );
             })}
 
-            {order.status !== ORDER_STATUS.DELIVERED ? (
-              <Bouncy style={styles.trackBtn} onPress={() => navigation && navigation.navigate('Tracking')}>
+            {order.statusCode !== 'DELIVERED' ? (
+              <Bouncy
+                style={styles.trackBtn}
+                onPress={() => navigation && navigation.navigate('Tracking', { orderId: order.id })}
+              >
                 <Icon name="map-pin" size={15} color={COLORS.white} />
-                <Text style={styles.trackBtnText}>Track on Map</Text>
+                <Text style={styles.trackBtnText}>Track Shipment</Text>
               </Bouncy>
             ) : null}
           </Animated.View>
@@ -141,15 +182,28 @@ const OrderDetailScreen = ({ navigation, route }) => {
         {/* Items */}
         <Animated.View style={[styles.sectionCard, cardStyle(cardAnims[1])]}>
           <Text style={styles.sectionTitle}>Items ({order.items.length})</Text>
-          {order.items.map((item) => (
+          {order.items.map(item => (
             <View key={item.id} style={styles.itemRow}>
               <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.itemName} numberOfLines={2}>
+                  {item.name}
+                </Text>
                 {item.variant ? <Text style={styles.itemVariant}>{item.variant}</Text> : null}
                 <Text style={styles.itemQty}>Qty: {item.qty}</Text>
               </View>
-              <Text style={styles.itemPrice}>₹{item.price * item.qty}</Text>
+              <View style={styles.itemEnd}>
+                <Text style={styles.itemPrice}>₹{item.price * item.qty}</Text>
+                {order.statusCode === 'DELIVERED' ? (
+                  <TouchableOpacity
+                    onPress={() => navigation.navigate('WriteReview', { orderItemId: item.id })}
+                    style={styles.reviewItemBtn}
+                  >
+                    <Icon name="star" size={12} color={COLORS.primary} />
+                    <Text style={styles.reviewItemText}>Rate</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
             </View>
           ))}
         </Animated.View>
@@ -176,12 +230,16 @@ const OrderDetailScreen = ({ navigation, route }) => {
           {price.discount ? (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Discount</Text>
-              <Text style={[styles.priceValue, { color: COLORS.ratingGreen }]}>-₹{price.discount}</Text>
+              <Text style={[styles.priceValue, { color: COLORS.ratingGreen }]}>
+                -₹{price.discount}
+              </Text>
             </View>
           ) : null}
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Delivery Fee</Text>
-            <Text style={styles.priceValue}>{price.deliveryFee ? `₹${price.deliveryFee}` : 'FREE'}</Text>
+            <Text style={styles.priceValue}>
+              {price.deliveryFee ? `₹${price.deliveryFee}` : 'FREE'}
+            </Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Platform Fee</Text>
@@ -204,7 +262,10 @@ const OrderDetailScreen = ({ navigation, route }) => {
             <Bouncy
               style={styles.outlineBtn}
               wrapperStyle={styles.outlineBtnWrapper}
-              onPress={() => navigation && navigation.navigate('CancelOrder', { order })}>
+              onPress={() =>
+                navigation && navigation.navigate('CancelOrder', { orderId: order.id })
+              }
+            >
               <Text style={[styles.outlineBtnText, { color: COLORS.error }]}>Cancel Order</Text>
             </Bouncy>
           ) : null}
@@ -212,14 +273,18 @@ const OrderDetailScreen = ({ navigation, route }) => {
             <Bouncy
               style={styles.outlineBtn}
               wrapperStyle={styles.outlineBtnWrapper}
-              onPress={() => navigation && navigation.navigate('ReturnReplace', { order })}>
+              onPress={() =>
+                navigation && navigation.navigate('ReturnReplace', { orderId: order.id })
+              }
+            >
               <Text style={styles.outlineBtnText}>Return / Replace</Text>
             </Bouncy>
           ) : null}
           <Bouncy
             style={styles.outlineBtn}
             wrapperStyle={styles.outlineBtnWrapper}
-            onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}>
+            onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}
+          >
             <Text style={styles.outlineBtnText}>Buy Again</Text>
           </Bouncy>
         </Animated.View>
@@ -420,6 +485,9 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: COLORS.textPrimary,
   },
+  itemEnd: { alignItems: 'flex-end', gap: SPACING.s },
+  reviewItemBtn: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  reviewItemText: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
   addressName: {
     fontSize: 13.5,
     fontWeight: '700',

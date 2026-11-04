@@ -9,7 +9,7 @@ const INK = '#0F1E42';
 const GLASS_BG = 'rgba(15,30,66,0.4)';
 const GLASS_BORDER = 'rgba(255,255,255,0.35)';
 
-const WalletHeroCard = ({ topInset, balance, coins, onBack, onAddMoney, onRedeem }) => {
+const WalletHeroCard = ({ topInset, balance, onBack }) => {
   return (
     <View style={styles.heroWrap}>
       <Image source={WALLET_BANNER} style={StyleSheet.absoluteFill} resizeMode="cover" />
@@ -33,20 +33,9 @@ const WalletHeroCard = ({ topInset, balance, coins, onBack, onAddMoney, onRedeem
           <View style={styles.balanceRow}>
             <Text style={styles.balanceValue}>₹{balance}</Text>
             <View style={styles.coinTag}>
-              <Icon name="award" size={11} color="#FFFFFF" />
-              <Text style={styles.coinTagText}>{coins} coins</Text>
+              <Text style={styles.coinTagText}>Store credit</Text>
             </View>
           </View>
-        </View>
-
-        <View style={styles.heroCtaRow}>
-          <TouchableOpacity activeOpacity={0.9} onPress={onAddMoney} style={styles.addMoneyBtn}>
-            <Icon name="plus" size={16} color={WAVE_BLUE} />
-            <Text style={styles.addMoneyText}>Add Money</Text>
-          </TouchableOpacity>
-          <TouchableOpacity activeOpacity={0.85} onPress={onRedeem} style={styles.redeemBtn}>
-            <Text style={styles.redeemText}>Redeem Coins</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </View>

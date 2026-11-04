@@ -47,7 +47,7 @@ Screen → Hook → RTK Query / Redux slice → Feature API layer → Axios inst
 | RTK Query for server state                       | Removes hand-written thunks/caching; consistent loading/error states       |
 | MMKV over AsyncStorage                           | ~30x faster synchronous storage; needed for startup and offline cache      |
 | Axios + interceptors in `core/api`               | Single place for auth tokens, refresh, retries, error normalization        |
-| Role-based navigators (Customer/Seller/Delivery) | Seller and delivery-partner apps can grow without touching customer flows  |
+| Role-based navigators (Customer/Seller)          | Seller and admin surfaces can grow without touching customer flows         |
 | Central theme tokens                             | Light/dark mode and rebranding without touching feature code               |
 | Central permissions module                       | One rationale/blocked-state flow for camera, location, notifications, etc. |
 | Offline queue + sync in `database/`              | Mutations survive connectivity loss; replayed by `sync.js`                 |
@@ -60,4 +60,4 @@ Screen → Hook → RTK Query / Redux slice → Feature API layer → Axios inst
 3. `app/providers/` composes Redux, Theme, Localization, GestureHandler, SafeArea and the global
    ErrorBoundary.
 4. `app/startup/` restores the session, decides the initial route, hides the splash screen.
-5. `navigation/RootNavigator.js` routes to Auth / Customer / Seller / Delivery stacks by role.
+5. `navigation/RootNavigator.js` routes to Auth / Customer stacks. A first-party rider app is out of scope; last-mile uses third-party courier partners later.

@@ -1,1 +1,1 @@
-﻿// Endpoint path constants for 'profile'.
+export const PROFILE_ENDPOINTS = { me: '/me' };

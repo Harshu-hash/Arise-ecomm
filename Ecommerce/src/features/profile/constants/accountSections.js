@@ -4,7 +4,12 @@ export const ACCOUNT_SECTIONS = [
     rows: [
       { id: 'edit', icon: 'user', label: 'Edit Profile', route: 'EditProfile' },
       { id: 'orders', icon: 'package', label: 'My Orders', route: 'MyOrders' },
-      { id: 'cards', icon: 'credit-card', label: 'Saved Credit / Debit & Gift Cards', route: 'SavedCards' },
+      {
+        id: 'cards',
+        icon: 'credit-card',
+        label: 'Saved Credit / Debit & Gift Cards',
+        route: 'SavedCards',
+      },
       { id: 'addresses', icon: 'map-pin', label: 'Saved Addresses', route: 'SavedAddresses' },
       { id: 'privacy', icon: 'shield', label: 'Privacy Center', route: 'PrivacyCenter' },
       { id: 'language', icon: 'globe', label: 'Language', route: 'Language' },
@@ -18,9 +23,9 @@ export const ACCOUNT_SECTIONS = [
     ],
   },
   {
-    title: 'Earn with Flipkart',
+    title: 'Earn with Arise',
     rows: [
-      { id: 'sell', icon: 'shopping-bag', label: 'Sell on Flipkart', route: 'SellOnFlipkart' },
+      { id: 'sell', icon: 'shopping-bag', label: 'Sell on Arise', route: 'SellOnArise' },
       { id: 'referral', icon: 'gift', label: 'Refer & Earn', route: 'Referral' },
     ],
   },
@@ -28,7 +33,7 @@ export const ACCOUNT_SECTIONS = [
     title: 'Feedback & Information',
     rows: [
       { id: 'rate', icon: 'star', label: 'Rate Us', route: 'RateUs' },
-      { id: 'about', icon: 'info', label: 'About Flipkart', route: 'About' },
+      { id: 'about', icon: 'info', label: 'About Arise', route: 'About' },
       { id: 'terms', icon: 'file-text', label: 'Terms & Conditions', route: 'TermsConditions' },
     ],
   },

@@ -6,7 +6,7 @@ import PressableScale from '../ui/PressableScale';
 import { haptics } from '../../utils/haptics';
 
 /**
- * Grocery-style grid product card — image with ETA pill, discount tag, name/unit,
+ * Marketplace grid product card — image with delivery pill, discount tag, name/unit,
  * price block, and an ADD button that turns into a quantity stepper once in the cart.
  * Used on Search results.
  */

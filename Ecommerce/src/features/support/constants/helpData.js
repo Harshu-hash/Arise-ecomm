@@ -15,7 +15,7 @@ export const HELP_CATEGORIES = [
         id: 'o2',
         question: 'How do I track my order?',
         answer:
-          'Open the app, go to Account > Orders, and select the order you want to track. You will see a step-by-step timeline including Order Confirmed, Packed, Shipped, Out for Delivery, and Delivered, along with the delivery partner’s live location where available.',
+          'Open the app, go to Account > Orders, and select the order you want to track. You will see a step-by-step timeline including Order Confirmed, Packed, Shipped, Out for Delivery, and Delivered, along with courier tracking details where the shipping partner provides them.',
       },
       {
         id: 'o3',
@@ -85,7 +85,7 @@ export const HELP_CATEGORIES = [
         id: 'r2',
         question: 'How do I return a product?',
         answer:
-          'Go to My Orders, select the item, and tap "Return or Replace Item". Choose a reason, select refund or replacement, confirm your pickup address, and schedule a pickup. Our delivery partner will collect the item from your doorstep within 2-3 days.',
+          'Go to My Orders, select the item, and tap "Return or Replace Item". Choose a reason, select refund or replacement, confirm your pickup address, and schedule a pickup. A courier partner will collect the item from your doorstep within 2-3 days.',
       },
       {
         id: 'r3',
@@ -140,22 +140,22 @@ export const HELP_CATEGORIES = [
     ],
   },
   {
-    id: 'plus',
+    id: 'rewards',
     icon: 'award',
-    title: 'Membership & Rewards',
-    subtitle: 'Plus benefits, SuperCoins',
+    title: 'Referrals & Store Credit',
+    subtitle: 'Referral rewards and wallet credit',
     articles: [
       {
         id: 'm1',
-        question: 'What are the benefits of a Plus membership?',
+        question: 'When is a referral reward credited?',
         answer:
-          'Plus members enjoy free faster delivery, early access to sales, exclusive deals, and dedicated customer support with priority resolution.',
+          'Referral rewards are credited after the referred customer completes an eligible order and its return window closes.',
       },
       {
         id: 'm2',
-        question: 'How do I earn and redeem reward coins?',
+        question: 'How do I use store credit?',
         answer:
-          'You earn reward coins on eligible purchases, reviews, and app engagement. Coins can be redeemed at checkout for instant discounts, subject to the minimum order value shown in your Wallet.',
+          'Eligible store credit appears in Wallet and can be selected at checkout. The backend confirms the usable amount and any expiry restrictions.',
       },
     ],
   },
@@ -217,7 +217,8 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-84920',
     name: 'boAt Airdopes 141 Bluetooth Truly Wireless Earbuds',
-    image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
+    image:
+      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
     price: 1299,
     date: '18 Aug 2026',
     status: 'Out for Delivery',
@@ -227,7 +228,8 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-77213',
     name: 'Samsung Galaxy M14 5G (ICY Silver, 128 GB)',
-    image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=400&q=80',
+    image:
+      'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=400&q=80',
     price: 12999,
     date: '02 Jul 2026',
     status: 'Delivered',
@@ -237,7 +239,8 @@ export const MOCK_ORDERS = [
   {
     id: 'ORD-65510',
     name: 'LIFE FIT Diary Collection Notebook A5 Unruled 150 Pages',
-    image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
+    image:
+      'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
     price: 298,
     date: '25 Jun 2026',
     status: 'Delivered',
@@ -255,8 +258,18 @@ export const MOCK_TICKETS = [
     createdOn: '19 Aug 2026',
     description: 'My order is showing out for delivery for 2 days now with no update.',
     updates: [
-      { id: 't1', author: 'You', text: 'My order is showing out for delivery for 2 days now with no update.', date: '19 Aug, 10:14 AM' },
-      { id: 't2', author: 'Support Agent', text: 'We’re sorry for the delay. We’ve escalated this to our logistics partner and expect delivery within 24 hours.', date: '19 Aug, 11:02 AM' },
+      {
+        id: 't1',
+        author: 'You',
+        text: 'My order is showing out for delivery for 2 days now with no update.',
+        date: '19 Aug, 10:14 AM',
+      },
+      {
+        id: 't2',
+        author: 'Support Agent',
+        text: 'We’re sorry for the delay. We’ve escalated this to our logistics partner and expect delivery within 24 hours.',
+        date: '19 Aug, 11:02 AM',
+      },
     ],
   },
   {
@@ -267,8 +280,18 @@ export const MOCK_TICKETS = [
     createdOn: '27 Jun 2026',
     description: 'Refund for returned notebook not received after 6 days.',
     updates: [
-      { id: 't3', author: 'You', text: 'Refund for returned notebook not received after 6 days.', date: '27 Jun, 09:20 AM' },
-      { id: 't4', author: 'Support Agent', text: 'We’ve checked with our payments team, the refund of ₹298 was processed today and should reflect within 3-5 business days.', date: '27 Jun, 03:45 PM' },
+      {
+        id: 't3',
+        author: 'You',
+        text: 'Refund for returned notebook not received after 6 days.',
+        date: '27 Jun, 09:20 AM',
+      },
+      {
+        id: 't4',
+        author: 'Support Agent',
+        text: 'We’ve checked with our payments team, the refund of ₹298 was processed today and should reflect within 3-5 business days.',
+        date: '27 Jun, 03:45 PM',
+      },
       { id: 't5', author: 'You', text: 'Got it, thank you!', date: '28 Jun, 09:02 AM' },
     ],
   },

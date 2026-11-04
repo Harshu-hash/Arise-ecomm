@@ -1,24 +1,30 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-
-const INITIAL_PREFERENCES = [
-  { id: 'personalized', label: 'Personalized Ads', subtitle: 'Use your browsing & purchase activity to show relevant ads', enabled: true },
-  { id: 'thirdParty', label: 'Third-Party Data Sharing', subtitle: 'Share anonymised data with ad partners', enabled: false },
-  { id: 'location', label: 'Location-Based Ads', subtitle: 'Show ads and offers based on your location', enabled: true },
-];
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetAdPreferencesQuery, useUpdateAdPreferencesMutation } from '../api/settings.api';
 
 const AdPreferencesScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [preferences, setPreferences] = useState(INITIAL_PREFERENCES);
+  const { data, isLoading, error, refetch } = useGetAdPreferencesQuery();
+  const [updatePreferences, { isLoading: isSaving }] = useUpdateAdPreferencesMutation();
+  const preferences = data?.items || [];
 
-  const toggle = (id) => {
-    setPreferences((prev) => prev.map((p) => (p.id === id ? { ...p, enabled: !p.enabled } : p)));
-  };
+  const toggle = preference =>
+    updatePreferences({
+      personalizedAds: data.personalizedAds,
+      thirdPartyDataSharing: data.thirdPartyDataSharing,
+      locationBasedAds: data.locationBasedAds,
+      [preference.id]: !preference.enabled,
+    });
+
+  if (isLoading) return <FullScreenLoader message="Loading privacy preferences..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -44,7 +50,8 @@ const AdPreferencesScreen = ({ navigation }) => {
             </View>
             <Switch
               value={pref.enabled}
-              onValueChange={() => toggle(pref.id)}
+              disabled={isSaving}
+              onValueChange={() => toggle(pref)}
               trackColor={{ false: COLORS.border, true: COLORS.primaryLight }}
               thumbColor={pref.enabled ? COLORS.primary : COLORS.textTertiary}
             />

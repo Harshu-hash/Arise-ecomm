@@ -1,1 +1,4 @@
-﻿// Custom middleware list (api middleware, logger in dev, analytics).
+import { baseApi } from '@core/api';
+
+export const appMiddleware = getDefaultMiddleware =>
+  getDefaultMiddleware({ serializableCheck: true }).concat(baseApi.middleware);

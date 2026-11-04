@@ -51,10 +51,13 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
     useCallback(() => {
       skipNextAnimRef.current = true;
       setLocalActiveId(activeId);
-    }, [activeId])
+    }, [activeId]),
   );
 
-  const activeIndex = Math.max(0, tabs.findIndex((t) => t.id === localActiveId));
+  const activeIndex = Math.max(
+    0,
+    tabs.findIndex(t => t.id === localActiveId),
+  );
   const slideAnim = useRef(new Animated.Value(activeIndex)).current;
 
   useEffect(() => {
@@ -79,9 +82,9 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
         }, LOADER_FADE_IN_WAIT);
       }
     });
-  }, [activeIndex, slideAnim]);
+  }, [activeIndex, hideBrandLoader, onSelect, showBrandLoader, slideAnim]);
 
-  const handlePress = (tab) => {
+  const handlePress = tab => {
     if (tab.id === localActiveId) {
       onSelect && onSelect(tab);
       return;
@@ -93,12 +96,11 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
     setLocalActiveId(tab.id);
   };
 
-  const handleTrackLayout = (e) => setTrackWidth(e.nativeEvent.layout.width);
+  const handleTrackLayout = e => setTrackWidth(e.nativeEvent.layout.width);
 
   const tabCount = tabs.length;
-  const slotWidth = trackWidth > 0
-    ? (trackWidth - TRACK_PADDING * 2 - TRACK_GAP * (tabCount - 1)) / tabCount
-    : 0;
+  const slotWidth =
+    trackWidth > 0 ? (trackWidth - TRACK_PADDING * 2 - TRACK_GAP * (tabCount - 1)) / tabCount : 0;
 
   const positionsInput = tabs.map((_, i) => i);
   const positionsOutput = tabs.map((_, i) => i * (slotWidth + TRACK_GAP));
@@ -108,7 +110,7 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
   });
 
   const activeTab = tabs[activeIndex] || tabs[0];
-  const activeIsFlipkart = activeTab?.id === 'flipkart';
+  const activeIsFlipkart = activeTab?.id === 'arise';
 
   return (
     <View style={styles.container}>
@@ -122,13 +124,15 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
               activeIsFlipkart ? styles.flipkartShadow : styles.value365Shadow,
               { width: slotWidth, transform: [{ translateX }] },
             ]}
-            pointerEvents="none">
+            pointerEvents="none"
+          >
             {tabs.map((tab, i) => {
-              const isFlipkartTab = tab.id === 'flipkart';
-              const grad = tab.gradient || (isFlipkartTab ? ['#FFE11B', '#FFC200'] : ['#E52E2E', '#900C1F']);
+              const isFlipkartTab = tab.id === 'arise';
+              const grad =
+                tab.gradient || (isFlipkartTab ? ['#FFE11B', '#FFC200'] : ['#E52E2E', '#900C1F']);
               const opacity = slideAnim.interpolate({
                 inputRange: positionsInput.length > 1 ? positionsInput : [0, 1],
-                outputRange: positionsInput.map((v) => (v === i ? 1 : 0)),
+                outputRange: positionsInput.map(v => (v === i ? 1 : 0)),
                 extrapolate: 'clamp',
               });
               return (
@@ -141,22 +145,23 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
           </Animated.View>
         )}
 
-        {tabs.map((tab) => {
+        {tabs.map(tab => {
           const isActive = tab.id === localActiveId;
-          const isFlipkart = tab.id === 'flipkart';
+          const isFlipkart = tab.id === 'arise';
 
           const activeTextColor = tab.activeText || (isFlipkart ? '#002F6C' : '#FFFFFF');
           const activeIconColor = tab.activeIcon || (isFlipkart ? '#002F6C' : '#FFD700');
           const badgeBgColor = tab.badgeBg || (isFlipkart ? '#002F6C' : '#FFD700');
           const badgeTextColor = tab.badgeText || (isFlipkart ? '#FFE11B' : '#8B0000');
-          const badgeLabel = tab.badge || (isFlipkart ? 'PLUS' : 'DEALS');
+          const badgeLabel = tab.badge || (isFlipkart ? 'MARKET' : 'DEALS');
 
           return (
             <TouchableOpacity
               key={tab.id}
               activeOpacity={0.88}
               onPress={() => handlePress(tab)}
-              style={styles.tabCard}>
+              style={styles.tabCard}
+            >
               <View style={styles.contentRow}>
                 <View style={styles.iconContainer}>
                   {tab.iconImage ? (
@@ -165,7 +170,7 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
                     <Icon
                       name={tab.icon}
                       size={14}
-                      color={isActive ? activeIconColor : (isFlipkart ? '#002F6C' : '#D32F2F')}
+                      color={isActive ? activeIconColor : isFlipkart ? '#002F6C' : '#D32F2F'}
                     />
                   )}
                 </View>
@@ -176,12 +181,18 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
                     { color: isActive ? activeTextColor : COLORS.textPrimary },
                     isActive && styles.activeLabel,
                   ]}
-                  numberOfLines={1}>
+                  numberOfLines={1}
+                >
                   {tab.label}
                 </Text>
 
                 {badgeLabel ? (
-                  <View style={[styles.badgeChip, { backgroundColor: isActive ? badgeBgColor : 'rgba(0,0,0,0.06)' }]}>
+                  <View
+                    style={[
+                      styles.badgeChip,
+                      { backgroundColor: isActive ? badgeBgColor : 'rgba(0,0,0,0.06)' },
+                    ]}
+                  >
                     {tab.badgeIcon ? (
                       <Icon
                         name={tab.badgeIcon}
@@ -190,7 +201,12 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
                         style={styles.badgeIcon}
                       />
                     ) : null}
-                    <Text style={[styles.badgeText, { color: isActive ? badgeTextColor : COLORS.textSecondary }]}>
+                    <Text
+                      style={[
+                        styles.badgeText,
+                        { color: isActive ? badgeTextColor : COLORS.textSecondary },
+                      ]}
+                    >
                       {badgeLabel}
                     </Text>
                   </View>

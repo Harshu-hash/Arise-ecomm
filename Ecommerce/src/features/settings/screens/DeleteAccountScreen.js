@@ -1,204 +1,208 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-
-const REASONS = [
-  'I have another account',
-  'Privacy concerns',
-  'Not using the app anymore',
-  'Poor experience / bugs',
-  'Other',
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import {
+  useCreateDeletionRequestMutation,
+  useGetDeletionEligibilityQuery,
+} from '@features/privacy';
+import { useToast } from '../../../contexts/ToastContext';
+const reasons = [
+  ['ANOTHER_ACCOUNT', 'I have another account'],
+  ['PRIVACY', 'Privacy concerns'],
+  ['NOT_USING', 'Not using the app'],
+  ['EXPERIENCE', 'Poor experience'],
+  ['OTHER', 'Other'],
 ];
-
 const DeleteAccountScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-  const [reason, setReason] = useState(null);
-  const [confirmed, setConfirmed] = useState(false);
-
+  const insets = useSafeAreaInsets(),
+    toast = useToast(),
+    query = useGetDeletionEligibilityQuery(),
+    [create, { isLoading }] = useCreateDeletionRequestMutation(),
+    [reason, setReason] = useState(null),
+    [confirmed, setConfirmed] = useState(false);
+  if (query.isLoading) return <FullScreenLoader message="Checking account eligibility..." />;
+  if (query.error)
+    return (
+      <ErrorState
+        title="Could not check deletion status"
+        message={query.error.message}
+        onRetry={query.refetch}
+      />
+    );
+  const data = query.data;
+  const submit = async () => {
+    try {
+      await create({ reasonCode: reason, acknowledged: confirmed }).unwrap();
+      toast.show('Account deletion request scheduled', { variant: 'success', icon: 'check' });
+    } catch (error) {
+      toast.show(error.message || 'Could not request account deletion', { variant: 'error' });
+    }
+  };
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Delete My Account</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.warningBox}>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.warning}>
           <Icon name="alert-triangle" size={20} color={COLORS.error} />
           <Text style={styles.warningText}>
-            This action is permanent. Deleting your account will remove your profile, order
-            history, saved addresses, cards and reviews. This cannot be undone.
+            Deletion is permanent once completed. Some records may be retained where law, payments,
+            disputes, or fraud prevention require it.
           </Text>
         </View>
-
-        <Text style={styles.sectionTitle}>Why are you leaving?</Text>
-        {REASONS.map((r) => (
-          <TouchableOpacity
-            key={r}
-            activeOpacity={0.7}
-            style={styles.reasonRow}
-            onPress={() => setReason(r)}>
-            <View style={[styles.radio, reason === r && styles.radioActive]}>
-              {reason === r ? <View style={styles.radioDot} /> : null}
-            </View>
-            <Text style={styles.reasonText}>{r}</Text>
-          </TouchableOpacity>
-        ))}
-
-        <TouchableOpacity
-          activeOpacity={0.7}
-          style={styles.confirmRow}
-          onPress={() => setConfirmed((v) => !v)}>
-          <View style={[styles.checkbox, confirmed && styles.checkboxActive]}>
-            {confirmed ? <Icon name="check" size={12} color={COLORS.white} /> : null}
+        {data.existingRequest ? (
+          <View style={styles.request}>
+            <Text style={styles.requestTitle}>
+              Deletion {data.existingRequest.status.toLowerCase()}
+            </Text>
+            <Text style={styles.requestText}>
+              {data.existingRequest.scheduledDeletionAt
+                ? `Scheduled for ${new Date(data.existingRequest.scheduledDeletionAt).toLocaleString('en-IN')}`
+                : 'Your request is being reviewed.'}
+            </Text>
           </View>
-          <Text style={styles.confirmText}>
-            I understand this action is permanent and cannot be reversed.
-          </Text>
-        </TouchableOpacity>
+        ) : null}
+        {data.blockers.length ? (
+          <>
+            <Text style={styles.section}>Deletion is currently unavailable</Text>
+            {data.blockers.map(item => (
+              <View key={item.code} style={styles.blocker}>
+                <Icon name="lock" size={15} color={COLORS.warning} />
+                <View style={styles.grow}>
+                  <Text style={styles.blockerCode}>{item.code.replace(/_/g, ' ')}</Text>
+                  <Text style={styles.blockerText}>{item.message}</Text>
+                </View>
+              </View>
+            ))}
+          </>
+        ) : !data.existingRequest ? (
+          <>
+            <Text style={styles.section}>Why are you leaving?</Text>
+            {reasons.map(([code, label]) => (
+              <TouchableOpacity key={code} onPress={() => setReason(code)} style={styles.reason}>
+                <Icon
+                  name={reason === code ? 'check-circle' : 'circle'}
+                  size={18}
+                  color={reason === code ? COLORS.primary : COLORS.textTertiary}
+                />
+                <Text style={styles.reasonText}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+            <TouchableOpacity onPress={() => setConfirmed(value => !value)} style={styles.confirm}>
+              <Icon
+                name={confirmed ? 'check-square' : 'square'}
+                size={18}
+                color={confirmed ? COLORS.error : COLORS.textTertiary}
+              />
+              <Text style={styles.confirmText}>
+                I understand this request is permanent after the cooling-off period.
+              </Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
       </ScrollView>
-
-      <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
-        <TouchableOpacity
-          activeOpacity={0.85}
-          disabled={!reason || !confirmed}
-          style={[styles.deleteBtn, (!reason || !confirmed) && styles.deleteBtnDisabled]}>
-          <Text style={styles.deleteBtnText}>Delete My Account</Text>
-        </TouchableOpacity>
-      </View>
+      {data.eligible && !data.existingRequest ? (
+        <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
+          <TouchableOpacity
+            disabled={!reason || !confirmed || isLoading}
+            onPress={submit}
+            style={[styles.button, (!reason || !confirmed || isLoading) && styles.disabled]}
+          >
+            <Text style={styles.buttonText}>
+              {isLoading ? 'Submitting...' : 'Request Account Deletion'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : null}
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  warningBox: {
+  headerTitle: { fontSize: 19, fontWeight: '600', color: COLORS.textPrimary },
+  content: { padding: SPACING.l, paddingBottom: SPACING.xxxl },
+  warning: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    gap: SPACING.m,
     backgroundColor: COLORS.offerRedLight,
     borderRadius: RADIUS.m,
     padding: SPACING.l,
-    gap: SPACING.m,
-    marginBottom: SPACING.xl,
   },
-  warningText: {
-    flex: 1,
-    fontSize: 12.5,
-    color: COLORS.textPrimary,
-    lineHeight: 18,
-  },
-  sectionTitle: {
-    fontSize: 14.5,
+  warningText: { flex: 1, fontSize: 12.5, color: COLORS.textPrimary, lineHeight: 18 },
+  section: {
+    fontSize: 15,
     fontWeight: '700',
     color: COLORS.textPrimary,
+    marginTop: SPACING.xl,
     marginBottom: SPACING.m,
   },
-  reasonRow: {
+  blocker: {
+    flexDirection: 'row',
+    gap: SPACING.m,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.s,
+    padding: SPACING.m,
+    marginBottom: SPACING.s,
+  },
+  grow: { flex: 1 },
+  blockerCode: { fontSize: 12, fontWeight: '700', color: COLORS.textPrimary },
+  blockerText: { fontSize: 12, color: COLORS.textSecondary, lineHeight: 17, marginTop: 3 },
+  request: {
+    backgroundColor: COLORS.primaryLight,
+    padding: SPACING.l,
+    borderRadius: RADIUS.m,
+    marginTop: SPACING.l,
+  },
+  requestTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary },
+  requestText: { fontSize: 12, color: COLORS.textSecondary, marginTop: 4 },
+  reason: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.m,
     paddingVertical: SPACING.s,
   },
-  radio: {
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.m,
-  },
-  radioActive: {
-    borderColor: COLORS.primary,
-  },
-  radioDot: {
-    width: 9,
-    height: 9,
-    borderRadius: 4.5,
-    backgroundColor: COLORS.primary,
-  },
-  reasonText: {
-    fontSize: 13.5,
-    color: COLORS.textPrimary,
-  },
-  confirmRow: {
+  reasonText: { fontSize: 13.5, color: COLORS.textPrimary },
+  confirm: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: SPACING.m,
     marginTop: SPACING.xl,
   },
-  checkbox: {
-    width: 18,
-    height: 18,
-    borderRadius: RADIUS.xs,
-    borderWidth: 1.5,
-    borderColor: COLORS.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.m,
-    marginTop: 1,
-  },
-  checkboxActive: {
-    backgroundColor: COLORS.error,
-    borderColor: COLORS.error,
-  },
-  confirmText: {
-    flex: 1,
-    fontSize: 12.5,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-  },
+  confirmText: { flex: 1, fontSize: 12.5, color: COLORS.textSecondary, lineHeight: 18 },
   footer: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.m,
+    padding: SPACING.l,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
-  deleteBtn: {
+  button: {
     backgroundColor: COLORS.error,
     borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
+    padding: SPACING.m,
     alignItems: 'center',
   },
-  deleteBtnDisabled: {
-    backgroundColor: COLORS.border,
-  },
-  deleteBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
+  disabled: { backgroundColor: COLORS.border },
+  buttonText: { color: COLORS.white, fontWeight: '700' },
 });
-
 export default DeleteAccountScreen;

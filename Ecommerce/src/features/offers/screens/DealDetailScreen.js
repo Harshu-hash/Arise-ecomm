@@ -15,11 +15,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager, GradientBackground, ProductCard } from '../../../shared/components';
-import { PRODUCT_FEED } from '../../home/data/homeData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetPromotionQuery } from '../api/offers.api';
 
 const DEFAULT_GRADIENT = ['#7A0C1E', '#CC0C39', '#FF6A3D'];
 const buildGradient = (accent) => (accent ? ['#7A0C1E', accent, '#FF8A3D'] : DEFAULT_GRADIENT);
-const COUPON_CODE = 'VALUE365';
 const TRUST_CHIPS = [
   { icon: 'truck', label: 'Free Delivery' },
   { icon: 'refresh-cw', label: 'Easy Returns' },
@@ -29,6 +30,7 @@ const TRUST_CHIPS = [
 const pad = (n) => String(n).padStart(2, '0');
 const useCountdown = (seconds) => {
   const [left, setLeft] = useState(seconds);
+  useEffect(() => setLeft(seconds), [seconds]);
   useEffect(() => {
     const id = setInterval(() => setLeft((v) => (v > 0 ? v - 1 : 0)), 1000);
     return () => clearInterval(id);
@@ -40,16 +42,33 @@ const useCountdown = (seconds) => {
 };
 
 const DealDetailScreen = ({ navigation, route }) => {
-  const deal = (route && route.params && route.params.deal) || {
+  const routeDeal = (route && route.params && route.params.deal) || {
     id: 'tvd1',
     label: 'Mega Deal',
     value: 'Up to 80% Off',
     tag: 'BESTSELLER',
     image: 'https://images.unsplash.com/photo-1591637333184-19aa84b3e01f?auto=format&fit=crop&w=800&q=80',
   };
+  const dealId = route?.params?.dealId || routeDeal.id;
+  const { data: promotion, isLoading, error, refetch } = useGetPromotionQuery(dealId);
+  const deal = promotion
+    ? {
+        ...routeDeal,
+        id: promotion.id,
+        label: promotion.title,
+        value: promotion.items[0]?.bannerText || routeDeal.value,
+        image: promotion.items[0]?.image || routeDeal.image,
+        tag: promotion.tag,
+        section: promotion.title,
+        accent: promotion.accent,
+      }
+    : routeDeal;
   const HERO_GRADIENT = buildGradient(deal.accent);
 
-  const { h, m, s } = useCountdown(4 * 3600 + 32 * 60 + 12);
+  const secondsRemaining = promotion?.endsAt
+    ? Math.max(0, Math.floor((new Date(promotion.endsAt).getTime() - Date.now()) / 1000))
+    : 0;
+  const { h, m, s } = useCountdown(secondsRemaining);
   const pulse = useRef(new Animated.Value(1)).current;
   const [copied, setCopied] = useState(false);
 
@@ -64,7 +83,7 @@ const DealDetailScreen = ({ navigation, route }) => {
     return () => loop.stop();
   }, [pulse]);
 
-  const related = useMemo(() => PRODUCT_FEED.slice(0, 6), []);
+  const related = useMemo(() => promotion?.relatedProducts || [], [promotion?.relatedProducts]);
 
   const handleShare = () => {
     Share.share({ message: `Check out this deal: ${deal.label} — ${deal.value}` }).catch(() => {});
@@ -74,6 +93,9 @@ const DealDetailScreen = ({ navigation, route }) => {
     setTimeout(() => setCopied(false), 1600);
   };
   const handleGrab = () => navigation && navigation.navigate('SearchResults', { deal });
+
+  if (isLoading) return <FullScreenLoader message="Loading deal..." />;
+  if (error && !promotion) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.root}>
@@ -140,8 +162,10 @@ const DealDetailScreen = ({ navigation, route }) => {
           <View style={styles.rowBetween}>
             <View>
               <Text style={styles.couponEyebrow}>SAVE EXTRA WITH</Text>
-              <Text style={styles.couponCode}>{COUPON_CODE}</Text>
-              <Text style={styles.couponHint}>Apply at checkout for an extra 10% off</Text>
+              <Text style={styles.couponCode}>{promotion?.couponCode || 'NO CODE NEEDED'}</Text>
+              <Text style={styles.couponHint}>
+                {promotion?.couponHint || 'Eligibility and final savings are confirmed in cart.'}
+              </Text>
             </View>
             <TouchableOpacity onPress={handleCopy} style={[styles.copyBtn, copied && styles.copyBtnDone]}>
               <Icon name={copied ? 'check' : 'copy'} size={13} color={COLORS.white} />

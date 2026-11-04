@@ -1,5 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { useSelector } from 'react-redux';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -13,36 +22,92 @@ import {
 } from '../../../shared/components';
 import PressableScale from '../../../shared/ui/PressableScale';
 import { haptics } from '../../../utils/haptics';
-import { useCart } from '../../../contexts/CartContext';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useGetCartQuery,
+  useMoveSavedItemToCartMutation,
+  useRemoveCartItemMutation,
+  useSaveCartItemForLaterMutation,
+  useUpdateCartItemMutation,
+} from '../api/cart.query';
 import CouponSection from '../components/CouponSection';
-
-const MIN_QTY = 1;
-const MAX_QTY = 10;
+import { useGetAddressesQuery } from '@features/address';
+import { selectIsAuthenticated } from '@features/auth';
 
 const SUGGESTED_PRODUCTS = [
-  { id: 'sg1', name: 'Noise ColorFit Smartwatch', image: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80', price: 1299, mrp: 4999 },
-  { id: 'sg2', name: 'Floral Print Shorts', image: 'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=400&q=80', price: 349, mrp: 899 },
-  { id: 'sg3', name: 'Wireless Earbuds', image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80', price: 799, mrp: 1999 },
+  {
+    id: 'e2',
+    name: 'Noise ColorFit Smartwatch',
+    image:
+      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80',
+    price: 1799,
+    mrp: 4999,
+  },
+  {
+    id: 'f2',
+    name: 'Cotton A-Line Kurti',
+    image:
+      'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=400&q=80',
+    price: 349,
+    mrp: 999,
+  },
+  {
+    id: 'e1',
+    name: 'Wireless Earbuds',
+    image:
+      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
+    price: 1299,
+    mrp: 2490,
+  },
 ];
 
 const CartScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { items, savedForLater, removeItem, changeQty, moveToSaved, moveToCart, appliedCoupon } = useCart();
+  const toast = useToast();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const { data: cart, error, isLoading, isFetching, refetch } = useGetCartQuery();
+  const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
+  const [removeCartItem] = useRemoveCartItemMutation();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [saveCartItemForLater] = useSaveCartItemForLaterMutation();
+  const [moveSavedItemToCart] = useMoveSavedItemToCartMutation();
+  const items = cart?.items ?? [];
+  const savedForLater = cart?.savedForLater ?? [];
+  const appliedCoupon = cart?.appliedCoupon ?? null;
+  const deliveryAddress =
+    addressBook?.items.find(address => address.isDefault) ?? addressBook?.items[0];
 
-  const handleRemove = (id) => {
-    haptics.warning();
-    removeItem(id);
+  const runMutation = async (request, fallbackMessage) => {
+    try {
+      await request.unwrap();
+    } catch (mutationError) {
+      toast.show(mutationError.message || fallbackMessage);
+    }
   };
 
-  const handleQtyChange = (id, delta) => changeQty(id, delta);
+  const handleRemove = id => {
+    haptics.warning();
+    runMutation(removeCartItem(id), 'Could not remove this item.');
+  };
 
-  const mrpTotal = items.reduce((sum, item) => sum + item.mrp * item.qty, 0);
-  const itemTotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const fees = items.length ? 9 : 0;
-  const productDiscount = mrpTotal - itemTotal;
-  const couponDiscount = appliedCoupon ? appliedCoupon.amount : 0;
+  const handleQtyChange = (item, delta) =>
+    runMutation(
+      updateCartItem({ cartItemId: item.id, quantity: item.qty + delta }),
+      'Could not update the quantity.',
+    );
+
+  const mrpTotal = cart?.totals.mrp ?? 0;
+  const itemTotal = cart?.totals.subtotal ?? 0;
+  const fees = (cart?.totals.deliveryFee ?? 0) + (cart?.totals.platformFee ?? 0);
+  const productDiscount = cart?.totals.productDiscount ?? 0;
+  const couponDiscount = cart?.totals.couponDiscount ?? 0;
   const discounts = productDiscount + couponDiscount;
-  const finalTotal = Math.max(itemTotal + fees - couponDiscount, 0);
+  const finalTotal = cart?.totals.payable ?? 0;
+
+  if (isLoading) return <FullScreenLoader message="Loading cart..." />;
+  if (error && !cart) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -59,7 +124,18 @@ const CartScreen = ({ navigation }) => {
         </View>
       </View>
 
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching}
+            onRefresh={refetch}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
         {items.length === 0 ? (
           <>
             <View style={styles.emptyPanel}>
@@ -69,7 +145,8 @@ const CartScreen = ({ navigation }) => {
               <PressableScale
                 haptic="medium"
                 onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}
-                style={styles.shopNowBtn}>
+                style={styles.shopNowBtn}
+              >
                 <Text style={styles.shopNowText}>Shop now</Text>
               </PressableScale>
             </View>
@@ -80,7 +157,9 @@ const CartScreen = ({ navigation }) => {
               <HorizontalProductRail
                 data={SUGGESTED_PRODUCTS}
                 style={{ marginTop: SPACING.m }}
-                onPressItem={(product) => navigation && navigation.navigate('ProductDetail', { product })}
+                onPressItem={product =>
+                  navigation && navigation.navigate('ProductDetail', { productId: product.id })
+                }
               />
             </View>
           </>
@@ -92,20 +171,39 @@ const CartScreen = ({ navigation }) => {
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.deliverText}>
-                  Deliver to: <Text style={styles.deliverBold}>Harshvardhan P...</Text>, 457001
+                  Deliver to:{' '}
+                  <Text style={styles.deliverBold}>
+                    {deliveryAddress
+                      ? `${deliveryAddress.name}, ${deliveryAddress.pincode}`
+                      : 'Select address'}
+                  </Text>
                 </Text>
-                <Text style={styles.deliverAddress}>84/2, Dheeraj shah nagar, Ratlam, Ratlam</Text>
+                <Text style={styles.deliverAddress} numberOfLines={1}>
+                  {deliveryAddress?.address || 'Add a serviceable delivery address'}
+                </Text>
               </View>
-              <TouchableOpacity activeOpacity={0.8} style={styles.changeBtn}>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={styles.changeBtn}
+                onPress={() =>
+                  navigation?.navigate(isAuthenticated ? 'SavedAddresses' : 'Login', {
+                    returnTo: 'Cart',
+                  })
+                }
+              >
                 <Text style={styles.changeBtnText}>Change</Text>
               </TouchableOpacity>
             </View>
 
-            {items.map((item) => (
+            {items.map(item => (
               <View key={item.id} style={styles.itemCard}>
                 <View style={styles.itemTopRow}>
                   <View style={styles.itemImageBox}>
-                    <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.itemImage}
+                      resizeMode="cover"
+                    />
                     <View style={styles.zoomTag}>
                       <Icon name="search" size={10} color={COLORS.white} />
                       <Text style={styles.zoomTagText}>Zoom</Text>
@@ -113,7 +211,9 @@ const CartScreen = ({ navigation }) => {
                   </View>
 
                   <View style={styles.itemInfo}>
-                    <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                    <Text style={styles.itemName} numberOfLines={2}>
+                      {item.name}
+                    </Text>
                     <Text style={styles.itemVariant}>{item.variant}</Text>
                     <View style={styles.ratingRow}>
                       <RatingBadge variant="stars" rating={item.rating} count={item.ratingCount} />
@@ -124,26 +224,46 @@ const CartScreen = ({ navigation }) => {
                         </View>
                       ) : null}
                     </View>
-                    <PriceBlock price={item.price} mrp={item.mrp} style={{ marginTop: SPACING.s }} />
+                    <PriceBlock
+                      price={item.price}
+                      mrp={item.mrp}
+                      style={{ marginTop: SPACING.s }}
+                    />
                   </View>
                 </View>
 
                 <View style={styles.itemBottomRow}>
                   <View style={styles.qtyStepper}>
                     <PressableScale
-                      disabled={item.qty <= MIN_QTY}
+                      disabled={item.qty <= item.minQty}
                       haptic="light"
-                      onPress={() => handleQtyChange(item.id, -1)}
-                      style={[styles.qtyStepperBtn, item.qty <= MIN_QTY && styles.qtyStepperBtnDisabled]}>
-                      <Icon name="minus" size={13} color={item.qty <= MIN_QTY ? COLORS.textTertiary : COLORS.primary} />
+                      onPress={() => handleQtyChange(item, -1)}
+                      style={[
+                        styles.qtyStepperBtn,
+                        item.qty <= item.minQty && styles.qtyStepperBtnDisabled,
+                      ]}
+                    >
+                      <Icon
+                        name="minus"
+                        size={13}
+                        color={item.qty <= item.minQty ? COLORS.textTertiary : COLORS.primary}
+                      />
                     </PressableScale>
                     <Text style={styles.qtyStepperValue}>{item.qty}</Text>
                     <PressableScale
-                      disabled={item.qty >= MAX_QTY}
+                      disabled={item.qty >= item.maxQty}
                       haptic="light"
-                      onPress={() => handleQtyChange(item.id, 1)}
-                      style={[styles.qtyStepperBtn, item.qty >= MAX_QTY && styles.qtyStepperBtnDisabled]}>
-                      <Icon name="plus" size={13} color={item.qty >= MAX_QTY ? COLORS.textTertiary : COLORS.primary} />
+                      onPress={() => handleQtyChange(item, 1)}
+                      style={[
+                        styles.qtyStepperBtn,
+                        item.qty >= item.maxQty && styles.qtyStepperBtnDisabled,
+                      ]}
+                    >
+                      <Icon
+                        name="plus"
+                        size={13}
+                        color={item.qty >= item.maxQty ? COLORS.textTertiary : COLORS.primary}
+                      />
                     </PressableScale>
                   </View>
                   <View style={styles.deliveryChip}>
@@ -153,22 +273,34 @@ const CartScreen = ({ navigation }) => {
                 </View>
 
                 <View style={styles.actionsRow}>
-                  <PressableScale haptic="warning" onPress={() => handleRemove(item.id)} style={styles.actionBtn}>
+                  <PressableScale
+                    haptic="warning"
+                    onPress={() => handleRemove(item.id)}
+                    style={styles.actionBtn}
+                  >
                     <Icon name="trash-2" size={15} color={COLORS.textSecondary} />
                     <Text style={styles.actionText}>Remove</Text>
                   </PressableScale>
                   <View style={styles.actionDivider} />
-                  <PressableScale haptic="light" onPress={() => moveToSaved(item.id)} style={styles.actionBtn}>
+                  <PressableScale
+                    haptic="light"
+                    onPress={() =>
+                      runMutation(
+                        saveCartItemForLater(item.id),
+                        'Could not save this item for later.',
+                      )
+                    }
+                    style={styles.actionBtn}
+                  >
                     <Icon name="bookmark" size={15} color={COLORS.textSecondary} />
                     <Text style={styles.actionText}>Save for later</Text>
                   </PressableScale>
                   <View style={styles.actionDivider} />
                   <PressableScale
                     haptic="medium"
-                    onPress={() =>
-                      navigation && navigation.navigate('Checkout', { items: [item] })
-                    }
-                    style={styles.actionBtn}>
+                    onPress={() => navigation && navigation.navigate('Checkout', { items: [item] })}
+                    style={styles.actionBtn}
+                  >
                     <Icon name="zap" size={15} color={COLORS.primary} />
                     <Text style={[styles.actionText, { color: COLORS.primary }]}>Buy this now</Text>
                   </PressableScale>
@@ -179,14 +311,29 @@ const CartScreen = ({ navigation }) => {
             {savedForLater.length > 0 && (
               <View style={styles.savedWrapper}>
                 <Text style={styles.savedTitle}>Saved for later ({savedForLater.length})</Text>
-                {savedForLater.map((item) => (
+                {savedForLater.map(item => (
                   <View key={item.id} style={styles.savedRow}>
-                    <Image source={{ uri: item.image }} style={styles.savedImage} resizeMode="cover" />
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.savedImage}
+                      resizeMode="cover"
+                    />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.savedName} numberOfLines={2}>{item.name}</Text>
+                      <Text style={styles.savedName} numberOfLines={2}>
+                        {item.name}
+                      </Text>
                       <PriceBlock price={item.price} mrp={item.mrp} style={{ marginTop: 4 }} />
                     </View>
-                    <PressableScale haptic="light" onPress={() => moveToCart(item.id)} style={styles.moveToCartBtn}>
+                    <PressableScale
+                      haptic="light"
+                      onPress={() =>
+                        runMutation(
+                          moveSavedItemToCart(item.id),
+                          'Could not move this item to cart.',
+                        )
+                      }
+                      style={styles.moveToCartBtn}
+                    >
                       <Text style={styles.moveToCartText}>Move to cart</Text>
                     </PressableScale>
                   </View>
@@ -195,7 +342,7 @@ const CartScreen = ({ navigation }) => {
             )}
 
             <View style={{ marginHorizontal: SPACING.l }}>
-              <CouponSection itemTotal={itemTotal} />
+              <CouponSection cartId={cart.id} />
             </View>
 
             <View style={styles.priceDetailsCard}>
@@ -205,13 +352,16 @@ const CartScreen = ({ navigation }) => {
                 <View style={styles.savingsBanner}>
                   <Icon name="check-circle" size={13} color={COLORS.ratingGreen} />
                   <Text style={styles.savingsBannerText}>
-                    You will save <Text style={styles.savingsBannerAmount}>₹{discounts}</Text> on this order
+                    You will save <Text style={styles.savingsBannerAmount}>₹{discounts}</Text> on
+                    this order
                   </Text>
                 </View>
               ) : null}
 
               <View style={styles.priceRow}>
-                <Text style={styles.priceLabel}>Price ({items.length} item{items.length > 1 ? 's' : ''})</Text>
+                <Text style={styles.priceLabel}>
+                  Price ({items.length} item{items.length > 1 ? 's' : ''})
+                </Text>
                 <Text style={styles.priceValue}>{`₹${mrpTotal}`}</Text>
               </View>
               {discounts > 0 ? (
@@ -236,7 +386,9 @@ const CartScreen = ({ navigation }) => {
               <HorizontalProductRail
                 data={SUGGESTED_PRODUCTS}
                 style={{ marginTop: SPACING.m }}
-                onPressItem={(product) => navigation && navigation.navigate('ProductDetail', { product })}
+                onPressItem={product =>
+                  navigation && navigation.navigate('ProductDetail', { productId: product.id })
+                }
               />
             </View>
           </>
@@ -258,8 +410,10 @@ const CartScreen = ({ navigation }) => {
           </View>
           <PressableScale
             haptic="medium"
-            onPress={() => navigation && navigation.navigate('Checkout', { items })}
-            style={styles.placeOrderBtn}>
+            disabled={!cart.checkoutAllowed || isFetching}
+            onPress={() => navigation && navigation.navigate('Checkout')}
+            style={styles.placeOrderBtn}
+          >
             <Text style={styles.placeOrderText}>Place Order</Text>
             <Icon name="arrow-right" size={16} color={COLORS.textPrimary} />
           </PressableScale>

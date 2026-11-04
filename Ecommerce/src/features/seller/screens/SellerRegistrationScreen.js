@@ -5,6 +5,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import { useToast } from '../../../contexts/ToastContext';
+import { useSubmitSellerLeadMutation } from '@features/seller';
 
 const SellerRegistrationScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -12,6 +14,31 @@ const SellerRegistrationScreen = ({ navigation }) => {
   const [gstin, setGstin] = useState('');
   const [mobile, setMobile] = useState('');
   const [pickupPincode, setPickupPincode] = useState('');
+  const toast = useToast();
+  const [submitSellerLead, { isLoading }] = useSubmitSellerLeadMutation();
+
+  const isValid =
+    businessName.trim().length >= 2 &&
+    /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z][A-Z0-9]Z[A-Z0-9]$/.test(gstin.trim()) &&
+    /^\+?[1-9][0-9]{9,14}$/.test(mobile.trim()) &&
+    /^[1-9][0-9]{5}$/.test(pickupPincode.trim());
+
+  const submit = async () => {
+    try {
+      await submitSellerLead({
+        businessName: businessName.trim(),
+        gstin: gstin.trim(),
+        mobile: mobile.trim(),
+        pickupPincode: pickupPincode.trim(),
+        consentVersion: 'seller-lead-v1',
+        idempotencyKey: `seller-lead-${Date.now()}-${mobile.trim()}`,
+      }).unwrap();
+      toast.show('Your seller application has been received.', { variant: 'success' });
+      navigation?.goBack();
+    } catch (error) {
+      toast.show(error.message || 'Could not submit your application.', { variant: 'error' });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -87,9 +114,10 @@ const SellerRegistrationScreen = ({ navigation }) => {
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
         <TouchableOpacity
           activeOpacity={0.85}
-          style={styles.submitBtn}
-          onPress={() => navigation && navigation.goBack()}>
-          <Text style={styles.submitBtnText}>Continue</Text>
+          disabled={!isValid || isLoading}
+          style={[styles.submitBtn, (!isValid || isLoading) && styles.submitBtnDisabled]}
+          onPress={submit}>
+          <Text style={styles.submitBtnText}>{isLoading ? 'Submitting...' : 'Submit Application'}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -175,6 +203,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
   },
+  submitBtnDisabled: { opacity: 0.45 },
 });
 
 export default SellerRegistrationScreen;

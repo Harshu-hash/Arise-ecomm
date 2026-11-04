@@ -8,7 +8,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get('window');
 /** Full-bleed campaign creative carousel with line/dot pagination, sat below the gradient header. */
 const HeroBannerCarousel = ({ banners }) => {
   const [activeIndex, setActiveIndex] = useState(0);
-  const onScroll = useRef((e) => {
+  const onScroll = useRef(e => {
     const idx = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
     setActiveIndex(idx);
   }).current;
@@ -20,14 +20,14 @@ const HeroBannerCarousel = ({ banners }) => {
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         onScroll={onScroll}
         scrollEventThrottle={16}
         renderItem={({ item }) => (
-          <Image 
-            source={typeof item.image === 'string' ? { uri: item.image } : item.image} 
-            style={styles.image} 
-            resizeMode="cover" 
+          <Image
+            source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+            style={styles.image}
+            resizeMode="cover"
           />
         )}
       />

@@ -1,30 +1,10 @@
-import React, { useEffect } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { useAppBoot } from '../../../contexts/AppBootContext';
 
-const SPLASH_DURATION_MS = 1400;
-
-const SplashScreen = ({ navigation }) => {
-  const { hasSeenOnboarding, isLoggedIn } = useAppBoot();
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!navigation) return;
-      if (isLoggedIn) {
-        navigation.replace('MainTabs');
-      } else if (!hasSeenOnboarding) {
-        navigation.replace('Onboarding');
-      } else {
-        navigation.replace('Login');
-      }
-    }, SPLASH_DURATION_MS);
-
-    return () => clearTimeout(timer);
-  }, [navigation, hasSeenOnboarding, isLoggedIn]);
-
+const SplashScreen = () => {
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="light-content" themeColor={COLORS.primary} />

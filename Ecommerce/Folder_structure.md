@@ -806,7 +806,7 @@ The architecture must allow adding or removing these without restructuring the p
 
 Multi Vendor
 
-Quick Commerce
+Third-party courier fulfilment
 
 Inventory
 

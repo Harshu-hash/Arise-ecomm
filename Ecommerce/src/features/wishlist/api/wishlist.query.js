@@ -1,1 +1,6 @@
-﻿// Query/mutation definitions for 'wishlist'.
+export {
+  useAddWishlistItemMutation,
+  useGetWishlistQuery,
+  useMoveWishlistItemToCartMutation,
+  useRemoveWishlistItemMutation,
+} from './wishlist.api';

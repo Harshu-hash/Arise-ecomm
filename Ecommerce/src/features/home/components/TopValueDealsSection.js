@@ -22,7 +22,8 @@ const TopValueDealsSection = ({ deals, onPressDeal }) => (
       <TouchableOpacity
         activeOpacity={0.7}
         onPress={() => onPressDeal && onPressDeal(deals && deals[0])}
-        style={styles.seeAllBtn}>
+        style={styles.seeAllBtn}
+      >
         <Text style={styles.seeAllText}>See All</Text>
         <Icon name="chevron-right" size={14} color={COLORS.primary} />
       </TouchableOpacity>
@@ -32,21 +33,26 @@ const TopValueDealsSection = ({ deals, onPressDeal }) => (
       <FlatList
         horizontal
         data={deals}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
         renderItem={({ item }) => (
           <TouchableOpacity
             activeOpacity={0.85}
             onPress={() => onPressDeal && onPressDeal(item)}
-            style={styles.card}>
+            style={styles.card}
+          >
             <View style={styles.imageWrapper}>
               <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
               <View style={styles.dealTag}>
-                <Text style={styles.dealTagText} numberOfLines={1}>{item.value}</Text>
+                <Text style={styles.dealTagText} numberOfLines={1}>
+                  {item.value}
+                </Text>
               </View>
             </View>
-            <Text style={styles.label} numberOfLines={1}>{item.label}</Text>
+            <Text style={styles.label} numberOfLines={1}>
+              {item.label}
+            </Text>
           </TouchableOpacity>
         )}
       />

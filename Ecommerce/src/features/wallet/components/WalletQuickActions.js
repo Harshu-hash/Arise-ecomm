@@ -7,12 +7,13 @@ import { HERO_GRADIENT } from '../data/walletData';
 
 const WalletQuickActions = ({ actions, onPressAction }) => (
   <View style={styles.quickGrid}>
-    {actions.map((action) => (
+    {actions.map(action => (
       <TouchableOpacity
         key={action.id}
         activeOpacity={0.8}
         onPress={() => onPressAction && onPressAction(action)}
-        style={styles.quickItem}>
+        style={styles.quickItem}
+      >
         <View style={styles.quickIconWrap}>
           <Icon name={action.icon} size={19} color={HERO_GRADIENT[0]} />
         </View>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useState, useCallback } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -8,29 +8,13 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import PressableScale from '../../../shared/ui/PressableScale';
 import CouponSection from '../../cart/components/CouponSection';
-import { useCart } from '../../../contexts/CartContext';
-
-const DEFAULT_ADDRESS = {
-  id: 'a1',
-  label: 'Home',
-  isDefault: true,
-  name: 'Harshvardhan Panchal',
-  line: '221B Baker Street, Sector 12, Near City Mall',
-  cityLine: 'Ahmedabad, Gujarat - 380015',
-  phone: '+91 98765 43210',
-};
-
-const DEFAULT_ITEMS = [
-  {
-    id: 'c1',
-    name: 'boAt Airdopes 141 Bluetooth Truly Wireless Earbuds',
-    variant: 'Bold Black',
-    qty: 1,
-    price: 1299,
-    mrp: 2490,
-    image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
-  },
-];
+import { haptics } from '../../../utils/haptics';
+import { useGetCartQuery, useUpdateCartItemMutation } from '@features/cart';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useToast } from '../../../contexts/ToastContext';
+import { useGetAddressesQuery } from '@features/address';
+import { useCreateCheckoutSessionMutation } from '../api/checkout.query';
 
 const SectionBadge = ({ number }) => (
   <View style={styles.sectionBadge}>
@@ -43,58 +27,131 @@ const MIN_QTY = 1;
 
 const CheckoutScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const initialItems = route?.params?.items?.length ? route.params.items : DEFAULT_ITEMS;
-
-  const { appliedCoupon } = useCart();
-  const [items, setItems] = useState(initialItems);
-  const [address, setAddress] = useState(DEFAULT_ADDRESS);
+  const directPurchase = Boolean(route?.params?.items?.length);
+  const [directItems, setDirectItems] = useState(route?.params?.items ?? []);
+  const { data: cart, error, isLoading, refetch } = useGetCartQuery();
+  const {
+    data: addressBook,
+    error: addressError,
+    isLoading: isLoadingAddresses,
+    refetch: refetchAddresses,
+  } = useGetAddressesQuery();
+  const [updateCartItem] = useUpdateCartItemMutation();
+  const [createCheckoutSession, { isLoading: isCreatingSession }] =
+    useCreateCheckoutSessionMutation();
+  const toast = useToast();
+  const items = directPurchase ? directItems : (cart?.items ?? []);
+  const appliedCoupon = directPurchase ? null : cart?.appliedCoupon;
+  const [selectedAddressId, setSelectedAddressId] = useState(route?.params?.selectedAddressId);
+  const address =
+    addressBook?.items.find(item => item.id === selectedAddressId) ||
+    addressBook?.items.find(item => item.isDefault) ||
+    addressBook?.items[0];
 
   useFocusEffect(
     useCallback(() => {
-      const selected = route?.params?.selectedAddress;
+      const selected = route?.params?.selectedAddressId;
       if (selected) {
-        setAddress(selected);
-        navigation.setParams({ selectedAddress: undefined });
+        setSelectedAddressId(selected);
+        navigation.setParams({ selectedAddressId: undefined });
       }
-    }, [route?.params?.selectedAddress, navigation])
+    }, [route?.params?.selectedAddressId, navigation]),
   );
 
-  const itemTotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
-  const mrpTotal = items.reduce((sum, item) => sum + (item.mrp || item.price) * item.qty, 0);
-  const deliveryFee = itemTotal >= 500 ? 0 : 40;
-  const platformFee = 5;
-  const productDiscount = mrpTotal - itemTotal;
-  const couponDiscount = appliedCoupon ? appliedCoupon.amount : 0;
+  const calculatedItemTotal = items.reduce((sum, item) => sum + item.price * item.qty, 0);
+  const calculatedMrpTotal = items.reduce(
+    (sum, item) => sum + (item.mrp || item.price) * item.qty,
+    0,
+  );
+  const itemTotal = directPurchase ? calculatedItemTotal : (cart?.totals.subtotal ?? 0);
+  const mrpTotal = directPurchase ? calculatedMrpTotal : (cart?.totals.mrp ?? 0);
+  const deliveryFee = directPurchase
+    ? calculatedItemTotal >= 500
+      ? 0
+      : 40
+    : (cart?.totals.deliveryFee ?? 0);
+  const platformFee = directPurchase ? 5 : (cart?.totals.platformFee ?? 0);
+  const productDiscount = directPurchase
+    ? calculatedMrpTotal - calculatedItemTotal
+    : (cart?.totals.productDiscount ?? 0);
+  const couponDiscount = directPurchase ? 0 : (cart?.totals.couponDiscount ?? 0);
   const totalSavings = productDiscount + couponDiscount;
-  const grandTotal = Math.max(itemTotal + deliveryFee + platformFee - couponDiscount, 0);
+  const grandTotal = directPurchase
+    ? Math.max(itemTotal + deliveryFee + platformFee, 0)
+    : (cart?.totals.payable ?? 0);
 
-  const priceDetails = useMemo(
-    () => ({
-      itemTotal,
-      deliveryFee,
-      platformFee,
-      discount: productDiscount + couponDiscount,
-      couponCode: appliedCoupon?.code || null,
-      grandTotal,
-    }),
-    [itemTotal, deliveryFee, platformFee, productDiscount, couponDiscount, appliedCoupon, grandTotal]
-  );
-
-  const handleQtyChange = (id, delta) => {
-    setItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? { ...item, qty: Math.min(MAX_QTY, Math.max(MIN_QTY, item.qty + delta)) }
-          : item
-      )
-    );
+  const handleQtyChange = async (item, delta) => {
+    if (directPurchase) {
+      setDirectItems(prev =>
+        prev.map(entry =>
+          entry.id === item.id
+            ? { ...entry, qty: Math.min(MAX_QTY, Math.max(MIN_QTY, entry.qty + delta)) }
+            : entry,
+        ),
+      );
+      return;
+    }
+    try {
+      await updateCartItem({ cartItemId: item.id, quantity: item.qty + delta }).unwrap();
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not update the quantity.');
+    }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     haptics.medium();
-    navigation &&
-      navigation.navigate('PaymentMethod', { items, address, priceDetails });
+    const source = directPurchase ? 'BUY_NOW' : 'CART';
+    const requestItems = directPurchase
+      ? items.map(item => ({
+          productId: item.productId || item.id,
+          variantLabel: item.variant || 'Standard',
+          quantity: item.qty,
+        }))
+      : undefined;
+    const identity = directPurchase
+      ? requestItems
+          .map(item => `${item.productId}:${item.variantLabel}:${item.quantity}`)
+          .join('|')
+      : `${cart.id}:${cart.version}`;
+    try {
+      const session = await createCheckoutSession({
+        source,
+        addressId: address.id,
+        cartVersion: directPurchase ? undefined : cart.version,
+        items: requestItems,
+        idempotencyKey: `checkout:${identity}:${address.id}`,
+      }).unwrap();
+      navigation?.navigate('PaymentMethod', { checkoutSessionId: session.id });
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not start checkout. Please try again.');
+    }
   };
+
+  if ((!directPurchase && isLoading) || isLoadingAddresses) {
+    return <FullScreenLoader message="Preparing checkout..." />;
+  }
+  if (!directPurchase && error && !cart) {
+    return <ErrorState message={error.message} onRetry={refetch} />;
+  }
+  if (!items.length) {
+    return (
+      <ErrorState
+        title="Your cart is empty"
+        message="Add at least one item before starting checkout."
+      />
+    );
+  }
+  if (addressError && !addressBook) {
+    return <ErrorState message={addressError.message} onRetry={refetchAddresses} />;
+  }
+  if (!address) {
+    return (
+      <ErrorState
+        title="Delivery address required"
+        message="Add a serviceable delivery address before continuing to payment."
+      />
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -129,8 +186,12 @@ const CheckoutScreen = ({ navigation, route }) => {
               style={styles.changeBtn}
               onPress={() =>
                 navigation &&
-                navigation.navigate('SavedAddresses', { selectMode: true, returnScreen: 'Checkout' })
-              }>
+                navigation.navigate('SavedAddresses', {
+                  selectMode: true,
+                  returnScreen: 'Checkout',
+                })
+              }
+            >
               <Text style={styles.changeText}>Change</Text>
             </TouchableOpacity>
           </View>
@@ -164,7 +225,10 @@ const CheckoutScreen = ({ navigation, route }) => {
           <View style={styles.sectionTitleRow}>
             <SectionBadge number="2" />
             <Text style={styles.sectionTitle}>
-              Order Summary <Text style={styles.sectionTitleMuted}>({items.length} item{items.length > 1 ? 's' : ''})</Text>
+              Order Summary{' '}
+              <Text style={styles.sectionTitleMuted}>
+                ({items.length} item{items.length > 1 ? 's' : ''})
+              </Text>
             </Text>
           </View>
           {items.map((item, idx) => (
@@ -173,15 +237,21 @@ const CheckoutScreen = ({ navigation, route }) => {
                 <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+                <Text style={styles.itemName} numberOfLines={2}>
+                  {item.name}
+                </Text>
                 {item.variant ? <Text style={styles.itemVariant}>{item.variant}</Text> : null}
                 <View style={styles.itemBottomRow}>
                   <View style={styles.qtyStepper}>
                     <PressableScale
                       disabled={item.qty <= MIN_QTY}
                       haptic="light"
-                      onPress={() => handleQtyChange(item.id, -1)}
-                      style={[styles.qtyStepperBtn, item.qty <= MIN_QTY && styles.qtyStepperBtnDisabled]}>
+                      onPress={() => handleQtyChange(item, -1)}
+                      style={[
+                        styles.qtyStepperBtn,
+                        item.qty <= MIN_QTY && styles.qtyStepperBtnDisabled,
+                      ]}
+                    >
                       <Icon
                         name="minus"
                         size={13}
@@ -192,8 +262,12 @@ const CheckoutScreen = ({ navigation, route }) => {
                     <PressableScale
                       disabled={item.qty >= MAX_QTY}
                       haptic="light"
-                      onPress={() => handleQtyChange(item.id, 1)}
-                      style={[styles.qtyStepperBtn, item.qty >= MAX_QTY && styles.qtyStepperBtnDisabled]}>
+                      onPress={() => handleQtyChange(item, 1)}
+                      style={[
+                        styles.qtyStepperBtn,
+                        item.qty >= MAX_QTY && styles.qtyStepperBtnDisabled,
+                      ]}
+                    >
                       <Icon
                         name="plus"
                         size={13}
@@ -209,7 +283,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
 
         {/* Coupon */}
-        <CouponSection itemTotal={itemTotal} />
+        {!directPurchase ? <CouponSection cartId={cart.id} /> : null}
 
         {/* Price details */}
         <View style={styles.sectionCard}>
@@ -219,7 +293,8 @@ const CheckoutScreen = ({ navigation, route }) => {
             <View style={styles.savingsBanner}>
               <Icon name="check-circle" size={14} color={COLORS.ratingGreen} />
               <Text style={styles.savingsBannerText}>
-                Your Total Savings on this order <Text style={styles.savingsBannerAmount}>₹{totalSavings}</Text>
+                Your Total Savings on this order{' '}
+                <Text style={styles.savingsBannerAmount}>₹{totalSavings}</Text>
               </Text>
             </View>
           ) : null}
@@ -247,7 +322,9 @@ const CheckoutScreen = ({ navigation, route }) => {
           {appliedCoupon ? (
             <View style={styles.priceRow}>
               <Text style={styles.priceLabel}>Coupon Discount ({appliedCoupon.code})</Text>
-              <Text style={[styles.priceValue, styles.discountValue]}>-₹{appliedCoupon.amount}</Text>
+              <Text style={[styles.priceValue, styles.discountValue]}>
+                -₹{appliedCoupon.amount}
+              </Text>
             </View>
           ) : null}
           <View style={styles.priceDivider} />
@@ -288,12 +365,18 @@ const CheckoutScreen = ({ navigation, route }) => {
             <Text style={styles.bottomTotalLabel}>Total Amount</Text>
           )}
         </View>
-        <PressableScale haptic={false} onPress={handleContinue} style={styles.continueBtn}>
-          <Text style={styles.continueText}>Continue</Text>
+        <PressableScale
+          disabled={isCreatingSession}
+          haptic={false}
+          onPress={handleContinue}
+          style={styles.continueBtn}
+        >
+          <Text style={styles.continueText}>
+            {isCreatingSession ? 'Securing prices...' : 'Continue'}
+          </Text>
           <Icon name="arrow-right" size={16} color={COLORS.textPrimary} />
         </PressableScale>
       </View>
-
     </View>
   );
 };

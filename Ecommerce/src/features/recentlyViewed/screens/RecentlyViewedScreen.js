@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -6,11 +6,18 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import EmptyState from '../../../shared/EmptyState/EmptyState';
-import { RECENTLY_VIEWED } from '../../home/data/homeData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import {
+  useClearRecentlyViewedMutation,
+  useGetRecentlyViewedQuery,
+} from '../api/recentlyViewed.api';
 
 const RecentlyViewedScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [items, setItems] = useState(RECENTLY_VIEWED);
+  const { data, isLoading, error, refetch } = useGetRecentlyViewedQuery();
+  const [clearRecentlyViewed, { isLoading: isClearing }] = useClearRecentlyViewedMutation();
+  const items = data?.items || [];
 
   const handleBack = () => {
     if (navigation && navigation.canGoBack()) {
@@ -20,11 +27,14 @@ const RecentlyViewedScreen = ({ navigation }) => {
     }
   };
 
-  const handleClearAll = () => setItems([]);
+  const handleClearAll = () => clearRecentlyViewed();
 
   const handlePressItem = (item) => {
-    navigation && navigation.navigate('Category', { category: { name: item.title } });
+    navigation && navigation.navigate('ProductDetail', { productId: item.productId });
   };
+
+  if (isLoading) return <FullScreenLoader message="Loading recently viewed..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -36,8 +46,8 @@ const RecentlyViewedScreen = ({ navigation }) => {
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Recently Viewed</Text>
         {items.length > 0 ? (
-          <TouchableOpacity onPress={handleClearAll} activeOpacity={0.7}>
-            <Text style={styles.clearText}>Clear All</Text>
+          <TouchableOpacity disabled={isClearing} onPress={handleClearAll} activeOpacity={0.7}>
+            <Text style={styles.clearText}>{isClearing ? 'Clearing...' : 'Clear All'}</Text>
           </TouchableOpacity>
         ) : (
           <View style={styles.backBtn} />

@@ -1,5 +1,12 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -7,11 +14,13 @@ import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
 import TextField from '../../../shared/inputs/TextField';
+import { useStartAuthMutation } from '../api/auth.query';
 
-const ForgotPasswordScreen = ({ navigation }) => {
+const ForgotPasswordScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [identifier, setIdentifier] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [startAuth, { isLoading, error }] = useStartAuthMutation();
+  const returnTo = route?.params?.returnTo;
 
   const handleBack = () => {
     if (navigation && navigation.canGoBack()) {
@@ -21,19 +30,31 @@ const ForgotPasswordScreen = ({ navigation }) => {
     }
   };
 
-  const handleSendOtp = () => {
+  const handleSendOtp = async () => {
     if (!identifier.trim()) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      navigation && navigation.navigate('OtpVerification', { identifier: identifier.trim(), mode: 'reset' });
-    }, 600);
+    try {
+      const challenge = await startAuth({
+        identifier: identifier.trim(),
+        purpose: 'PASSWORD_RESET',
+      }).unwrap();
+      navigation?.navigate('OtpVerification', {
+        identifier: identifier.trim(),
+        destinationMasked: challenge.destinationMasked,
+        challengeId: challenge.challengeId,
+        resendAvailableAt: challenge.resendAvailableAt,
+        mode: 'reset',
+        returnTo,
+      });
+    } catch {
+      // RTK Query exposes the normalized error below the field.
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.background} />
 
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
@@ -55,18 +76,25 @@ const ForgotPasswordScreen = ({ navigation }) => {
           placeholder="Enter mobile number or email"
           leftIcon="mail"
           autoCapitalize="none"
+          error={error?.fieldErrors?.identifier}
           style={styles.field}
         />
 
         <AppButton
           title="Send OTP"
           onPress={handleSendOtp}
-          loading={loading}
+          loading={isLoading}
           disabled={!identifier.trim()}
           fullWidth
           size="lg"
           style={styles.cta}
         />
+
+        {error && !error.fieldErrors?.identifier ? (
+          <Text accessibilityRole="alert" style={styles.errorText}>
+            {error.message}
+          </Text>
+        ) : null}
       </View>
     </KeyboardAvoidingView>
   );
@@ -106,6 +134,11 @@ const styles = StyleSheet.create({
   },
   cta: {
     marginTop: SPACING.l,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: SPACING.s,
   },
 });
 

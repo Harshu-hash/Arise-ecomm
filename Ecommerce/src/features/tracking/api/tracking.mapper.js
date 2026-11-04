@@ -1,1 +1,3 @@
-﻿// Maps backend DTOs to app models for 'tracking'.
+import { trackingResponseSchema } from './tracking.schemas';
+
+export const mapTracking = payload => trackingResponseSchema.parse(payload).data;

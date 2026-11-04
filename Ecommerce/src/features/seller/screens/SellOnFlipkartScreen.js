@@ -19,7 +19,7 @@ const STEPS = [
   { id: 's3', label: 'Start receiving orders & get paid' },
 ];
 
-const SellOnFlipkartScreen = ({ navigation }) => {
+const SellOnAriseScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -30,7 +30,7 @@ const SellOnFlipkartScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Sell on Flipkart</Text>
+        <Text style={styles.headerTitle}>Sell on Arise</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
@@ -38,7 +38,7 @@ const SellOnFlipkartScreen = ({ navigation }) => {
           <Icon name="trending-up" size={26} color={COLORS.white} />
           <Text style={styles.heroTitle}>Grow Your Business Online</Text>
           <Text style={styles.heroSubtitle}>
-            Join lakhs of sellers already growing with Flipkart. Zero setup cost to get started.
+            Apply to join eligible sellers growing with Arise. Verification requirements apply.
           </Text>
         </View>
 
@@ -197,4 +197,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default SellOnFlipkartScreen;
+export default SellOnAriseScreen;

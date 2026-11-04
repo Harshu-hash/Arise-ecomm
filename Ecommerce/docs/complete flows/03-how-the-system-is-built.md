@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-This document explains how the quick commerce platform is put together — in plain language, without technical details. Think of it as a map of how all the pieces connect so that a customer order in one part of the city reaches the right shop and the right rider at the right time.
+This document explains how the marketplace platform is put together — in plain language, without technical details. Think of it as a map of how all the pieces connect so that a customer order reaches the right seller and, later, a third-party courier for shipping.
 
 ---
 

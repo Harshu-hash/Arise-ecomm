@@ -25,7 +25,7 @@ const AccountSettingsScreen = ({ navigation }) => {
         {ACCOUNT_SECTIONS.map((section, index) => (
           <View key={section.title} style={[styles.section, index > 0 && styles.sectionDivider]}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.rows.map((row) => (
+            {section.rows.map(row => (
               <AccountListRow
                 key={row.id}
                 icon={row.icon}

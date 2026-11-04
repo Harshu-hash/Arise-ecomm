@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-The quick commerce platform serves four different types of users. Each person gets their own app or portal designed for their specific job. This document explains who they are, what they can do, and what restrictions apply.
+The marketplace serves customers, sellers, and admins. Each group gets a surface designed for their job. First-party riders are out of scope; last-mile delivery will use third-party courier partners later. This document explains who they are, what they can do, and what restrictions apply.
 
 ---
 

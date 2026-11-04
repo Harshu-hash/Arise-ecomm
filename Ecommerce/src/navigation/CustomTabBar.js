@@ -6,7 +6,6 @@ import { haptics } from '../utils/haptics';
 
 const CUSTOM_ICONS = {
   Home: require('../assets/images/bottom_navbar/Home_logo.png'),
-  Play: require('../assets/images/bottom_navbar/play_logo.png'),
   Categories: require('../assets/images/bottom_navbar/catagory_logo.png'),
   Account: require('../assets/images/bottom_navbar/profile_logo.png'),
   Cart: require('../assets/images/bottom_navbar/cart_logo.png'),
@@ -23,7 +22,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   const [barWidth, setBarWidth] = useState(0);
   const translateX = useRef(new Animated.Value(0)).current;
   const iconScales = useRef({}).current;
-  const getIconScale = (key) => {
+  const getIconScale = key => {
     if (!iconScales[key]) iconScales[key] = new Animated.Value(1);
     return iconScales[key];
   };
@@ -45,7 +44,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
     }
   }, [state.index, barWidth, numRoutes, translateX]);
 
-  const handleBarLayout = (e) => {
+  const handleBarLayout = e => {
     const width = e.nativeEvent.layout.width;
     if (width && width !== barWidth) {
       setBarWidth(width);
@@ -58,7 +57,10 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
   }
 
   return (
-    <View style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]} pointerEvents="box-none">
+    <View
+      style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}
+      pointerEvents="box-none"
+    >
       <View style={styles.bar} onLayout={handleBarLayout}>
         {barWidth > 0 && (
           <Animated.View
@@ -79,12 +81,26 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
           const iconScale = getIconScale(route.key);
 
           const onPress = () => {
-            const event = navigation.emit({ type: 'tabPress', target: route.key, canPreventDefault: true });
+            const event = navigation.emit({
+              type: 'tabPress',
+              target: route.key,
+              canPreventDefault: true,
+            });
             if (!isFocused && !event.defaultPrevented) {
               haptics.selection();
               Animated.sequence([
-                Animated.spring(iconScale, { toValue: 0.82, useNativeDriver: true, speed: 40, bounciness: 0 }),
-                Animated.spring(iconScale, { toValue: 1, useNativeDriver: true, speed: 14, bounciness: 10 }),
+                Animated.spring(iconScale, {
+                  toValue: 0.82,
+                  useNativeDriver: true,
+                  speed: 40,
+                  bounciness: 0,
+                }),
+                Animated.spring(iconScale, {
+                  toValue: 1,
+                  useNativeDriver: true,
+                  speed: 14,
+                  bounciness: 10,
+                }),
               ]).start();
               navigation.navigate(route.name);
             }
@@ -97,7 +113,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
               accessibilityState={isFocused ? { selected: true } : {}}
               onPress={onPress}
               activeOpacity={0.8}
-              style={styles.tabTouchable}>
+              style={styles.tabTouchable}
+            >
               <View style={styles.circleContainer}>
                 <Animated.Image
                   source={iconSource}
@@ -107,7 +124,8 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
                 <Text
                   style={[styles.label, isFocused ? styles.labelActive : styles.labelInactive]}
                   numberOfLines={1}
-                  adjustsFontSizeToFit>
+                  adjustsFontSizeToFit
+                >
                   {label}
                 </Text>
               </View>

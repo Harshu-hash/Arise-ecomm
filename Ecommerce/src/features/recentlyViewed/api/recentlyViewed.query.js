@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'recentlyViewed'.
+export { useClearRecentlyViewedMutation, useGetRecentlyViewedQuery } from './recentlyViewed.api';

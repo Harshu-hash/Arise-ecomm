@@ -1,71 +1,39 @@
-import React, { useMemo, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  ActivityIndicator,
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  Image,
+  TouchableOpacity,
+  ScrollView,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { StatusBarManager, BottomSheetModal, PriceBlock, RatingBadge } from '../../../shared/components';
 import {
-  PRODUCT_CATALOG,
-  CATEGORY_FILTERS,
-  BRAND_FILTERS,
-  RATING_FILTERS,
-  PRICE_RANGE_FILTERS,
-  SORT_OPTIONS,
-  TRENDING_SEARCHES,
-} from '../constants/searchData';
+  StatusBarManager,
+  BottomSheetModal,
+  PriceBlock,
+  RatingBadge,
+} from '../../../shared/components';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useSearchProductsQuery } from '../api/search.query';
+import {
+  useAddWishlistItemMutation,
+  useGetWishlistQuery,
+  useRemoveWishlistItemMutation,
+} from '@features/wishlist';
+import { useToast } from '../../../contexts/ToastContext';
 
 const EMPTY_FILTERS = { categories: [], brands: [], priceRangeId: null, minRating: null };
 
-const matchesQuery = (product, query) => {
-  if (!query) return true;
-  const q = query.toLowerCase();
-  return (
-    product.name.toLowerCase().includes(q) ||
-    product.brand.toLowerCase().includes(q) ||
-    product.category.toLowerCase().includes(q)
-  );
-};
-
-const discountPct = (product) =>
+const discountPct = product =>
   product.mrp && product.mrp > product.price
     ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
     : 0;
-
-const applyFiltersAndSort = (query, filters, sortId) => {
-  const priceRange = PRICE_RANGE_FILTERS.find((r) => r.id === filters.priceRangeId);
-
-  let results = PRODUCT_CATALOG.filter((product) => {
-    if (!matchesQuery(product, query)) return false;
-    if (filters.categories.length && !filters.categories.includes(product.category)) return false;
-    if (filters.brands.length && !filters.brands.includes(product.brand)) return false;
-    if (priceRange && !(product.price >= priceRange.min && product.price < priceRange.max)) return false;
-    if (filters.minRating && product.rating < filters.minRating) return false;
-    return true;
-  });
-
-  switch (sortId) {
-    case 'popularity':
-      results = [...results].sort((a, b) => b.ratingCount - a.ratingCount);
-      break;
-    case 'price_low':
-      results = [...results].sort((a, b) => a.price - b.price);
-      break;
-    case 'price_high':
-      results = [...results].sort((a, b) => b.price - a.price);
-      break;
-    case 'discount':
-      results = [...results].sort((a, b) => discountPct(b) - discountPct(a));
-      break;
-    case 'rating':
-      results = [...results].sort((a, b) => b.rating - a.rating);
-      break;
-    default:
-      break;
-  }
-
-  return results;
-};
 
 const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
   const pct = discountPct(product);
@@ -84,7 +52,8 @@ const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
           activeOpacity={0.7}
           onPress={onToggleWishlist}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.heartBtn}>
+          style={styles.heartBtn}
+        >
           <Icon
             name="heart"
             size={16}
@@ -94,7 +63,9 @@ const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
         </TouchableOpacity>
       </View>
 
-      <Text style={styles.name} numberOfLines={2}>{product.name}</Text>
+      <Text style={styles.name} numberOfLines={2}>
+        {product.name}
+      </Text>
 
       <View style={styles.ratingRow}>
         <RatingBadge variant="pill" rating={product.rating} />
@@ -115,20 +86,78 @@ const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
 const SearchResultsScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const query = route?.params?.query || '';
+  const categoryId = route?.params?.categoryId;
+  const brandId = route?.params?.brandId;
 
   const [sortId, setSortId] = useState('relevance');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
   const [draftFilters, setDraftFilters] = useState(EMPTY_FILTERS);
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const [wishlist, setWishlist] = useState([]);
+  const [cursor, setCursor] = useState(null);
+  const [results, setResults] = useState([]);
+  const toast = useToast();
+  const { data: wishlistData } = useGetWishlistQuery();
+  const [addWishlistItem] = useAddWishlistItemMutation();
+  const [removeWishlistItem] = useRemoveWishlistItemMutation();
+  const wishlistIds = useMemo(
+    () => new Set((wishlistData?.items ?? []).map(item => item.id)),
+    [wishlistData?.items],
+  );
 
-  const results = useMemo(() => applyFiltersAndSort(query, filters, sortId), [query, filters, sortId]);
+  const requestKey = useMemo(
+    () => JSON.stringify({ query, categoryId, brandId, filters, sortId }),
+    [brandId, categoryId, filters, query, sortId],
+  );
+  const requestArgs = useMemo(
+    () => ({
+      q: query,
+      categoryId,
+      brandId,
+      categories: filters.categories.join(','),
+      brands: filters.brands.join(','),
+      priceRangeId: filters.priceRangeId || undefined,
+      minRating: filters.minRating || undefined,
+      sort: sortId,
+      cursor: cursor || undefined,
+      limit: 12,
+    }),
+    [brandId, categoryId, cursor, filters, query, sortId],
+  );
+  const { data, error, isLoading, isFetching, refetch } = useSearchProductsQuery(requestArgs);
+
+  useEffect(() => {
+    setCursor(null);
+    setResults([]);
+  }, [requestKey]);
+
+  useEffect(() => {
+    if (!data) return;
+    setResults(previous => {
+      const next = cursor ? [...previous, ...data.items] : data.items;
+      return [...new Map(next.map(item => [item.id, item])).values()];
+    });
+  }, [cursor, data]);
+
+  const categoryFilters = data?.facets.categories ?? [];
+  const brandFilters = data?.facets.brands ?? [];
+  const ratingFilters = data?.facets.ratings ?? [];
+  const priceRangeFilters = data?.facets.priceRanges ?? [];
+  const sortOptions = data?.sortOptions ?? [];
 
   const activeFilterCount =
-    filters.categories.length + filters.brands.length + (filters.priceRangeId ? 1 : 0) + (filters.minRating ? 1 : 0);
+    filters.categories.length +
+    filters.brands.length +
+    (filters.priceRangeId ? 1 : 0) +
+    (filters.minRating ? 1 : 0);
 
-  const toggleWishlist = (id) =>
-    setWishlist((prev) => (prev.includes(id) ? prev.filter((w) => w !== id) : [...prev, id]));
+  const toggleWishlist = async id => {
+    const isWishlisted = wishlistIds.has(id);
+    try {
+      await (isWishlisted ? removeWishlistItem(id) : addWishlistItem(id)).unwrap();
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not update your wishlist.');
+    }
+  };
 
   const openFilterSheet = () => {
     setDraftFilters(filters);
@@ -136,9 +165,9 @@ const SearchResultsScreen = ({ navigation, route }) => {
   };
 
   const toggleDraft = (key, value) => {
-    setDraftFilters((prev) => {
+    setDraftFilters(prev => {
       const list = prev[key];
-      const next = list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+      const next = list.includes(value) ? list.filter(v => v !== value) : [...list, value];
       return { ...prev, [key]: next };
     });
   };
@@ -151,19 +180,31 @@ const SearchResultsScreen = ({ navigation, route }) => {
   const clearDraftFilters = () => setDraftFilters(EMPTY_FILTERS);
 
   const removeFilter = (key, value) => {
-    setFilters((prev) => {
+    setFilters(prev => {
       if (key === 'priceRangeId' || key === 'minRating') return { ...prev, [key]: null };
-      return { ...prev, [key]: prev[key].filter((v) => v !== value) };
+      return { ...prev, [key]: prev[key].filter(v => v !== value) };
     });
   };
 
   const appliedChips = [
-    ...filters.categories.map((c) => ({ key: 'categories', value: c, label: c })),
-    ...filters.brands.map((b) => ({ key: 'brands', value: b, label: b })),
+    ...filters.categories.map(category => ({
+      key: 'categories',
+      value: category,
+      label: category,
+    })),
+    ...filters.brands.map(brand => ({ key: 'brands', value: brand, label: brand })),
     ...(filters.priceRangeId
-      ? [{ key: 'priceRangeId', value: filters.priceRangeId, label: PRICE_RANGE_FILTERS.find((r) => r.id === filters.priceRangeId)?.label }]
+      ? [
+          {
+            key: 'priceRangeId',
+            value: filters.priceRangeId,
+            label: priceRangeFilters.find(range => range.id === filters.priceRangeId)?.label,
+          },
+        ]
       : []),
-    ...(filters.minRating ? [{ key: 'minRating', value: filters.minRating, label: `${filters.minRating}★ & above` }] : []),
+    ...(filters.minRating
+      ? [{ key: 'minRating', value: filters.minRating, label: `${filters.minRating}+ rating` }]
+      : []),
   ];
 
   return (
@@ -179,37 +220,56 @@ const SearchResultsScreen = ({ navigation, route }) => {
         <TouchableOpacity
           activeOpacity={0.85}
           style={styles.searchBar}
-          onPress={() => navigation && navigation.navigate('Search', { initialQuery: query })}>
-          <Icon name="search" size={16} color={COLORS.textSecondary} style={{ marginRight: SPACING.s }} />
+          onPress={() => navigation && navigation.navigate('Search', { initialQuery: query })}
+        >
+          <Icon
+            name="search"
+            size={16}
+            color={COLORS.textSecondary}
+            style={{ marginRight: SPACING.s }}
+          />
           <Text style={styles.searchBarText} numberOfLines={1}>
             {query || 'Search for items...'}
           </Text>
         </TouchableOpacity>
 
-        <TouchableOpacity onPress={() => navigation && navigation.navigate('Cart')} style={styles.cartBtn}>
+        <TouchableOpacity
+          onPress={() => navigation && navigation.navigate('Cart')}
+          style={styles.cartBtn}
+        >
           <Icon name="shopping-cart" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
       </View>
 
       {/* Sort bar */}
       <View style={styles.sortBarWrap}>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.sortBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.sortBar}
+        >
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={openFilterSheet}
-            style={[styles.sortChip, activeFilterCount > 0 && styles.sortChipActive]}>
-            <Icon name="sliders" size={13} color={activeFilterCount > 0 ? COLORS.primary : COLORS.textPrimary} />
+            style={[styles.sortChip, activeFilterCount > 0 && styles.sortChipActive]}
+          >
+            <Icon
+              name="sliders"
+              size={13}
+              color={activeFilterCount > 0 ? COLORS.primary : COLORS.textPrimary}
+            />
             <Text style={[styles.sortChipText, activeFilterCount > 0 && styles.sortChipTextActive]}>
               Filters{activeFilterCount > 0 ? ` (${activeFilterCount})` : ''}
             </Text>
           </TouchableOpacity>
 
-          {SORT_OPTIONS.map((opt) => (
+          {sortOptions.map(opt => (
             <TouchableOpacity
               key={opt.id}
               activeOpacity={0.8}
               onPress={() => setSortId(opt.id)}
-              style={[styles.sortChip, sortId === opt.id && styles.sortChipActive]}>
+              style={[styles.sortChip, sortId === opt.id && styles.sortChipActive]}
+            >
               <Text style={[styles.sortChipText, sortId === opt.id && styles.sortChipTextActive]}>
                 {opt.label}
               </Text>
@@ -221,14 +281,21 @@ const SearchResultsScreen = ({ navigation, route }) => {
       {/* Applied filter chips */}
       {appliedChips.length > 0 ? (
         <View style={styles.appliedWrap}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.appliedRow}>
-            {appliedChips.map((chip) => (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.appliedRow}
+          >
+            {appliedChips.map(chip => (
               <TouchableOpacity
                 key={`${chip.key}-${chip.value}`}
                 activeOpacity={0.8}
                 onPress={() => removeFilter(chip.key, chip.value)}
-                style={styles.appliedChip}>
-                <Text style={styles.appliedChipText} numberOfLines={1}>{chip.label}</Text>
+                style={styles.appliedChip}
+              >
+                <Text style={styles.appliedChipText} numberOfLines={1}>
+                  {chip.label}
+                </Text>
                 <Icon name="x" size={12} color={COLORS.primary} style={{ marginLeft: 4 }} />
               </TouchableOpacity>
             ))}
@@ -241,10 +308,17 @@ const SearchResultsScreen = ({ navigation, route }) => {
 
       {/* Results */}
       <Text style={styles.resultCount}>
-        {results.length} result{results.length !== 1 ? 's' : ''}{query ? ` for "${query}"` : ''}
+        {data?.total ?? results.length} result{(data?.total ?? results.length) !== 1 ? 's' : ''}
+        {query ? ` for "${query}"` : ''}
       </Text>
 
-      {results.length === 0 ? (
+      {isLoading && results.length === 0 ? (
+        <View style={styles.loadingWrap}>
+          <ActivityIndicator size="large" color={COLORS.primary} />
+        </View>
+      ) : error && results.length === 0 ? (
+        <ErrorState message={error.message} onRetry={refetch} />
+      ) : results.length === 0 ? (
         <ScrollView contentContainerStyle={styles.emptyWrap} showsVerticalScrollIndicator={false}>
           <Icon name="search" size={44} color={COLORS.border} />
           <Text style={styles.emptyTitle}>No results found</Text>
@@ -254,38 +328,42 @@ const SearchResultsScreen = ({ navigation, route }) => {
               : `We couldn't find any matches for "${query}". Try a different search.`}
           </Text>
           {activeFilterCount > 0 ? (
-            <TouchableOpacity activeOpacity={0.85} style={styles.clearFiltersBtn} onPress={() => setFilters(EMPTY_FILTERS)}>
+            <TouchableOpacity
+              activeOpacity={0.85}
+              style={styles.clearFiltersBtn}
+              onPress={() => setFilters(EMPTY_FILTERS)}
+            >
               <Text style={styles.clearFiltersText}>Clear Filters</Text>
             </TouchableOpacity>
           ) : null}
-
-          <Text style={styles.emptyTrendingTitle}>Trending Searches</Text>
-          <View style={styles.emptyTrendingChips}>
-            {TRENDING_SEARCHES.slice(0, 6).map((item) => (
-              <TouchableOpacity
-                key={item}
-                activeOpacity={0.8}
-                onPress={() => navigation && navigation.setParams({ query: item })}
-                style={styles.trendingChip}>
-                <Text style={styles.trendingChipText}>{item}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
         </ScrollView>
       ) : (
         <FlatList
           data={results}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           numColumns={2}
           showsVerticalScrollIndicator={false}
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.gridContent}
+          refreshing={isFetching && !cursor}
+          onRefresh={() => {
+            setCursor(null);
+            setResults([]);
+            if (!cursor) refetch();
+          }}
+          onEndReachedThreshold={0.4}
+          onEndReached={() => {
+            if (data?.nextCursor && !isFetching) setCursor(data.nextCursor);
+          }}
+          ListFooterComponent={
+            isFetching && cursor ? <ActivityIndicator color={COLORS.primary} /> : null
+          }
           renderItem={({ item }) => (
             <ResultCard
               product={item}
-              wishlisted={wishlist.includes(item.id)}
+              wishlisted={wishlistIds.has(item.id)}
               onToggleWishlist={() => toggleWishlist(item.id)}
-              onPress={() => navigation && navigation.navigate('ProductDetail', { product: item })}
+              onPress={() => navigation?.navigate('ProductDetail', { productId: item.id })}
             />
           )}
         />
@@ -303,17 +381,22 @@ const SearchResultsScreen = ({ navigation, route }) => {
         <ScrollView style={styles.sheetScroll} showsVerticalScrollIndicator={false}>
           <Text style={styles.filterSectionTitle}>Category</Text>
           <View style={styles.filterChipsRow}>
-            {CATEGORY_FILTERS.map((cat) => (
+            {categoryFilters.map(cat => (
               <TouchableOpacity
                 key={cat}
                 activeOpacity={0.8}
                 onPress={() => toggleDraft('categories', cat)}
-                style={[styles.filterChip, draftFilters.categories.includes(cat) && styles.filterChipActive]}>
+                style={[
+                  styles.filterChip,
+                  draftFilters.categories.includes(cat) && styles.filterChipActive,
+                ]}
+              >
                 <Text
                   style={[
                     styles.filterChipText,
                     draftFilters.categories.includes(cat) && styles.filterChipTextActive,
-                  ]}>
+                  ]}
+                >
                   {cat}
                 </Text>
               </TouchableOpacity>
@@ -321,18 +404,21 @@ const SearchResultsScreen = ({ navigation, route }) => {
           </View>
 
           <Text style={styles.filterSectionTitle}>Price Range</Text>
-          {PRICE_RANGE_FILTERS.map((range) => (
+          {priceRangeFilters.map(range => (
             <TouchableOpacity
               key={range.id}
               activeOpacity={0.7}
               style={styles.radioRow}
               onPress={() =>
-                setDraftFilters((prev) => ({
+                setDraftFilters(prev => ({
                   ...prev,
                   priceRangeId: prev.priceRangeId === range.id ? null : range.id,
                 }))
-              }>
-              <View style={[styles.radio, draftFilters.priceRangeId === range.id && styles.radioActive]}>
+              }
+            >
+              <View
+                style={[styles.radio, draftFilters.priceRangeId === range.id && styles.radioActive]}
+              >
                 {draftFilters.priceRangeId === range.id ? <View style={styles.radioDot} /> : null}
               </View>
               <Text style={styles.radioLabel}>{range.label}</Text>
@@ -340,18 +426,21 @@ const SearchResultsScreen = ({ navigation, route }) => {
           ))}
 
           <Text style={styles.filterSectionTitle}>Customer Rating</Text>
-          {RATING_FILTERS.map((r) => (
+          {ratingFilters.map(r => (
             <TouchableOpacity
               key={r.id}
               activeOpacity={0.7}
               style={styles.radioRow}
               onPress={() =>
-                setDraftFilters((prev) => ({
+                setDraftFilters(prev => ({
                   ...prev,
                   minRating: prev.minRating === r.value ? null : r.value,
                 }))
-              }>
-              <View style={[styles.radio, draftFilters.minRating === r.value && styles.radioActive]}>
+              }
+            >
+              <View
+                style={[styles.radio, draftFilters.minRating === r.value && styles.radioActive]}
+              >
                 {draftFilters.minRating === r.value ? <View style={styles.radioDot} /> : null}
               </View>
               <Text style={styles.radioLabel}>{r.label}</Text>
@@ -360,17 +449,22 @@ const SearchResultsScreen = ({ navigation, route }) => {
 
           <Text style={styles.filterSectionTitle}>Brand</Text>
           <View style={styles.filterChipsRow}>
-            {BRAND_FILTERS.map((brand) => (
+            {brandFilters.map(brand => (
               <TouchableOpacity
                 key={brand}
                 activeOpacity={0.8}
                 onPress={() => toggleDraft('brands', brand)}
-                style={[styles.filterChip, draftFilters.brands.includes(brand) && styles.filterChipActive]}>
+                style={[
+                  styles.filterChip,
+                  draftFilters.brands.includes(brand) && styles.filterChipActive,
+                ]}
+              >
                 <Text
                   style={[
                     styles.filterChipText,
                     draftFilters.brands.includes(brand) && styles.filterChipTextActive,
-                  ]}>
+                  ]}
+                >
                   {brand}
                 </Text>
               </TouchableOpacity>
@@ -491,6 +585,11 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     paddingHorizontal: SPACING.l,
     paddingVertical: SPACING.s,
+  },
+  loadingWrap: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   gridContent: {
     paddingHorizontal: SPACING.l,

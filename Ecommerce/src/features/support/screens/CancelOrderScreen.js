@@ -1,18 +1,46 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, TextInput } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  TextInput,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import { CANCEL_REASONS } from '../constants/helpData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useCancelOrderMutation, useGetOrderQuery } from '@features/orders';
 
 const CancelOrderScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const order = route?.params?.order;
+  const orderId = route?.params?.orderId || route?.params?.order?.id;
+  const { data: order, error, isLoading, refetch } = useGetOrderQuery(orderId, { skip: !orderId });
+  const [cancelOrder, { isLoading: isCancelling }] = useCancelOrderMutation();
   const [reason, setReason] = useState(null);
   const [comment, setComment] = useState('');
   const [cancelled, setCancelled] = useState(false);
+  const [cancelError, setCancelError] = useState('');
+
+  const handleCancel = async () => {
+    setCancelError('');
+    try {
+      await cancelOrder({ orderId, reason, comment: comment.trim() || undefined }).unwrap();
+      setCancelled(true);
+    } catch (mutationError) {
+      setCancelError(mutationError.message || 'This order could not be cancelled.');
+    }
+  };
+
+  if (isLoading) return <FullScreenLoader message="Loading order..." />;
+  if (error || !order)
+    return <ErrorState title="Order not found" message={error?.message} onRetry={refetch} />;
 
   if (cancelled) {
     return (
@@ -24,19 +52,21 @@ const CancelOrderScreen = ({ navigation, route }) => {
           </View>
           <Text style={styles.successTitle}>Order Cancelled</Text>
           <Text style={styles.successSubtitle}>
-            Your order {order?.id} has been cancelled. If any amount was paid, it will be refunded to
-            your original payment method within 5-7 business days.
+            Your order {order?.id} has been cancelled. If any amount was paid, it will be refunded
+            to your original payment method within 5-7 business days.
           </Text>
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.primaryBtn}
-            onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}>
+            onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}
+          >
             <Text style={styles.primaryBtnText}>Continue Shopping</Text>
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
             style={styles.secondaryBtn}
-            onPress={() => navigation && navigation.navigate('HelpCenter')}>
+            onPress={() => navigation && navigation.navigate('HelpCenter')}
+          >
             <Text style={styles.secondaryBtnText}>Back to Help Center</Text>
           </TouchableOpacity>
         </View>
@@ -60,15 +90,24 @@ const CancelOrderScreen = ({ navigation, route }) => {
           <View style={styles.orderCard}>
             <Image source={{ uri: order.image }} style={styles.image} resizeMode="cover" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.orderName} numberOfLines={2}>{order.name}</Text>
-              <Text style={styles.orderMeta}>{order.id} · ₹{order.price}</Text>
+              <Text style={styles.orderName} numberOfLines={2}>
+                {order.name}
+              </Text>
+              <Text style={styles.orderMeta}>
+                {order.id} · ₹{order.price}
+              </Text>
             </View>
           </View>
         ) : null}
 
         <Text style={styles.sectionTitle}>Why are you cancelling?</Text>
-        {CANCEL_REASONS.map((r) => (
-          <TouchableOpacity key={r} activeOpacity={0.7} style={styles.reasonRow} onPress={() => setReason(r)}>
+        {CANCEL_REASONS.map(r => (
+          <TouchableOpacity
+            key={r}
+            activeOpacity={0.7}
+            style={styles.reasonRow}
+            onPress={() => setReason(r)}
+          >
             <View style={[styles.radio, reason === r && styles.radioActive]}>
               {reason === r ? <View style={styles.radioDot} /> : null}
             </View>
@@ -94,15 +133,19 @@ const CancelOrderScreen = ({ navigation, route }) => {
             business days.
           </Text>
         </View>
+        {cancelError ? <Text style={styles.cancelError}>{cancelError}</Text> : null}
       </ScrollView>
 
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
         <TouchableOpacity
           activeOpacity={0.85}
-          disabled={!reason}
-          style={[styles.confirmBtn, !reason && styles.confirmBtnDisabled]}
-          onPress={() => setCancelled(true)}>
-          <Text style={styles.confirmBtnText}>Confirm Cancellation</Text>
+          disabled={!reason || isCancelling}
+          style={[styles.confirmBtn, (!reason || isCancelling) && styles.confirmBtnDisabled]}
+          onPress={handleCancel}
+        >
+          <Text style={styles.confirmBtnText}>
+            {isCancelling ? 'Cancelling...' : 'Confirm Cancellation'}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -217,6 +260,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textTertiary,
     lineHeight: 16,
+  },
+  cancelError: {
+    color: COLORS.error,
+    fontSize: 12.5,
+    marginTop: SPACING.m,
   },
   footer: {
     paddingHorizontal: SPACING.l,

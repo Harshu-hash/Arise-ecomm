@@ -5,11 +5,18 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { MOCK_ORDERS } from '../constants/helpData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetOrdersQuery } from '@features/orders';
 
 const OrderHelpScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const intent = route?.params?.intent;
+  const { data, error, isLoading, refetch } = useGetOrdersQuery({ limit: 20 });
+  const orders = data?.items ?? [];
+
+  if (isLoading) return <FullScreenLoader message="Loading orders..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -25,7 +32,7 @@ const OrderHelpScreen = ({ navigation, route }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <Text style={styles.introText}>Choose the order you need help with.</Text>
 
-        {MOCK_ORDERS.map((order) => (
+        {orders.map(order => (
           <TouchableOpacity
             key={order.id}
             activeOpacity={0.8}
@@ -33,22 +40,37 @@ const OrderHelpScreen = ({ navigation, route }) => {
             onPress={() => {
               if (!navigation) return;
               if (intent === 'cancel' && order.canCancel) {
-                navigation.navigate('CancelOrder', { order });
+                navigation.navigate('CancelOrder', { orderId: order.id });
               } else if (intent === 'return' && order.canReturn) {
-                navigation.navigate('ReturnReplace', { order });
+                navigation.navigate('ReturnReplace', { orderId: order.id });
               } else if (intent === 'track') {
-                navigation.navigate('OrderDetail', { order });
+                navigation.navigate('OrderDetail', { orderId: order.id });
               } else {
                 navigation.navigate('OrderIssue', { order });
               }
-            }}>
+            }}
+          >
             <Image source={{ uri: order.image }} style={styles.image} resizeMode="cover" />
             <View style={styles.cardInfo}>
-              <Text style={styles.orderName} numberOfLines={2}>{order.name}</Text>
-              <Text style={styles.orderMeta}>{order.id} · {order.date}</Text>
+              <Text style={styles.orderName} numberOfLines={2}>
+                {order.name}
+              </Text>
+              <Text style={styles.orderMeta}>
+                {order.id} · {order.date}
+              </Text>
               <View style={styles.bottomRow}>
-                <View style={[styles.statusPill, order.status === 'Delivered' && styles.statusPillDelivered]}>
-                  <Text style={[styles.statusText, order.status === 'Delivered' && styles.statusTextDelivered]}>
+                <View
+                  style={[
+                    styles.statusPill,
+                    order.status === 'Delivered' && styles.statusPillDelivered,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.statusText,
+                      order.status === 'Delivered' && styles.statusTextDelivered,
+                    ]}
+                  >
                     {order.status}
                   </Text>
                 </View>

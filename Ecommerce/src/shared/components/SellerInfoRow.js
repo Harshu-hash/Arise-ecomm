@@ -4,8 +4,8 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../constants/colors';
 import { SPACING, RADIUS } from '../../constants/spacing';
 
-/** "Sold By X · 4.5★ · N years with Flipkart | See other sellers" row for Product Detail. */
-const SellerInfoRow = ({ sellerName, rating, yearsWithFlipkart, onSeeOtherSellers }) => (
+/** Seller identity and marketplace tenure row for Product Detail. */
+const SellerInfoRow = ({ sellerName, rating, yearsWithArise = 0, onSeeOtherSellers }) => (
   <View style={styles.row}>
     <View style={styles.iconBox}>
       <Icon name="shopping-bag" size={15} color={COLORS.textPrimary} />
@@ -15,7 +15,7 @@ const SellerInfoRow = ({ sellerName, rating, yearsWithFlipkart, onSeeOtherSeller
       <View style={styles.metaRow}>
         <Text style={styles.metaText}>{`${rating}★`}</Text>
         <Text style={styles.metaDot}>{'•'}</Text>
-        <Text style={styles.metaText}>{`${yearsWithFlipkart} years with Flipkart`}</Text>
+        <Text style={styles.metaText}>{`${yearsWithArise} years on Arise`}</Text>
         <Text style={styles.metaDot}>{'|'}</Text>
         <TouchableOpacity onPress={onSeeOtherSellers}>
           <Text style={styles.link}>See other sellers</Text>

@@ -5,59 +5,73 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetOrderQuery } from '@features/orders';
 
 const OrderIssueScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const order = route?.params?.order;
+  const orderId = route?.params?.orderId || route?.params?.order?.id;
+  const { data: order, error, isLoading, refetch } = useGetOrderQuery(orderId, { skip: !orderId });
+
+  if (isLoading) return <FullScreenLoader message="Loading order..." />;
+  if (error || !order) {
+    return <ErrorState title="Order not found" message={error?.message} onRetry={refetch} />;
+  }
 
   const ISSUES = [
-    order?.status !== 'Delivered' && {
+    order.status !== 'Delivered' && {
       id: 'track',
       icon: 'map-pin',
       label: 'Track my order',
-      onPress: () => navigation && navigation.navigate('Tracking'),
+      onPress: () => navigation && navigation.navigate('Tracking', { orderId: order.id }),
     },
-    order?.canCancel && {
+    order.canCancel && {
       id: 'cancel',
       icon: 'x-circle',
       label: 'Cancel this order',
-      onPress: () => navigation && navigation.navigate('CancelOrder', { order }),
+      onPress: () => navigation && navigation.navigate('CancelOrder', { orderId: order.id }),
     },
-    order?.canReturn && {
+    order.canReturn && {
       id: 'return',
       icon: 'refresh-ccw',
       label: 'Return or replace item',
-      onPress: () => navigation && navigation.navigate('ReturnReplace', { order }),
+      onPress: () => navigation && navigation.navigate('ReturnReplace', { orderId: order.id }),
     },
     {
       id: 'missing',
       icon: 'alert-circle',
       label: 'I didn’t receive my order',
-      onPress: () => navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'delivery' }),
+      onPress: () =>
+        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'delivery' }),
     },
     {
       id: 'damaged',
       icon: 'alert-triangle',
       label: 'Item is damaged or defective',
-      onPress: () => navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'product' }),
+      onPress: () =>
+        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'product' }),
     },
     {
       id: 'refund',
       icon: 'rotate-ccw',
       label: 'Refund related query',
-      onPress: () => navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'refund' }),
+      onPress: () =>
+        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'refund' }),
     },
     {
       id: 'invoice',
       icon: 'file-text',
       label: 'Download invoice',
-      onPress: () => navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
+      onPress: () =>
+        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
     },
     {
       id: 'other',
       icon: 'more-horizontal',
       label: 'Something else',
-      onPress: () => navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
+      onPress: () =>
+        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
     },
   ].filter(Boolean);
 
@@ -77,8 +91,12 @@ const OrderIssueScreen = ({ navigation, route }) => {
           <View style={styles.orderCard}>
             <Image source={{ uri: order.image }} style={styles.image} resizeMode="cover" />
             <View style={{ flex: 1 }}>
-              <Text style={styles.orderName} numberOfLines={2}>{order.name}</Text>
-              <Text style={styles.orderMeta}>{order.id} · {order.date}</Text>
+              <Text style={styles.orderName} numberOfLines={2}>
+                {order.name}
+              </Text>
+              <Text style={styles.orderMeta}>
+                {order.id} · {order.date}
+              </Text>
               <Text style={styles.orderStatus}>{order.status}</Text>
             </View>
           </View>
@@ -86,8 +104,13 @@ const OrderIssueScreen = ({ navigation, route }) => {
 
         <Text style={styles.sectionTitle}>What do you need help with?</Text>
 
-        {ISSUES.map((issue) => (
-          <TouchableOpacity key={issue.id} activeOpacity={0.7} style={styles.row} onPress={issue.onPress}>
+        {ISSUES.map(issue => (
+          <TouchableOpacity
+            key={issue.id}
+            activeOpacity={0.7}
+            style={styles.row}
+            onPress={issue.onPress}
+          >
             <View style={styles.rowIconBox}>
               <Icon name={issue.icon} size={17} color={COLORS.primary} />
             </View>

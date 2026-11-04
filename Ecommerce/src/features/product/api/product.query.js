@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'product'.
+export { useGetProductQuery, useLazyGetProductQuery } from './product.api';

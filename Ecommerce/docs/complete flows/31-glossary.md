@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-A simple dictionary of terms used throughout the quick commerce platform documentation. If you encounter an unfamiliar word, look it up here.
+A simple dictionary of terms used throughout the marketplace platform documentation. If you encounter an unfamiliar word, look it up here.
 
 ---
 
@@ -22,7 +22,7 @@ Money in a seller's or rider's wallet that can be withdrawn right now. Different
 The amount of physical cash a delivery partner is currently holding from cash-on-delivery orders. Must be submitted to the platform.
 
 **Cash on delivery (COD)**
-A payment method where the customer pays the delivery partner in physical cash at the doorstep instead of paying online at checkout.
+A payment method where the customer pays in cash at the doorstep instead of paying online at checkout. Cash collection is handled by the courier partner when last-mile is integrated.
 
 **Category**
 A way to organize products — like "Dairy", "Snacks", or "Beverages". The platform uses a three-level category system.
@@ -43,8 +43,8 @@ A person who shops on the platform — browses products, places orders, and rece
 
 ## D
 
-**Dark store**
-A warehouse or shop that stocks products specifically for quick commerce delivery — not a regular walk-in store.
+**Courier partner**
+A third-party logistics company that picks up packed orders and delivers them to customers. Arise does not operate its own rider fleet.
 
 **Delivery code**
 A short code shown to the customer when the rider arrives. The rider must enter this code to confirm delivery. Also called OTP (one-time password).
@@ -152,20 +152,13 @@ An alert that appears on the user's phone even when the app is closed.
 
 ---
 
-## Q
-
-**Quick commerce**
-A business model where everyday items are ordered online and delivered very fast (minutes to an hour) from nearby shops.
-
----
-
 ## R
 
 **Return window**
-The time period after delivery during which a customer can request a return (e.g., 30 minutes to a few hours).
+The time period after delivery during which a customer can request a return (typically several days, depending on category).
 
 **Rider**
-See delivery partner.
+Not a first-party role on Arise. Last-mile uses third-party courier partners later. See courier partner.
 
 ---
 
@@ -175,7 +168,7 @@ See delivery partner.
 A shop or store owner who lists products on the platform and fulfills customer orders.
 
 **Settlement**
-The process of distributing money after a successful delivery — paying the seller, rider, and platform their shares.
+The process of distributing money after a successful delivery — paying the seller and the platform their shares. Courier fees are settled with logistics partners when last-mile is integrated.
 
 **Shop by store**
 A feature that lets customers browse products organized by seller/shop.

@@ -1,5 +1,14 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Animated, Easing, Dimensions } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  Animated,
+  Easing,
+  Dimensions,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import Svg, { Path } from 'react-native-svg';
@@ -42,7 +51,10 @@ const ConfettiPiece = ({ piece }) => {
     outputRange: [0, -piece.burst, piece.fall],
   });
   const translateX = piece.anim.interpolate({ inputRange: [0, 1], outputRange: [0, piece.drift] });
-  const rotate = piece.anim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', piece.rotation] });
+  const rotate = piece.anim.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0deg', piece.rotation],
+  });
   const opacity = piece.anim.interpolate({ inputRange: [0, 0.7, 1], outputRange: [1, 1, 0] });
 
   return (
@@ -81,23 +93,33 @@ const OrderPlacedScreen = ({ navigation, route }) => {
   useEffect(() => {
     Animated.stagger(
       25,
-      confetti.current.map((piece) =>
+      confetti.current.map(piece =>
         Animated.timing(piece.anim, {
           toValue: 1,
           duration: piece.duration,
           delay: piece.delay,
           easing: Easing.linear,
           useNativeDriver: true,
-        })
-      )
+        }),
+      ),
     ).start();
 
     Animated.loop(
       Animated.stagger(300, [
-        Animated.timing(ring1, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }),
-        Animated.timing(ring2, { toValue: 1, duration: 1000, easing: Easing.out(Easing.quad), useNativeDriver: true }),
+        Animated.timing(ring1, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ring2, {
+          toValue: 1,
+          duration: 1000,
+          easing: Easing.out(Easing.quad),
+          useNativeDriver: true,
+        }),
       ]),
-      { iterations: 2 }
+      { iterations: 2 },
     ).start();
 
     Animated.timing(contentAnim, {
@@ -120,7 +142,7 @@ const OrderPlacedScreen = ({ navigation, route }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const ringStyle = (ringAnim) => ({
+  const ringStyle = ringAnim => ({
     opacity: ringAnim.interpolate({ inputRange: [0, 1], outputRange: [0.35, 0] }),
     transform: [{ scale: ringAnim.interpolate({ inputRange: [0, 1], outputRange: [1, 2.4] }) }],
   });
@@ -137,7 +159,7 @@ const OrderPlacedScreen = ({ navigation, route }) => {
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
 
       <View style={styles.confettiLayer} pointerEvents="none">
-        {confetti.current.map((piece) => (
+        {confetti.current.map(piece => (
           <ConfettiPiece key={piece.key} piece={piece} />
         ))}
       </View>
@@ -145,14 +167,20 @@ const OrderPlacedScreen = ({ navigation, route }) => {
       <ScrollView
         contentContainerStyle={[
           styles.scrollContent,
-          { paddingTop: Math.max(insets.top, SPACING.xxl), paddingBottom: Math.max(insets.bottom, SPACING.xxxl) },
+          {
+            paddingTop: Math.max(insets.top, SPACING.xxl),
+            paddingBottom: Math.max(insets.bottom, SPACING.xxxl),
+          },
         ]}
-        showsVerticalScrollIndicator={false}>
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.successIconWrap}>
           <Animated.View style={[styles.pulseRing, ringStyle(ring1)]} />
           <Animated.View style={[styles.pulseRing, ringStyle(ring2)]} />
 
-          <Animated.View style={[styles.successIconCircle, { transform: [{ scale: circleScale }] }]}>
+          <Animated.View
+            style={[styles.successIconCircle, { transform: [{ scale: circleScale }] }]}
+          >
             <Svg width={40} height={40} viewBox="0 0 24 24">
               <AnimatedPath
                 d="M5 13l4 4L19 7"
@@ -174,8 +202,8 @@ const OrderPlacedScreen = ({ navigation, route }) => {
         <Animated.View style={contentStyle}>
           <Text style={styles.title}>Order Placed Successfully!</Text>
           <Text style={styles.subtitle}>
-            Thank you for shopping with us. {itemCount > 1 ? 'Your items have' : 'Your item has'} been confirmed
-            and will be delivered soon.
+            Thank you for shopping with us. {itemCount > 1 ? 'Your items have' : 'Your item has'}{' '}
+            been confirmed and will be delivered soon.
           </Text>
 
           {order ? (
@@ -199,7 +227,10 @@ const OrderPlacedScreen = ({ navigation, route }) => {
               <View style={styles.divider} />
               <View style={styles.orderRow}>
                 <Text style={styles.orderRowLabel}>Delivering to</Text>
-                <Text style={[styles.orderRowValue, { flex: 1, textAlign: 'right' }]} numberOfLines={2}>
+                <Text
+                  style={[styles.orderRowValue, { flex: 1, textAlign: 'right' }]}
+                  numberOfLines={2}
+                >
                   {order.address?.line}
                 </Text>
               </View>
@@ -210,14 +241,18 @@ const OrderPlacedScreen = ({ navigation, route }) => {
             <TouchableOpacity
               activeOpacity={0.9}
               style={styles.primaryBtn}
-              onPress={() => navigation && navigation.navigate('OrderDetail', { order })}>
+              onPress={() =>
+                navigation && navigation.navigate('OrderDetail', { orderId: order.id })
+              }
+            >
               <Icon name="map-pin" size={16} color={COLORS.white} />
               <Text style={styles.primaryBtnText}>Track Order</Text>
             </TouchableOpacity>
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.secondaryBtn}
-              onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}>
+              onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}
+            >
               <Text style={styles.secondaryBtnText}>Continue Shopping</Text>
             </TouchableOpacity>
           </View>

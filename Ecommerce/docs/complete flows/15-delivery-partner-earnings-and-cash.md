@@ -1,8 +1,10 @@
 # Delivery Partner Earnings and Cash
 
+> **Out of scope for Arise v1.** Arise does not run a first-party rider payroll or cash-hub. Courier fees will be settled with third-party logistics partners later.
+
 ## What Is This?
 
-Delivery partners earn money for every completed delivery. They also handle cash collected from customers on cash-on-delivery orders. This document explains earnings, COD cash management, and how to withdraw money to a bank account.
+This historical chapter described first-party rider earnings and COD cash. It is not the marketplace fulfilment model.
 
 ---
 

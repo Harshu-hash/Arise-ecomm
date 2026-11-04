@@ -1,0 +1,13 @@
+appId: com.ariseecommerce
+name: Customer critical-path smoke
+---
+- launchApp:
+    clearState: true
+- extendedWaitUntil:
+    visible: "Arise"
+    timeout: 20000
+- assertVisible: "Home"
+- tapOn: "Categories"
+- assertVisible: "Categories"
+- tapOn: "Account"
+- assertVisible: "Account"

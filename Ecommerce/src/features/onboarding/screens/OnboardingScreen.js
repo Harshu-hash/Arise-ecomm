@@ -1,19 +1,28 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, Dimensions, Animated } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  Dimensions,
+  Animated,
+} from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
-import { useAppBoot } from '../../../contexts/AppBootContext';
+import { useDispatch } from 'react-redux';
+import { persistOnboardingCompletion } from '../../../app/bootstrap/restorePreferences';
 import { ONBOARDING_SLIDES } from '../data/onboardingSlides';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
-const OnboardingScreen = ({ navigation }) => {
+const OnboardingScreen = () => {
   const insets = useSafeAreaInsets();
-  const { setHasSeenOnboarding } = useAppBoot();
+  const dispatch = useDispatch();
   const listRef = useRef(null);
   const [activeIndex, setActiveIndex] = useState(0);
   const scrollX = useRef(new Animated.Value(0)).current;
@@ -21,8 +30,7 @@ const OnboardingScreen = ({ navigation }) => {
   const isLastSlide = activeIndex === ONBOARDING_SLIDES.length - 1;
 
   const finishOnboarding = () => {
-    setHasSeenOnboarding(true);
-    navigation && navigation.replace('Login');
+    persistOnboardingCompletion(dispatch);
   };
 
   const handleNext = () => {
@@ -33,16 +41,13 @@ const OnboardingScreen = ({ navigation }) => {
     listRef.current?.scrollToIndex({ index: activeIndex + 1, animated: true });
   };
 
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    {
-      useNativeDriver: false,
-      listener: (e) => {
-        const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
-        setActiveIndex(index);
-      },
+  const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
+    useNativeDriver: false,
+    listener: e => {
+      const index = Math.round(e.nativeEvent.contentOffset.x / SCREEN_WIDTH);
+      setActiveIndex(index);
     },
-  );
+  });
 
   return (
     <View style={styles.container}>
@@ -51,14 +56,15 @@ const OnboardingScreen = ({ navigation }) => {
       <TouchableOpacity
         style={[styles.skipBtn, { top: Math.max(insets.top, 12) }]}
         onPress={finishOnboarding}
-        activeOpacity={0.7}>
+        activeOpacity={0.7}
+      >
         <Text style={styles.skipText}>Skip</Text>
       </TouchableOpacity>
 
       <FlatList
         ref={listRef}
         data={ONBOARDING_SLIDES}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         horizontal
         pagingEnabled
         showsHorizontalScrollIndicator={false}
@@ -77,10 +83,7 @@ const OnboardingScreen = ({ navigation }) => {
 
       <View style={styles.dotsRow}>
         {ONBOARDING_SLIDES.map((slide, index) => (
-          <View
-            key={slide.id}
-            style={[styles.dot, index === activeIndex && styles.dotActive]}
-          />
+          <View key={slide.id} style={[styles.dot, index === activeIndex && styles.dotActive]} />
         ))}
       </View>
 

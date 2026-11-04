@@ -14,7 +14,7 @@ Anyone who wants to understand what the system does on its own — especially im
 
 ## Why Automation Matters
 
-In quick commerce, speed is everything. The system cannot wait for a human to:
+On a marketplace, orders cannot stall. The system cannot wait for a human to:
 
 - Cancel an order when a seller does not respond
 - Find a rider when the first search fails

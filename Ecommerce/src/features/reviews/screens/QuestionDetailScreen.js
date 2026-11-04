@@ -1,178 +1,191 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-
-const MOCK_ANSWERS = [
-  { id: 'a1', author: 'Rohit K.', text: 'Yes, 10 minutes of charging gives around 2 hours of playback.', date: '21 Aug 2026', helpful: 18 },
-  { id: 'a2', author: 'Flipkart Seller', text: 'Confirmed, the earbuds support fast charging via USB-C.', date: '22 Aug 2026', helpful: 5 },
-];
-
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useCreateAnswerMutation,
+  useGetQuestionQuery,
+  useMarkAnswerHelpfulMutation,
+} from '../api/reviews.api';
 const QuestionDetailScreen = ({ navigation, route }) => {
-  const insets = useSafeAreaInsets();
-  const question = route?.params?.question;
-  const [answerText, setAnswerText] = useState('');
-
+  const insets = useSafeAreaInsets(),
+    toast = useToast(),
+    questionId = route?.params?.questionId || route?.params?.question?.id;
+  const query = useGetQuestionQuery(questionId, { skip: !questionId });
+  const [body, setBody] = useState('');
+  const [createAnswer, { isLoading: isSending }] = useCreateAnswerMutation();
+  const [markHelpful] = useMarkAnswerHelpfulMutation();
+  const send = async () => {
+    try {
+      await createAnswer({ questionId, body }).unwrap();
+      setBody('');
+      toast.show('Answer submitted for moderation', { variant: 'success', icon: 'check' });
+    } catch (error) {
+      toast.show(error.message || 'Could not submit answer', { variant: 'error' });
+    }
+  };
+  const toggle = answer =>
+    markHelpful({ questionId, answerId: answer.id, helpful: !answer.viewerFoundHelpful });
+  if (query.isLoading) return <FullScreenLoader message="Loading answers..." />;
+  if (query.error || !query.data)
+    return (
+      <ErrorState
+        title="Question not found"
+        message={query.error?.message}
+        onRetry={query.refetch}
+      />
+    );
+  const question = query.data;
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Question Detail</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {question ? (
-          <>
-            <Text style={styles.productName} numberOfLines={1}>{question.product}</Text>
+      <FlatList
+        data={question.answers}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.list}
+        refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={query.refetch} />}
+        ListHeaderComponent={
+          <View>
+            <Text style={styles.product}>{question.product}</Text>
             <View style={styles.questionCard}>
-              <Icon name="help-circle" size={16} color={COLORS.primary} style={{ marginRight: SPACING.s }} />
-              <Text style={styles.questionText}>{question.question}</Text>
+              <Text style={styles.question}>{question.question}</Text>
+              <Text style={styles.askedBy}>
+                Asked by {question.authorDisplayName} · {question.date}
+              </Text>
             </View>
-          </>
-        ) : null}
-
-        <Text style={styles.sectionTitle}>Answers ({MOCK_ANSWERS.length})</Text>
-
-        {MOCK_ANSWERS.map((answer) => (
-          <View key={answer.id} style={styles.answerCard}>
-            <Text style={styles.answerAuthor}>{answer.author}</Text>
-            <Text style={styles.answerText}>{answer.text}</Text>
-            <View style={styles.answerBottomRow}>
-              <Text style={styles.answerDate}>{answer.date}</Text>
-              <View style={styles.helpfulRow}>
-                <Icon name="thumbs-up" size={12} color={COLORS.textTertiary} />
-                <Text style={styles.helpfulText}>{answer.helpful}</Text>
-              </View>
+            <Text style={styles.section}>Answers ({question.answersCount})</Text>
+          </View>
+        }
+        ListEmptyComponent={<Text style={styles.empty}>No published answers yet.</Text>}
+        renderItem={({ item }) => (
+          <View style={styles.answerCard}>
+            <View style={styles.authorRow}>
+              <Text style={styles.author}>{item.author}</Text>
+              <Text style={styles.type}>{item.authorType}</Text>
+            </View>
+            <Text style={styles.answer}>{item.text}</Text>
+            {item.moderationStatus !== 'PUBLISHED' ? (
+              <Text style={styles.pending}>Pending moderation</Text>
+            ) : null}
+            <View style={styles.answerMeta}>
+              <Text style={styles.date}>{item.date}</Text>
+              <TouchableOpacity onPress={() => toggle(item)} style={styles.helpful}>
+                <Icon
+                  name="thumbs-up"
+                  size={13}
+                  color={item.viewerFoundHelpful ? COLORS.primary : COLORS.textTertiary}
+                />
+                <Text style={[styles.date, item.viewerFoundHelpful && styles.active]}>
+                  {item.helpfulCount} helpful
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
-        ))}
-      </ScrollView>
-
+        )}
+      />
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
         <TextInput
-          style={styles.input}
-          value={answerText}
-          onChangeText={setAnswerText}
-          placeholder="Write your answer..."
+          value={body}
+          onChangeText={setBody}
+          maxLength={2000}
+          placeholder="Write an answer..."
           placeholderTextColor={COLORS.textTertiary}
+          style={styles.input}
         />
         <TouchableOpacity
-          activeOpacity={0.85}
-          disabled={!answerText.trim()}
-          style={[styles.sendBtn, !answerText.trim() && styles.sendBtnDisabled]}>
+          disabled={body.trim().length < 2 || isSending}
+          onPress={send}
+          style={[styles.send, (body.trim().length < 2 || isSending) && styles.disabled]}
+        >
           <Icon name="send" size={17} color={COLORS.white} />
         </TouchableOpacity>
       </View>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  productName: {
+  headerTitle: { fontSize: 19, fontWeight: '600', color: COLORS.textPrimary },
+  list: { padding: SPACING.l, paddingBottom: SPACING.xxxl },
+  product: {
     fontSize: 12,
     fontWeight: '600',
     color: COLORS.textTertiary,
-    marginBottom: SPACING.m,
     textTransform: 'uppercase',
+    marginBottom: SPACING.m,
   },
   questionCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     backgroundColor: COLORS.primaryLight,
     borderRadius: RADIUS.m,
     padding: SPACING.l,
     marginBottom: SPACING.xl,
   },
-  questionText: {
-    flex: 1,
-    fontSize: 14.5,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    lineHeight: 19,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.m,
-  },
+  question: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary, lineHeight: 21 },
+  askedBy: { fontSize: 11, color: COLORS.textTertiary, marginTop: SPACING.m },
+  section: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: SPACING.m },
+  empty: { fontSize: 13, color: COLORS.textSecondary, textAlign: 'center', padding: SPACING.xl },
   answerCard: {
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.s,
     padding: SPACING.m,
     marginBottom: SPACING.m,
   },
-  answerAuthor: {
-    fontSize: 12.5,
+  authorRow: { flexDirection: 'row', alignItems: 'center', gap: SPACING.s },
+  author: { fontSize: 12.5, fontWeight: '700', color: COLORS.textPrimary },
+  type: {
+    fontSize: 9,
     fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
+    color: COLORS.primary,
+    backgroundColor: COLORS.primaryLight,
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: RADIUS.xs,
   },
-  answerText: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-    marginBottom: SPACING.s,
-  },
-  answerBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  answerDate: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-  },
-  helpfulRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  helpfulText: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-  },
+  answer: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19, marginTop: SPACING.s },
+  pending: { fontSize: 11, color: COLORS.textTertiary, marginTop: SPACING.s },
+  answerMeta: { flexDirection: 'row', justifyContent: 'space-between', marginTop: SPACING.m },
+  date: { fontSize: 11, color: COLORS.textTertiary },
+  helpful: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+  active: { color: COLORS.primary, fontWeight: '700' },
   footer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: SPACING.s,
     paddingHorizontal: SPACING.l,
     paddingTop: SPACING.m,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.surface,
-    gap: SPACING.s,
   },
   input: {
     flex: 1,
@@ -180,11 +193,9 @@ const styles = StyleSheet.create({
     borderColor: COLORS.border,
     borderRadius: RADIUS.round,
     paddingHorizontal: SPACING.l,
-    paddingVertical: SPACING.s,
-    fontSize: 13.5,
     color: COLORS.textPrimary,
   },
-  sendBtn: {
+  send: {
     width: 40,
     height: 40,
     borderRadius: 20,
@@ -192,9 +203,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  sendBtnDisabled: {
-    backgroundColor: COLORS.border,
-  },
+  disabled: { backgroundColor: COLORS.border },
 });
-
 export default QuestionDetailScreen;

@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-This document explains what you need to set up and run the quick commerce platform — for local testing and for a live production business. Written in plain language with no technical commands.
+This document explains what you need to set up and run the marketplace platform — for local testing and for a live production business. Written in plain language with no technical commands.
 
 ---
 
@@ -89,7 +89,7 @@ For a real business serving real customers, the platform should be split for rel
 
 ### Domain name
 
-- A proper domain name (e.g., `www.yourquickcommerce.com`)
+- A proper domain name (e.g., `www.arise.example.com`)
 - Secure connection (HTTPS) for all pages
 
 ---

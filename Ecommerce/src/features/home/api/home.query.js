@@ -1,1 +1,6 @@
-﻿// Query/mutation definitions for 'home'.
+export {
+  useGetAppConfigQuery,
+  useGetHomeQuery,
+  useLazyGetAppConfigQuery,
+  useLazyGetHomeQuery,
+} from './home.api';

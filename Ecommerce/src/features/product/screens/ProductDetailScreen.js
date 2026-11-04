@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -30,8 +30,17 @@ import { StatusBarManager, BottomSheetModal } from '../../../shared/components';
 import PressableScale from '../../../shared/ui/PressableScale';
 import { haptics } from '../../../utils/haptics';
 import { useToast } from '../../../contexts/ToastContext';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetProductQuery } from '../api/product.query';
+import {
+  useAddWishlistItemMutation,
+  useGetWishlistQuery,
+  useRemoveWishlistItemMutation,
+} from '@features/wishlist';
+import { useAddCartItemMutation } from '@features/cart';
 
-// Aliases onto the app theme (Flipkart-derived palette in constants/colors).
+// Aliases onto the app theme.
 const PINK = COLORS.primary;
 const PINK_BG = COLORS.primaryLight;
 const ORANGE = COLORS.ratingGreen;
@@ -45,32 +54,6 @@ const FALLBACK_IMAGES = [
   IMG('photo-1603252109303-2751441dd157'),
   IMG('photo-1620012253295-c15cc3e65df4'),
 ];
-
-const DEFAULT_PRODUCT = {
-  id: 'p-46351675',
-  brand: 'Beyoung',
-  name: 'Men Casual Shirt',
-  price: 915,
-  mrp: 2499,
-  rating: 3.9,
-  ratingCount: 135,
-  reviewCount: 26,
-  color: 'Maroon',
-  sizes: ['38', '40', '42', '44', '46'],
-  image: FALLBACK_IMAGES[0],
-  images: FALLBACK_IMAGES,
-  deliveryDate: 'Tue, 6 Oct',
-  address: 'Block - 3rd floor, Corporate House, 307 B,...',
-  description:
-    'Maroon Textured Opaque Casual shirts, has a Spread Collar, Button Placket, 2 Flap pocket, Long Regular Sleeves, Curved hem',
-  fit: 'Regular Fit',
-  modelInfo: "The model (height 6') is wearing a size 40",
-  care: 'Gentle Machine Wash',
-  productCode: '46351675',
-  manufacturer:
-    'Beyoung Folks Pvt. Ltd.Eklingpura Chouraha, Ahmedabad Main Road (NH 8- Near Mahadev Hotel) Udaipur, India- 313002',
-  countryOfOrigin: 'India',
-};
 
 const COLOUR_OPTIONS = [
   { name: 'Maroon', image: FALLBACK_IMAGES[0] },
@@ -125,7 +108,7 @@ const REVIEWS = [
     date: 'May 28, 2026',
     size: '40',
     text: 'Very comfortable. The fit is perfect and the quality is good for the price.',
-    author: 'Myntra Customer',
+    author: 'Verified Customer',
   },
 ];
 
@@ -178,9 +161,24 @@ const SIZE_CHART_ROWS = [
 ];
 
 const BANK_OFFERS = [
-  { id: 'o1', icon: 'credit-card', title: '10% off up to ₹150', text: 'On HDFC Bank Credit Card EMI transactions, min spend ₹5,000' },
-  { id: 'o2', icon: 'tag', title: 'Get extra 5% off', text: 'Apply coupon EXTRA5 at checkout, valid on this product' },
-  { id: 'o3', icon: 'repeat', title: 'No Cost EMI', text: 'Available on orders above ₹3,000. EMI starts at ₹305/month' },
+  {
+    id: 'o1',
+    icon: 'credit-card',
+    title: '10% off up to ₹150',
+    text: 'On HDFC Bank Credit Card EMI transactions, min spend ₹5,000',
+  },
+  {
+    id: 'o2',
+    icon: 'tag',
+    title: 'Get extra 5% off',
+    text: 'Apply coupon EXTRA5 at checkout, valid on this product',
+  },
+  {
+    id: 'o3',
+    icon: 'repeat',
+    title: 'No Cost EMI',
+    text: 'Available on orders above ₹3,000. EMI starts at ₹305/month',
+  },
 ];
 
 const CTA_HEIGHT = 46;
@@ -255,23 +253,24 @@ const InfoBlock = ({ title, children }) => (
   </View>
 );
 
-const ProductDetailScreen = ({ route, navigation }) => {
+const ProductDetailContent = ({ product, navigation }) => {
   const insets = useSafeAreaInsets();
   const { width, height: windowHeight } = useWindowDimensions();
-  const product = useMemo(
-    () => ({ ...DEFAULT_PRODUCT, ...(route?.params?.product || {}) }),
-    [route?.params?.product],
-  );
 
   const gallery = product.images?.length ? product.images : [product.image].filter(Boolean);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.color);
   const [selectedSize, setSelectedSize] = useState(null);
   const [sizeError, setSizeError] = useState(false);
-  const [wishlisted, setWishlisted] = useState(false);
+  const { data: wishlist } = useGetWishlistQuery();
+  const [addWishlistItem, { isLoading: isAddingToWishlist }] = useAddWishlistItemMutation();
+  const [removeWishlistItem, { isLoading: isRemovingFromWishlist }] =
+    useRemoveWishlistItemMutation();
+  const wishlisted = wishlist?.items.some(item => item.id === product.id) ?? false;
   const heartScale = useSharedValue(1);
   const [suggestionTab, setSuggestionTab] = useState('All');
   const [addedToBag, setAddedToBag] = useState(false);
+  const [addCartItem, { isLoading: isAddingToCart }] = useAddCartItemMutation();
   const [priceAlertOn, setPriceAlertOn] = useState(false);
   const [sizeChartVisible, setSizeChartVisible] = useState(false);
   const [offersVisible, setOffersVisible] = useState(false);
@@ -332,15 +331,27 @@ const ProductDetailScreen = ({ route, navigation }) => {
     return true;
   };
 
-  const onAddToBag = () => {
+  const onAddToBag = async () => {
     if (!requireSize()) return;
     if (addedToBag) {
       haptics.light();
       navigation && navigation.navigate('Cart');
       return;
     }
-    haptics.medium();
-    setAddedToBag(true);
+    try {
+      await addCartItem({
+        productId: product.id,
+        variantId: `${selectedColor}-${selectedSize}`.toLowerCase().replace(/\s+/g, '-'),
+        variantLabel: `${selectedColor}, Size ${selectedSize}`,
+        offerId: `offer-${product.id}`,
+        quantity: 1,
+      }).unwrap();
+      haptics.medium();
+      setAddedToBag(true);
+      toast.show('Added to cart', { icon: 'shopping-cart' });
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not add this product to cart.');
+    }
   };
 
   const onBuyNow = () => {
@@ -370,15 +381,21 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   const openProduct = p => navigation && navigation.push('ProductDetail', { product: p });
 
-  const toggleWishlist = () => {
-    setWishlisted(w => {
-      const next = !w;
-      haptics[next ? 'medium' : 'light']();
-      heartScale.value = withSpring(1.3, { damping: 9, stiffness: 180 }, () => {
-        heartScale.value = withSpring(1, { damping: 12, stiffness: 200 });
-      });
-      return next;
+  const toggleWishlist = async () => {
+    if (isAddingToWishlist || isRemovingFromWishlist) return;
+    const next = !wishlisted;
+    haptics[next ? 'medium' : 'light']();
+    heartScale.value = withSpring(1.3, { damping: 9, stiffness: 180 }, () => {
+      heartScale.value = withSpring(1, { damping: 12, stiffness: 200 });
     });
+    try {
+      await (next ? addWishlistItem(product.id) : removeWishlistItem(product.id)).unwrap();
+      toast.show(next ? 'Saved to wishlist' : 'Removed from wishlist', {
+        icon: next ? 'heart' : 'heart-off',
+      });
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not update your wishlist.');
+    }
   };
 
   const heartAnimatedStyle = useAnimatedStyle(() => ({
@@ -386,13 +403,12 @@ const ProductDetailScreen = ({ route, navigation }) => {
   }));
 
   const togglePriceAlert = () => {
-    setPriceAlertOn((on) => {
+    setPriceAlertOn(on => {
       const next = !on;
       haptics.selection();
-      toast.show(
-        next ? "We'll notify you when the price drops" : 'Price alert removed',
-        { icon: next ? 'bell' : 'bell-off' },
-      );
+      toast.show(next ? "We'll notify you when the price drops" : 'Price alert removed', {
+        icon: next ? 'bell' : 'bell-off',
+      });
       return next;
     });
   };
@@ -414,17 +430,24 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
   const handleViewReviews = () => {
     haptics.selection();
-    navigation && navigation.navigate('Reviews');
+    navigation &&
+      navigation.navigate('Reviews', { productId: product.id, productName: product.name });
   };
 
-  const handleSimilarAdd = (item) => {
+  const handleViewQuestions = () => {
+    haptics.selection();
+    navigation &&
+      navigation.navigate('QuestionsAnswers', { productId: product.id, productName: product.name });
+  };
+
+  const handleSimilarAdd = item => {
     haptics.medium();
     toast.show(`${item.brand} ${item.name} added to bag`, { icon: 'check', variant: 'success' });
   };
 
-  const toggleSuggestionLike = (id) => {
+  const toggleSuggestionLike = id => {
     haptics.light();
-    setLikedSuggestions((prev) => {
+    setLikedSuggestions(prev => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
@@ -442,18 +465,17 @@ const ProductDetailScreen = ({ route, navigation }) => {
   const ctaButtons = (
     <>
       <PressableScale
+        disabled={isAddingToCart}
         haptic={false}
         onPress={onAddToBag}
         style={[styles.ctaBtn, styles.addBagBtn]}
       >
         <Icon name="shopping-bag" size={17} color={COLORS.textPrimary} />
-        <Text style={styles.addBagText}>{addedToBag ? 'Go to Bag' : 'Add to Bag'}</Text>
+        <Text style={styles.addBagText}>
+          {isAddingToCart ? 'Adding...' : addedToBag ? 'Go to Bag' : 'Add to Bag'}
+        </Text>
       </PressableScale>
-      <PressableScale
-        haptic={false}
-        onPress={onBuyNow}
-        style={[styles.ctaBtn, styles.buyNowBtn]}
-      >
+      <PressableScale haptic={false} onPress={onBuyNow} style={[styles.ctaBtn, styles.buyNowBtn]}>
         <Icon name="zap" size={17} color={COLORS.textPrimary} />
         <Text style={styles.buyNowText}>Buy Now</Text>
       </PressableScale>
@@ -532,8 +554,16 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
           {/* Action pills */}
           <View style={styles.actionRow}>
-            <TouchableOpacity style={styles.actionPill} activeOpacity={0.7} onPress={togglePriceAlert}>
-              <Icon name={priceAlertOn ? 'bell' : 'bell-off'} size={22} color={priceAlertOn ? PINK : COLORS.textPrimary} />
+            <TouchableOpacity
+              style={styles.actionPill}
+              activeOpacity={0.7}
+              onPress={togglePriceAlert}
+            >
+              <Icon
+                name={priceAlertOn ? 'bell' : 'bell-off'}
+                size={22}
+                color={priceAlertOn ? PINK : COLORS.textPrimary}
+              />
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.actionPill}
@@ -663,7 +693,11 @@ const ProductDetailScreen = ({ route, navigation }) => {
 
           {/* Delivery & Services */}
           <Section title="Delivery & Services" style={styles.padded}>
-            <TouchableOpacity activeOpacity={0.8} style={styles.addressBox} onPress={handleAddressChange}>
+            <TouchableOpacity
+              activeOpacity={0.8}
+              style={styles.addressBox}
+              onPress={handleAddressChange}
+            >
               <Icon name="map-pin" size={20} color={COLORS.textPrimary} />
               <Text style={styles.addressText} numberOfLines={1}>
                 <Text style={styles.addressBold}>{product.address.split(' - ')[0]} - </Text>
@@ -840,7 +874,10 @@ const ProductDetailScreen = ({ route, navigation }) => {
                   </View>
                   <Text style={styles.reviewBody} numberOfLines={3}>
                     {item.text}
-                    <Text style={styles.readMore} onPress={handleViewReviews}> read more</Text>
+                    <Text style={styles.readMore} onPress={handleViewReviews}>
+                      {' '}
+                      read more
+                    </Text>
                   </Text>
                   <View style={styles.reviewAuthorRow}>
                     <Icon name="check-circle" size={16} color={GREEN} />
@@ -850,6 +887,20 @@ const ProductDetailScreen = ({ route, navigation }) => {
               )}
             />
           </Section>
+
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={handleViewQuestions}
+            style={styles.questionsLink}
+          >
+            <View>
+              <Text style={styles.questionsTitle}>Questions &amp; Answers</Text>
+              <Text style={styles.questionsSubtitle}>
+                Ask buyers and sellers about this product
+              </Text>
+            </View>
+            <Icon name="chevron-right" size={20} color={COLORS.textTertiary} />
+          </TouchableOpacity>
 
           {/* More information */}
           <Dropdown title="More Information" style={{ marginTop: SPACING.xxl }}>
@@ -961,7 +1012,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
               <Text style={[styles.chartCell, styles.chartHeaderCell]}>Length</Text>
               <Text style={[styles.chartCell, styles.chartHeaderCell]}>Shoulder</Text>
             </View>
-            {SIZE_CHART_ROWS.filter((row) => product.sizes.includes(row.size)).map((row) => (
+            {SIZE_CHART_ROWS.filter(row => product.sizes.includes(row.size)).map(row => (
               <View
                 key={row.size}
                 style={[styles.chartRow, row.size === selectedSize && styles.chartRowActive]}
@@ -980,7 +1031,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
         <View style={styles.sheetContent}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Available Offers</Text>
-          {BANK_OFFERS.map((offer) => (
+          {BANK_OFFERS.map(offer => (
             <View key={offer.id} style={styles.offerRow}>
               <View style={styles.offerIconCircle}>
                 <Icon name={offer.icon} size={18} color={PINK} />
@@ -997,7 +1048,53 @@ const ProductDetailScreen = ({ route, navigation }) => {
   );
 };
 
+const ProductDetailScreen = ({ route, navigation }) => {
+  const productId = route?.params?.productId || route?.params?.product?.id;
+  const {
+    data: product,
+    error,
+    isLoading,
+    refetch,
+  } = useGetProductQuery(productId, {
+    skip: !productId,
+  });
+
+  if (!productId) {
+    return (
+      <ErrorState
+        title="Product unavailable"
+        message="This product link is incomplete. Return to the catalog and try again."
+      />
+    );
+  }
+  if (isLoading) return <FullScreenLoader message="Loading product..." />;
+  if (error || !product) {
+    return (
+      <ErrorState
+        title={error?.status === 404 ? 'Product not found' : undefined}
+        message={error?.message}
+        onRetry={refetch}
+      />
+    );
+  }
+  return <ProductDetailContent product={product} navigation={navigation} />;
+};
+
 const styles = StyleSheet.create({
+  questionsLink: {
+    marginTop: SPACING.xxl,
+    marginHorizontal: SPACING.l,
+    padding: SPACING.l,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.m,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.surface,
+  },
+  questionsTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
+  questionsSubtitle: { fontSize: 12, color: COLORS.textSecondary, marginTop: 3 },
   container: { flex: 1, backgroundColor: COLORS.white },
   rowCenter: { flexDirection: 'row', alignItems: 'center' },
   padded: { paddingHorizontal: SPACING.l },

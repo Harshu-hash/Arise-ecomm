@@ -6,20 +6,52 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager, AccountListRow } from '../../../shared/components';
 import { ACCOUNT_SECTIONS } from '../constants/accountSections';
-import { useAppBoot } from '../../../contexts/AppBootContext';
+import { useSelector } from 'react-redux';
+import {
+  selectCurrentUser,
+  selectIsAuthenticated,
+  useLogoutAllMutation,
+  useLogoutMutation,
+} from '../../auth';
+import { useGetProfileQuery } from '../api/profile.api';
 
 const QUICK_ACTIONS = [
   { id: 'orders', label: 'Orders', icon: 'package', bg: '#E5EEFF', color: COLORS.primary },
   { id: 'wishlist', label: 'Wishlist', icon: 'heart', bg: '#FDE7EC', color: COLORS.offerRed },
-  { id: 'coupons', label: 'Coupons', icon: 'gift', bg: COLORS.ratingGreenBg, color: COLORS.ratingGreen },
+  {
+    id: 'coupons',
+    label: 'Coupons',
+    icon: 'gift',
+    bg: COLORS.ratingGreenBg,
+    color: COLORS.ratingGreen,
+  },
   { id: 'notifications', label: 'Notifications', icon: 'bell', bg: '#F1E9FF', color: '#7A3DF0' },
-  { id: 'help', label: 'Help Center', icon: 'headphones', bg: COLORS.etaGoldLight, color: COLORS.warning },
+  {
+    id: 'help',
+    label: 'Help Center',
+    icon: 'headphones',
+    bg: COLORS.etaGoldLight,
+    color: COLORS.warning,
+  },
 ];
 
 const ProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const { isLoggedIn } = useAppBoot();
-  const email = 'harshvardhanpanc145@gmail...';
+  const isLoggedIn = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectCurrentUser);
+  const { data: profile } = useGetProfileQuery(undefined, { skip: !isLoggedIn });
+  const identifier =
+    profile?.name || user?.displayName || user?.email || user?.phone || 'Arise customer';
+  const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
+  const [logoutAll, { isLoading: isLoggingOutAll }] = useLogoutAllMutation();
+
+  const finishLogout = async mutation => {
+    try {
+      await mutation().unwrap();
+    } catch {
+      // Local credentials and API cache are cleared even if the server is unavailable.
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -30,12 +62,14 @@ const ProfileScreen = ({ navigation }) => {
         contentContainerStyle={[
           styles.scrollContent,
           { paddingTop: Math.max(insets.top, 12), paddingBottom: 100 + insets.bottom },
-        ]}>
+        ]}
+      >
         {!isLoggedIn ? (
           <TouchableOpacity
             activeOpacity={0.85}
-            onPress={() => navigation && navigation.navigate('Login')}
-            style={styles.loginBanner}>
+            onPress={() => navigation?.getParent()?.navigate('Auth', { screen: 'Login' })}
+            style={styles.loginBanner}
+          >
             <View style={styles.loginAvatar}>
               <Icon name="user" size={20} color={COLORS.primary} />
             </View>
@@ -48,7 +82,9 @@ const ProfileScreen = ({ navigation }) => {
         ) : (
           <View style={styles.userCard}>
             <View style={styles.userCardTopRow}>
-              <Text style={styles.userEmail} numberOfLines={1}>{email}</Text>
+              <Text style={styles.userEmail} numberOfLines={1}>
+                {identifier}
+              </Text>
               <View style={styles.coinPill}>
                 <Icon name="zap" size={12} color={COLORS.ctaYellow} />
                 <Text style={styles.coinText}>0</Text>
@@ -66,7 +102,7 @@ const ProfileScreen = ({ navigation }) => {
         )}
 
         <View style={styles.quickGrid}>
-          {QUICK_ACTIONS.map((action) => (
+          {QUICK_ACTIONS.map(action => (
             <TouchableOpacity
               key={action.id}
               activeOpacity={0.8}
@@ -78,7 +114,8 @@ const ProfileScreen = ({ navigation }) => {
                 if (action.id === 'notifications') navigation.navigate('Notifications');
                 if (action.id === 'help') navigation.navigate('HelpCenter');
               }}
-              style={styles.quickCard}>
+              style={styles.quickCard}
+            >
               <View style={[styles.quickIconCircle, { backgroundColor: action.bg }]}>
                 <Icon name={action.icon} size={18} color={action.color} />
               </View>
@@ -90,7 +127,7 @@ const ProfileScreen = ({ navigation }) => {
         {ACCOUNT_SECTIONS.map((section, index) => (
           <View key={section.title} style={[styles.section, index > 0 && styles.sectionDivider]}>
             <Text style={styles.sectionTitle}>{section.title}</Text>
-            {section.rows.map((row) => (
+            {section.rows.map(row => (
               <AccountListRow
                 key={row.id}
                 icon={row.icon}
@@ -100,6 +137,22 @@ const ProfileScreen = ({ navigation }) => {
             ))}
           </View>
         ))}
+
+        {isLoggedIn ? (
+          <View style={[styles.section, styles.sectionDivider]}>
+            <Text style={styles.sectionTitle}>Session</Text>
+            <AccountListRow
+              icon="log-out"
+              label={isLoggingOut ? 'Logging out...' : 'Log out'}
+              onPress={isLoggingOut ? undefined : () => finishLogout(logout)}
+            />
+            <AccountListRow
+              icon="shield"
+              label={isLoggingOutAll ? 'Logging out...' : 'Log out from all devices'}
+              onPress={isLoggingOutAll ? undefined : () => finishLogout(logoutAll)}
+            />
+          </View>
+        ) : null}
       </ScrollView>
     </View>
   );

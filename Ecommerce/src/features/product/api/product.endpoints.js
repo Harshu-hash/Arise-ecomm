@@ -1,1 +1,3 @@
-﻿// Endpoint path constants for 'product'.
+export const PRODUCT_ENDPOINTS = Object.freeze({
+  detail: productId => `/products/${encodeURIComponent(productId)}`,
+});

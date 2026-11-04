@@ -6,7 +6,11 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 
 /** Left sidebar row on "All Categories" — circular image/icon + label, blue accent when selected. */
 const CategorySidebarRow = ({ item, isSelected, onPress }) => (
-  <TouchableOpacity activeOpacity={0.8} onPress={onPress} style={[styles.row, isSelected && styles.rowSelected]}>
+  <TouchableOpacity
+    activeOpacity={0.8}
+    onPress={onPress}
+    style={[styles.row, isSelected && styles.rowSelected]}
+  >
     <View style={styles.imageBox}>
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
@@ -14,7 +18,9 @@ const CategorySidebarRow = ({ item, isSelected, onPress }) => (
         <Icon name={item.icon || 'grid'} size={20} color={COLORS.primary} />
       )}
     </View>
-    <Text style={[styles.label, isSelected && styles.labelSelected]} numberOfLines={2}>{item.name}</Text>
+    <Text style={[styles.label, isSelected && styles.labelSelected]} numberOfLines={2}>
+      {item.name}
+    </Text>
   </TouchableOpacity>
 );
 

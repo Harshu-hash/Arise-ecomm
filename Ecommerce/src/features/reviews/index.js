@@ -1,1 +1,2 @@
-﻿// Public API of the 'reviews' feature. Other features may ONLY import from this file.
+export * from './api/reviews.api';
+export * from './api/reviews.mapper';

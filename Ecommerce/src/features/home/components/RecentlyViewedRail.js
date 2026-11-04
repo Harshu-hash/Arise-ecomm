@@ -25,14 +25,22 @@ const RecentlyViewedRail = ({ items, onPressItem, onSeeAll }) => (
       <FlatList
         horizontal
         data={items}
-        keyExtractor={(item) => item.id}
+        keyExtractor={item => item.id}
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: SPACING.l }}
         renderItem={({ item }) => (
-          <TouchableOpacity activeOpacity={0.85} onPress={() => onPressItem && onPressItem(item)} style={styles.card}>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            onPress={() => onPressItem && onPressItem(item)}
+            style={styles.card}
+          >
             <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
-            <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
-            <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
+            <Text style={styles.itemTitle} numberOfLines={1}>
+              {item.title}
+            </Text>
+            <Text style={styles.itemSubtitle} numberOfLines={1}>
+              {item.subtitle}
+            </Text>
           </TouchableOpacity>
         )}
       />

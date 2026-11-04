@@ -19,16 +19,27 @@ const CategorySpotlightTile = ({ item, onPress }) => (
       {item.badge ? (
         item.badgeVariant === 'title' ? (
           <View style={styles.titleOverlay}>
-            <Text style={styles.titleOverlayText} numberOfLines={2}>{item.badge}</Text>
+            <Text style={styles.titleOverlayText} numberOfLines={2}>
+              {item.badge}
+            </Text>
           </View>
         ) : (
-          <View style={[styles.badge, { backgroundColor: BADGE_COLORS[item.badgeVariant] || COLORS.primary }]}>
-            <Text style={styles.badgeText} numberOfLines={1}>{item.badge}</Text>
+          <View
+            style={[
+              styles.badge,
+              { backgroundColor: BADGE_COLORS[item.badgeVariant] || COLORS.primary },
+            ]}
+          >
+            <Text style={styles.badgeText} numberOfLines={1}>
+              {item.badge}
+            </Text>
           </View>
         )
       ) : null}
     </View>
-    <Text style={styles.label} numberOfLines={2}>{item.label}</Text>
+    <Text style={styles.label} numberOfLines={2}>
+      {item.label}
+    </Text>
   </TouchableOpacity>
 );
 

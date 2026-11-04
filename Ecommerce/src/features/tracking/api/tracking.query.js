@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'tracking'.
+export { useGetShipmentTrackingQuery } from './tracking.api';

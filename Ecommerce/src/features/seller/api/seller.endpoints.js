@@ -1,1 +1,3 @@
-﻿// Endpoint path constants for 'seller'.
+export const SELLER_ENDPOINTS = Object.freeze({
+  leads: '/seller-leads',
+});

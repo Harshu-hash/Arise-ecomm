@@ -1,5 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, KeyboardAvoidingView, Platform } from 'react-native';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import Animated, { useSharedValue, useAnimatedStyle, withSpring } from 'react-native-reanimated';
@@ -7,11 +15,21 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
-import { useAppBoot } from '../../../contexts/AppBootContext';
 import { haptics } from '../../../utils/haptics';
+import {
+  useResendOtpMutation,
+  useVerifyOtpMutation,
+  useVerifyPasswordResetOtpMutation,
+} from '../api/auth.query';
+import { buildCustomerRootState } from '../../../navigation/navigationState';
 
 const OTP_LENGTH = 4;
 const RESEND_SECONDS = 30;
+const secondsUntil = value => {
+  const timestamp = Date.parse(value);
+  if (Number.isNaN(timestamp)) return RESEND_SECONDS;
+  return Math.max(0, Math.ceil((timestamp - Date.now()) / 1000));
+};
 
 const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
@@ -44,18 +62,22 @@ const OtpDigitBox = ({ digit, inputRef, ...inputProps }) => {
 
 const OtpVerificationScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { setIsLoggedIn } = useAppBoot();
   const params = route?.params || {};
-  const { identifier = '', mode = 'login' } = params;
+  const { identifier = '', destinationMasked = '', mode = 'login', returnTo } = params;
 
   const [digits, setDigits] = useState(Array(OTP_LENGTH).fill(''));
-  const [loading, setLoading] = useState(false);
-  const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [challengeId, setChallengeId] = useState(params.challengeId);
+  const [destination, setDestination] = useState(destinationMasked);
+  const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(params.resendAvailableAt));
   const inputRefs = useRef([]);
+  const [verifyOtp, { isLoading, error: verifyError }] = useVerifyOtpMutation();
+  const [verifyPasswordResetOtp, { isLoading: isVerifyingReset, error: resetVerifyError }] =
+    useVerifyPasswordResetOtpMutation();
+  const [resendOtp, { isLoading: isResending, error: resendError }] = useResendOtpMutation();
 
   useEffect(() => {
     if (secondsLeft <= 0) return;
-    const timer = setTimeout(() => setSecondsLeft((s) => s - 1), 1000);
+    const timer = setTimeout(() => setSecondsLeft(s => s - 1), 1000);
     return () => clearTimeout(timer);
   }, [secondsLeft]);
 
@@ -68,7 +90,18 @@ const OtpVerificationScreen = ({ navigation, route }) => {
   };
 
   const handleChangeDigit = (text, index) => {
-    const clean = text.replace(/[^0-9]/g, '').slice(-1);
+    const clean = text.replace(/[^0-9]/g, '');
+    if (clean.length > 1) {
+      const pasted = clean.slice(0, OTP_LENGTH - index).split('');
+      const next = [...digits];
+      pasted.forEach((value, offset) => {
+        next[index + offset] = value;
+      });
+      setDigits(next);
+      haptics.selection();
+      inputRefs.current[Math.min(index + pasted.length, OTP_LENGTH - 1)]?.focus();
+      return;
+    }
     const next = [...digits];
     next[index] = clean;
     setDigits(next);
@@ -87,33 +120,48 @@ const OtpVerificationScreen = ({ navigation, route }) => {
   const otpValue = digits.join('');
   const canVerify = otpValue.length === OTP_LENGTH;
 
-  const handleVerify = () => {
+  const handleVerify = async () => {
     if (!canVerify) return;
-    setLoading(true);
-    setTimeout(() => {
-      setLoading(false);
-      haptics.success();
+    try {
       if (mode === 'reset') {
-        navigation && navigation.navigate('ResetPassword', { identifier });
-      } else {
-        setIsLoggedIn(true);
-        navigation && navigation.replace('MainTabs');
+        const verification = await verifyPasswordResetOtp({ challengeId, otp: otpValue }).unwrap();
+        haptics.success();
+        navigation?.navigate('ResetPassword', {
+          identifier,
+          resetToken: verification.resetToken,
+          resetTokenExpiresAt: verification.expiresAt,
+          returnTo,
+        });
+        return;
       }
-    }, 600);
+      await verifyOtp({ challengeId, otp: otpValue }).unwrap();
+      haptics.success();
+      navigation?.getParent()?.reset(buildCustomerRootState(returnTo));
+    } catch {
+      haptics.error();
+    }
   };
 
-  const handleResend = () => {
+  const handleResend = async () => {
     if (secondsLeft > 0) return;
-    haptics.selection();
-    setSecondsLeft(RESEND_SECONDS);
-    setDigits(Array(OTP_LENGTH).fill(''));
-    inputRefs.current[0]?.focus();
+    try {
+      const challenge = await resendOtp({ challengeId }).unwrap();
+      setChallengeId(challenge.challengeId);
+      setDestination(challenge.destinationMasked);
+      haptics.selection();
+      setSecondsLeft(secondsUntil(challenge.resendAvailableAt));
+      setDigits(Array(OTP_LENGTH).fill(''));
+      inputRefs.current[0]?.focus();
+    } catch {
+      haptics.error();
+    }
   };
 
   return (
     <KeyboardAvoidingView
       style={styles.container}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.background} />
 
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
@@ -126,7 +174,7 @@ const OtpVerificationScreen = ({ navigation, route }) => {
         <Text style={styles.title}>Verify OTP</Text>
         <Text style={styles.subtitle}>
           Enter the {OTP_LENGTH}-digit code sent to{' '}
-          <Text style={styles.identifier}>{identifier || 'your number'}</Text>
+          <Text style={styles.identifier}>{destination || identifier || 'your number'}</Text>
         </Text>
 
         <View style={styles.otpRow}>
@@ -134,9 +182,14 @@ const OtpVerificationScreen = ({ navigation, route }) => {
             <OtpDigitBox
               key={index}
               digit={digit}
-              inputRef={(ref) => { inputRefs.current[index] = ref; }}
-              onChangeText={(text) => handleChangeDigit(text, index)}
-              onKeyPress={(e) => handleKeyPress(e, index)}
+              inputRef={ref => {
+                inputRefs.current[index] = ref;
+              }}
+              maxLength={index === 0 ? OTP_LENGTH : 1}
+              textContentType={index === 0 ? 'oneTimeCode' : 'none'}
+              autoComplete={index === 0 ? 'sms-otp' : 'off'}
+              onChangeText={text => handleChangeDigit(text, index)}
+              onKeyPress={e => handleKeyPress(e, index)}
             />
           ))}
         </View>
@@ -144,20 +197,29 @@ const OtpVerificationScreen = ({ navigation, route }) => {
         <AppButton
           title="Verify"
           onPress={handleVerify}
-          loading={loading}
-          disabled={!canVerify}
+          loading={isLoading || isVerifyingReset}
+          disabled={!canVerify || !challengeId}
           fullWidth
           size="lg"
           style={styles.cta}
         />
 
+        {verifyError || resetVerifyError || resendError ? (
+          <Text accessibilityRole="alert" style={styles.errorText}>
+            {(verifyError || resetVerifyError || resendError).message}
+          </Text>
+        ) : null}
+
         <TouchableOpacity
           activeOpacity={0.7}
-          disabled={secondsLeft > 0}
+          disabled={secondsLeft > 0 || isResending}
           onPress={handleResend}
-          style={styles.resendRow}>
+          style={styles.resendRow}
+        >
           <Text style={[styles.resendText, secondsLeft > 0 && styles.resendTextDisabled]}>
-            {secondsLeft > 0 ? `Resend OTP in 00:${String(secondsLeft).padStart(2, '0')}` : 'Resend OTP'}
+            {secondsLeft > 0
+              ? `Resend OTP in 00:${String(secondsLeft).padStart(2, '0')}`
+              : 'Resend OTP'}
           </Text>
         </TouchableOpacity>
       </View>
@@ -231,6 +293,12 @@ const styles = StyleSheet.create({
   },
   resendTextDisabled: {
     color: COLORS.textTertiary,
+  },
+  errorText: {
+    color: COLORS.error,
+    fontSize: 12,
+    marginTop: SPACING.s,
+    textAlign: 'center',
   },
 });
 

@@ -1,231 +1,125 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
-import { SPACING, RADIUS } from '../../../constants/spacing';
+import { RADIUS, SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-
-const CARDS = [
-  { id: 'c1', type: 'Credit Card', brand: 'VISA', last4: '4242', holder: 'HARSHVARDHAN PANCHAL', expiry: '08/28' },
-  { id: 'c2', type: 'Debit Card', brand: 'Mastercard', last4: '8871', holder: 'HARSHVARDHAN PANCHAL', expiry: '02/27' },
-];
-
-const GIFT_CARDS = [{ id: 'g1', code: 'FKGV-3391-XXXX', balance: '₹500' }];
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useDeletePaymentMethodMutation,
+  useGetPaymentMethodsQuery,
+} from '../api/payment.api';
 
 const SavedCardsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const toast = useToast();
+  const { data, isLoading, error, refetch } = useGetPaymentMethodsQuery();
+  const [deleteMethod, { isLoading: isDeleting }] = useDeletePaymentMethodMutation();
+
+  if (isLoading) return <FullScreenLoader message="Loading payment methods..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
+
+  const remove = async id => {
+    try {
+      await deleteMethod(id).unwrap();
+      toast.show('Payment method removed.', { variant: 'success', icon: 'check' });
+    } catch (requestError) {
+      toast.show(requestError.message || 'Could not remove the payment method.');
+    }
+  };
+  const methods = data?.items || [];
 
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.back}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Saved Cards & Gift Cards</Text>
+        <Text style={styles.headerTitle}>Saved Payment Methods</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <Text style={styles.sectionTitle}>Credit / Debit Cards</Text>
-
-        {CARDS.map((card) => (
-          <View key={card.id} style={styles.cardBox}>
-            <View style={styles.cardTopRow}>
-              <Icon name="credit-card" size={20} color={COLORS.primary} />
-              <Text style={styles.cardBrand}>{card.brand}</Text>
-            </View>
-            <Text style={styles.cardNumber}>•••• •••• •••• {card.last4}</Text>
-            <View style={styles.cardBottomRow}>
-              <View>
-                <Text style={styles.cardMetaLabel}>CARD HOLDER</Text>
-                <Text style={styles.cardMetaValue}>{card.holder}</Text>
+      <ScrollView contentContainerStyle={styles.content}>
+        {!methods.length ? (
+          <EmptyState
+            icon="credit-card"
+            title="No saved payment methods"
+            message="Cards are tokenized and stored by the payment provider, never by Arise."
+          />
+        ) : (
+          methods.map(method => (
+            <View key={method.id} style={styles.card}>
+              <View style={styles.row}>
+                <Icon name="credit-card" size={22} color={COLORS.primary} />
+                <View style={styles.details}>
+                  <Text style={styles.label}>{method.label}</Text>
+                  <Text style={styles.meta}>
+                    {method.expiryMonth && method.expiryYear
+                      ? `Expires ${String(method.expiryMonth).padStart(2, '0')}/${String(method.expiryYear).slice(-2)}`
+                      : 'Provider-managed method'}
+                  </Text>
+                </View>
+                {method.isDefault ? <Text style={styles.defaultText}>Default</Text> : null}
               </View>
-              <View>
-                <Text style={styles.cardMetaLabel}>EXPIRES</Text>
-                <Text style={styles.cardMetaValue}>{card.expiry}</Text>
-              </View>
+              <TouchableOpacity disabled={isDeleting} onPress={() => remove(method.id)}>
+                <Text style={styles.remove}>Remove</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity activeOpacity={0.7} style={styles.removeRow}>
-              <Icon name="trash-2" size={13} color={COLORS.error} />
-              <Text style={styles.removeText}>Remove Card</Text>
-            </TouchableOpacity>
-          </View>
-        ))}
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.addBtn}
-          onPress={() => navigation && navigation.navigate('AddCard')}>
+          ))
+        )}
+        <TouchableOpacity style={styles.action} onPress={() => navigation?.navigate('AddCard')}>
           <Icon name="plus" size={17} color={COLORS.primary} />
-          <Text style={styles.addBtnText}>Add New Card</Text>
+          <Text style={styles.actionText}>Add card securely</Text>
         </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Gift Cards</Text>
-        {GIFT_CARDS.map((gc) => (
-          <View key={gc.id} style={styles.giftRow}>
-            <Icon name="gift" size={18} color={COLORS.ratingGreen} style={{ marginRight: SPACING.s }} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.giftCode}>{gc.code}</Text>
-              <Text style={styles.giftBalanceLabel}>Available balance</Text>
-            </View>
-            <Text style={styles.giftBalance}>{gc.balance}</Text>
-          </View>
-        ))}
-
-        <TouchableOpacity
-          activeOpacity={0.85}
-          style={styles.addBtn}
-          onPress={() => navigation && navigation.navigate('AddGiftCard')}>
-          <Icon name="plus" size={17} color={COLORS.primary} />
-          <Text style={styles.addBtnText}>Add Gift Card</Text>
+        <TouchableOpacity style={styles.action} onPress={() => navigation?.navigate('AddGiftCard')}>
+          <Icon name="gift" size={17} color={COLORS.primary} />
+          <Text style={styles.actionText}>Redeem gift card</Text>
         </TouchableOpacity>
-
-        <View style={styles.secureNote}>
-          <Icon name="lock" size={14} color={COLORS.textTertiary} />
-          <Text style={styles.secureNoteText}>
-            Your card details are stored securely and encrypted end-to-end.
-          </Text>
-        </View>
+        <Text style={styles.securityNote}>
+          Arise stores only an opaque provider token, card brand, last four digits and expiry.
+        </Text>
       </ScrollView>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.m,
-  },
-  cardBox: {
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: RADIUS.m,
-    padding: SPACING.l,
-    marginBottom: SPACING.l,
-  },
-  cardTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: SPACING.l,
-  },
-  cardBrand: {
-    fontSize: 13,
-    fontWeight: '800',
-    color: COLORS.white,
-    letterSpacing: 0.5,
-  },
-  cardNumber: {
-    fontSize: 17,
-    fontWeight: '600',
-    color: COLORS.white,
-    letterSpacing: 1.5,
-    marginBottom: SPACING.l,
-  },
-  cardBottomRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  cardMetaLabel: {
-    fontSize: 9.5,
-    color: 'rgba(255,255,255,0.65)',
-    marginBottom: 2,
-  },
-  cardMetaValue: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  removeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.l,
-    gap: 6,
-  },
-  removeText: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: COLORS.error,
-  },
-  addBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    marginBottom: SPACING.xl,
-    gap: SPACING.xs,
-  },
-  addBtnText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
-  giftRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  back: { marginRight: SPACING.m },
+  headerTitle: { fontSize: 18, fontWeight: '600', color: COLORS.textPrimary },
+  content: { padding: SPACING.l },
+  card: {
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
-    borderRadius: RADIUS.s,
-    padding: SPACING.m,
-    marginBottom: SPACING.l,
+    borderRadius: RADIUS.m,
+    padding: SPACING.l,
+    marginBottom: SPACING.m,
   },
-  giftCode: {
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  giftBalanceLabel: {
-    fontSize: 11.5,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  giftBalance: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.ratingGreen,
-  },
-  secureNote: {
+  row: { flexDirection: 'row', alignItems: 'center' },
+  details: { flex: 1, marginLeft: SPACING.m },
+  label: { color: COLORS.textPrimary, fontSize: 14, fontWeight: '700' },
+  meta: { color: COLORS.textSecondary, fontSize: 12, marginTop: SPACING.xs },
+  defaultText: { color: COLORS.ratingGreen, fontSize: 11, fontWeight: '700' },
+  remove: { color: COLORS.error, fontWeight: '700', marginTop: SPACING.m },
+  action: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: SPACING.s,
-    gap: SPACING.xs,
+    gap: SPACING.s,
+    paddingVertical: SPACING.m,
   },
-  secureNoteText: {
-    flex: 1,
-    fontSize: 12,
-    color: COLORS.textTertiary,
-    lineHeight: 16,
-  },
+  actionText: { color: COLORS.primary, fontWeight: '700' },
+  securityNote: { color: COLORS.textTertiary, fontSize: 12, lineHeight: 18, marginTop: SPACING.l },
 });
 
 export default SavedCardsScreen;

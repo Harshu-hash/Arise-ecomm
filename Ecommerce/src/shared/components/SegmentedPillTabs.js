@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { SPACING, RADIUS } from '../../constants/spacing';
 
-/** "Flipkart (1) / Minutes" pill row used on Cart. tabs: [{ id, label, count }] */
+/** Segmented pill row used on Cart. tabs: [{ id, label, count }] */
 const SegmentedPillTabs = ({ tabs, activeId, onSelect }) => (
   <View style={styles.row}>
     {tabs.map((tab) => {

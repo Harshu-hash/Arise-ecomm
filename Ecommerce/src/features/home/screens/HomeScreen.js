@@ -1,7 +1,11 @@
-import React, { useState, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { Animated, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../../constants/colors';
+import { RADIUS, SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
 import LocationSearchHeader from '../components/LocationSearchHeader';
 import HeroBannerCarousel from '../components/HeroBannerCarousel';
 import AdSheetCard from '../components/AdSheetCard';
@@ -13,160 +17,205 @@ import BrandsSpotlightSection from '../components/BrandsSpotlightSection';
 import TopValueDealsSection from '../components/TopValueDealsSection';
 import ProductFeedSection from '../components/ProductFeedSection';
 import AddressSelectSheet from '../components/AddressSelectSheet';
-import {
-  HERO_BANNERS,
-  AD_BANNERS,
-  RECENTLY_VIEWED,
-  AD_TILES,
-  SUGGESTED_PRODUCTS,
-  BRANDS_SPOTLIGHT,
-  TOP_VALUE_DEALS,
-  PRODUCT_FEED,
-  CATEGORY_TABS,
-  SAVED_ADDRESSES,
-} from '../data/homeData';
+import HomeScreenSkeleton from '../components/HomeScreenSkeleton';
+import { useGetHomeQuery } from '../api/home.query';
+import { useGetAddressesQuery } from '@features/address';
+import { selectIsAuthenticated } from '@features/auth';
 
 const DEFAULT_HEADER_HEIGHT = 272;
-// Ad sheet climbs this many extra px (beyond normal scroll movement) over this much
-// scroll distance, so it visually overlaps further onto the hero banner as you scroll.
 const AD_SHEET_PARALLAX_DISTANCE = 50;
 const AD_SHEET_PARALLAX_SCROLL_RANGE = 160;
+const EMPTY_DELIVERY_LOCATION = {
+  id: 'select-address',
+  label: 'Delivery address',
+  icon: 'map-pin',
+  address: 'Select a delivery address',
+};
+
+const SectionLoadWarning = ({ count, onRetry }) => (
+  <View style={styles.sectionWarning} accessibilityRole="alert">
+    <Text style={styles.sectionWarningText}>
+      {count === 1 ? 'One section could not be loaded.' : `${count} sections could not be loaded.`}
+    </Text>
+    <TouchableOpacity onPress={onRetry} activeOpacity={0.7}>
+      <Text style={styles.retryText}>Retry</Text>
+    </TouchableOpacity>
+  </View>
+);
 
 const HomeScreen = ({ navigation }) => {
-  const [activeCategoryId, setActiveCategoryId] = useState(CATEGORY_TABS[0].id);
-  const [selectedAddressId, setSelectedAddressId] = useState(SAVED_ADDRESSES[0].id);
+  const { data, error, isLoading, isFetching, refetch } = useGetHomeQuery();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
+  const [activeCategoryId, setActiveCategoryId] = useState(null);
+  const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isAddressSheetVisible, setIsAddressSheetVisible] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(DEFAULT_HEADER_HEIGHT);
-
-  const selectedAddress = SAVED_ADDRESSES.find((a) => a.id === selectedAddressId) || SAVED_ADDRESSES[0];
-
-  // Shared with LocationSearchHeader (a position:absolute overlay) so it can translate
-  // itself up as the page scrolls — purely transform/opacity, native-driver, no jank.
-  // Everything derived from this stays in lockstep since it's all one native-driven value
-  // (a second, JS-driven value was tried for the category row's own height animation, but
-  // that could desync from this one under fast scrolling and leave a visible gap — do not
-  // reintroduce it; see the note in CategoryTabStrip.js).
   const scrollY = useRef(new Animated.Value(0)).current;
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-    { useNativeDriver: true }
-  );
 
+  if (isLoading) return <HomeScreenSkeleton />;
+  if (error || !data) {
+    return <ErrorState message={error?.message} onRetry={refetch} />;
+  }
+
+  const hasContent =
+    data.heroBanners.length > 0 ||
+    data.adBanners.length > 0 ||
+    data.recentlyViewed.length > 0 ||
+    data.adTiles.length > 0 ||
+    data.showFlashSale ||
+    data.suggestedProducts.length > 0 ||
+    data.brandsSpotlight.length > 0 ||
+    data.topValueDeals.length > 0 ||
+    data.productFeed.length > 0;
+
+  if (!hasContent) {
+    return (
+      <EmptyState
+        icon="shopping-bag"
+        title="Nothing to show yet"
+        message="New products and offers will appear here soon."
+        actionLabel="Refresh"
+        onActionPress={refetch}
+      />
+    );
+  }
+
+  const deliveryLocations = addressBook?.items ?? [];
+  const selectedAddress =
+    deliveryLocations.find(address => address.id === selectedAddressId) ||
+    deliveryLocations.find(address => address.isDefault) ||
+    deliveryLocations[0] ||
+    EMPTY_DELIVERY_LOCATION;
+  const resolvedCategoryId = activeCategoryId || data.header.categoryTabs[0]?.id;
+  const activeBrandId = data.header.brandTabs[0]?.id;
+  const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
+    useNativeDriver: true,
+  });
   const adSheetParallaxY = scrollY.interpolate({
     inputRange: [0, AD_SHEET_PARALLAX_SCROLL_RANGE],
     outputRange: [0, -AD_SHEET_PARALLAX_DISTANCE],
     extrapolate: 'clamp',
   });
 
-  const handleSearchPress = () => navigation && navigation.navigate('Search');
-  const handleCouponPress = () => navigation && navigation.navigate('Coupons');
-  const handleWalletPress = () => navigation && navigation.navigate('Wallet');
-  const handleSelectCategory = (tab) => setActiveCategoryId(tab.id);
-  const handleBrandSelect = (tab) => {
-    if (tab.id === 'value365') {
-      navigation && navigation.navigate('Offers');
-    }
-  };
-
-  const handleAddressPress = () => setIsAddressSheetVisible(true);
-  const handleCloseAddressSheet = () => setIsAddressSheetVisible(false);
-  const handleSelectAddress = (addr) => {
-    setSelectedAddressId(addr.id);
-    setIsAddressSheetVisible(false);
-  };
-
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor="#FFCB9D" />
-
       <Animated.ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={[styles.scrollContent, { paddingTop: headerHeight }]}
         onScroll={handleScroll}
-        scrollEventThrottle={16}>
-        <HeroBannerCarousel banners={HERO_BANNERS} />
+        scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={isFetching && !isLoading}
+            onRefresh={refetch}
+            colors={[COLORS.primary]}
+            tintColor={COLORS.primary}
+          />
+        }
+      >
+        {data.heroBanners.length > 0 ? <HeroBannerCarousel banners={data.heroBanners} /> : null}
 
-        {/*
-          Everything below the hero banner moves together as ONE block with an extra
-          upward translateY (native-driven, on top of normal scroll movement) that grows
-          with scroll distance — so the ad sheet visually climbs up and increasingly
-          overlaps the hero banner above it, while its own spacing to the sections below
-          stays exactly as laid out (they're all shifted by the same amount, together).
-          Wrapping only the ad sheet by itself left a gap below it, since the sections
-          after it — outside that transform — stayed at their normal, un-shifted position.
-        */}
         <Animated.View style={{ transform: [{ translateY: adSheetParallaxY }] }}>
-          <AdSheetCard banners={AD_BANNERS} />
-
-          <RecentlyViewedRail
-            items={RECENTLY_VIEWED}
-            onPressItem={(item) => navigation && navigation.navigate('Category', { category: { name: item.title } })}
-            onSeeAll={() => navigation && navigation.navigate('RecentlyViewed')}
-          />
-
-          <FlashSaleBanner onPress={() => navigation && navigation.navigate('FlashSale')} />
-
-          <AdTileRow tiles={AD_TILES} onPressTile={() => navigation && navigation.navigate('Offers')} />
-
-          <SuggestedForYouSection
-            products={SUGGESTED_PRODUCTS}
-            onPressProduct={(product) => navigation && navigation.navigate('ProductDetail', { product })}
-            onSeeAll={() => navigation && navigation.navigate('SearchResults', {})}
-          />
-
-          <BrandsSpotlightSection
-            brands={BRANDS_SPOTLIGHT}
-            onPressBrand={() => {}}
-            onSeeAll={() => navigation && navigation.navigate('Brands')}
-          />
-
-          <TopValueDealsSection
-            deals={TOP_VALUE_DEALS}
-            onPressDeal={(deal) => navigation && navigation.navigate(deal ? 'DealDetail' : 'Offers', deal ? { deal } : undefined)}
-          />
-
-          <ProductFeedSection
-            products={PRODUCT_FEED}
-            onPressProduct={(product) => navigation && navigation.navigate('ProductDetail', { product })}
-          />
+          {data.failedSections.length > 0 ? (
+            <SectionLoadWarning count={data.failedSections.length} onRetry={refetch} />
+          ) : null}
+          {data.adBanners.length > 0 ? <AdSheetCard banners={data.adBanners} /> : null}
+          {data.recentlyViewed.length > 0 ? (
+            <RecentlyViewedRail
+              items={data.recentlyViewed}
+              onPressItem={item =>
+                navigation?.navigate('Category', { category: { name: item.title } })
+              }
+              onSeeAll={() => navigation?.navigate('RecentlyViewed')}
+            />
+          ) : null}
+          {data.showFlashSale ? (
+            <FlashSaleBanner onPress={() => navigation?.navigate('FlashSale')} />
+          ) : null}
+          {data.adTiles.length > 0 ? (
+            <AdTileRow tiles={data.adTiles} onPressTile={() => navigation?.navigate('Offers')} />
+          ) : null}
+          {data.suggestedProducts.length > 0 ? (
+            <SuggestedForYouSection
+              products={data.suggestedProducts}
+              onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
+              onSeeAll={() => navigation?.navigate('SearchResults', {})}
+            />
+          ) : null}
+          {data.brandsSpotlight.length > 0 ? (
+            <BrandsSpotlightSection
+              brands={data.brandsSpotlight}
+              onPressBrand={brand => navigation?.navigate('Brands', { brandId: brand.id })}
+              onSeeAll={() => navigation?.navigate('Brands')}
+            />
+          ) : null}
+          {data.topValueDeals.length > 0 ? (
+            <TopValueDealsSection
+              deals={data.topValueDeals}
+              onPressDeal={deal => navigation?.navigate('DealDetail', { deal })}
+            />
+          ) : null}
+          {data.productFeed.length > 0 ? (
+            <ProductFeedSection
+              products={data.productFeed}
+              onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
+            />
+          ) : null}
         </Animated.View>
       </Animated.ScrollView>
 
       <LocationSearchHeader
         address={selectedAddress.address}
-        onAddressPress={handleAddressPress}
-        onSearchPress={handleSearchPress}
+        onAddressPress={() => setIsAddressSheetVisible(true)}
+        onSearchPress={() => navigation?.navigate('Search')}
         onScanPress={() => {}}
-        onCouponPress={handleCouponPress}
-        onWalletPress={handleWalletPress}
-        activeCategoryId={activeCategoryId}
-        onSelectCategory={handleSelectCategory}
-        activeBrandId="flipkart"
-        onBrandSelect={handleBrandSelect}
+        onCouponPress={() => navigation?.navigate('Coupons')}
+        onWalletPress={() => navigation?.navigate('Wallet')}
+        activeCategoryId={resolvedCategoryId}
+        onSelectCategory={tab => setActiveCategoryId(tab.id)}
+        activeBrandId={activeBrandId}
+        onBrandSelect={tab => tab.id !== activeBrandId && navigation?.navigate('Offers')}
         scrollY={scrollY}
         onHeaderHeight={setHeaderHeight}
+        brandTabs={data.header.brandTabs}
+        categoryTabs={data.header.categoryTabs}
+        searchPlaceholders={data.header.searchPlaceholders}
       />
 
       <AddressSelectSheet
         visible={isAddressSheetVisible}
-        onClose={handleCloseAddressSheet}
-        addresses={SAVED_ADDRESSES}
-        selectedId={selectedAddressId}
-        onSelectAddress={handleSelectAddress}
-        onAddNew={handleCloseAddressSheet}
+        onClose={() => setIsAddressSheetVisible(false)}
+        addresses={deliveryLocations}
+        selectedId={selectedAddress.id}
+        onSelectAddress={address => {
+          setSelectedAddressId(address.id);
+          setIsAddressSheetVisible(false);
+        }}
+        onAddNew={() => {
+          setIsAddressSheetVisible(false);
+          navigation?.navigate('AddEditAddress');
+        }}
       />
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
+  container: { flex: 1, backgroundColor: COLORS.background },
+  scrollContent: { paddingBottom: 24 },
+  sectionWarning: {
+    margin: SPACING.l,
+    padding: SPACING.m,
+    borderRadius: RADIUS.m,
+    backgroundColor: COLORS.offerRedLight,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
   },
-  scrollContent: {
-    paddingBottom: 24,
-  },
+  sectionWarningText: { flex: 1, color: COLORS.textPrimary, fontSize: 13 },
+  retryText: { color: COLORS.primary, fontWeight: '700', marginLeft: SPACING.m },
 });
 
 export default HomeScreen;

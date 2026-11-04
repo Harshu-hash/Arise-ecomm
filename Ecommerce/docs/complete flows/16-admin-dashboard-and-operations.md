@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-The admin console is the control center for running the entire quick commerce business. This document covers the admin dashboard, order operations, fleet tracking, and support management.
+The admin console is the control center for running the entire marketplace. This document covers the admin dashboard, order operations, shipment tracking, and support management.
 
 ---
 

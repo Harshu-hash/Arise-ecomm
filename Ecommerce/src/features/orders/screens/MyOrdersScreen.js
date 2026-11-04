@@ -1,15 +1,27 @@
-import React, { useState, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import React, { useState } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  RefreshControl,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { MOCK_ORDERS, STATUS_FILTERS, ORDER_STATUS, getOrderStatusGroup } from '../constants/ordersData';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetOrdersQuery } from '../api/orders.query';
 
-const statusStyle = (status) => {
-  if (status === ORDER_STATUS.DELIVERED) return { bg: COLORS.ratingGreenBg, color: COLORS.ratingGreen };
-  if (status === ORDER_STATUS.CANCELLED || status === ORDER_STATUS.RETURNED) {
+const STATUS_FILTERS = ['All', 'Processing', 'Delivered', 'Cancelled'];
+
+const statusStyle = status => {
+  if (status === 'Delivered') return { bg: COLORS.ratingGreenBg, color: COLORS.ratingGreen };
+  if (status === 'Cancelled' || status === 'Returned') {
     return { bg: COLORS.offerRedLight, color: COLORS.offerRed };
   }
   return { bg: COLORS.primaryLight, color: COLORS.primary };
@@ -19,10 +31,14 @@ const MyOrdersScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [activeFilter, setActiveFilter] = useState('All');
 
-  const orders = useMemo(() => {
-    if (activeFilter === 'All') return MOCK_ORDERS;
-    return MOCK_ORDERS.filter((order) => getOrderStatusGroup(order.status) === activeFilter);
-  }, [activeFilter]);
+  const { data, error, isLoading, isFetching, refetch } = useGetOrdersQuery({
+    statusGroup: activeFilter === 'All' ? undefined : activeFilter,
+    limit: 20,
+  });
+  const orders = data?.items ?? [];
+
+  if (isLoading) return <FullScreenLoader message="Loading orders..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -36,13 +52,19 @@ const MyOrdersScreen = ({ navigation }) => {
       </View>
 
       <View style={styles.filterRow}>
-        {STATUS_FILTERS.map((filter) => (
+        {STATUS_FILTERS.map(filter => (
           <TouchableOpacity
             key={filter}
             activeOpacity={0.8}
             onPress={() => setActiveFilter(filter)}
-            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}>
-            <Text style={[styles.filterChipText, activeFilter === filter && styles.filterChipTextActive]}>
+            style={[styles.filterChip, activeFilter === filter && styles.filterChipActive]}
+          >
+            <Text
+              style={[
+                styles.filterChipText,
+                activeFilter === filter && styles.filterChipTextActive,
+              ]}
+            >
               {filter}
             </Text>
           </TouchableOpacity>
@@ -56,26 +78,43 @@ const MyOrdersScreen = ({ navigation }) => {
           <Text style={styles.emptySubtitle}>Orders matching this filter will show up here.</Text>
         </View>
       ) : (
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-          {orders.map((order) => {
+        <ScrollView
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={isFetching} onRefresh={refetch} colors={[COLORS.primary]} />
+          }
+        >
+          {orders.map(order => {
             const pill = statusStyle(order.status);
             return (
               <TouchableOpacity
                 key={order.id}
                 activeOpacity={0.85}
                 style={styles.card}
-                onPress={() => navigation && navigation.navigate('OrderDetail', { order })}>
+                onPress={() =>
+                  navigation && navigation.navigate('OrderDetail', { orderId: order.id })
+                }
+              >
                 <View style={styles.cardTopRow}>
                   <Text style={styles.orderId}>{order.id}</Text>
                   <Text style={styles.orderDate}>{order.date}</Text>
                 </View>
 
-                {order.items.map((item) => (
+                {order.items.map(item => (
                   <View key={item.id} style={styles.itemRow}>
-                    <Image source={{ uri: item.image }} style={styles.itemImage} resizeMode="cover" />
+                    <Image
+                      source={{ uri: item.image }}
+                      style={styles.itemImage}
+                      resizeMode="cover"
+                    />
                     <View style={{ flex: 1 }}>
-                      <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
-                      <Text style={styles.itemMeta}>Qty: {item.qty} · ₹{item.price}</Text>
+                      <Text style={styles.itemName} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.itemMeta}>
+                        Qty: {item.qty} · ₹{item.price}
+                      </Text>
                     </View>
                   </View>
                 ))}

@@ -16,7 +16,7 @@ After placing an order, customers need to see order status, track delivery in re
 
 - View all past and active orders
 - See detailed information for each order
-- Track delivery on a live map
+- Track shipment status from courier events
 - Share delivery code to confirm receipt
 - Cancel an order (when allowed)
 - Request a return on delivered orders
@@ -34,7 +34,7 @@ Customers see all their orders in one place, usually sorted with newest first.
 | ---------------- | ---------------------------------------- |
 | Pending          | Order placed, waiting for shop to accept |
 | Confirmed        | Shop accepted and preparing              |
-| Out for delivery | Rider is on the way to customer          |
+| Out for delivery | Courier is on the way to the customer    |
 | Delivered        | Order completed successfully             |
 | Cancelled        | Order was cancelled                      |
 | Returned         | Return process completed                 |
@@ -55,17 +55,17 @@ Tapping an order opens the full detail view:
 - Payment method (online or cash on delivery)
 - Delivery address
 - Shop name(s)
-- Assigned delivery partner (when applicable)
+- Courier / AWB details (when a shipment exists)
 
 ### Progress tracker
 
 A visual step-by-step indicator showing where the order is:
 
 1. **Order placed** — checkout complete
-2. **Shop preparing** — seller accepted and packing
-3. **Finding delivery partner** — system searching for nearby rider
-4. **Delivery partner assigned** — rider heading to shop
-5. **Out for delivery** — rider heading to customer
+2. **Packed by seller** — seller confirmed and packed
+3. **Shipped** — handed to a third-party courier
+4. **In transit** — moving through the courier network
+5. **Out for delivery** — courier heading to the customer
 6. **Delivered** — order complete
 
 The current step is highlighted. Completed steps show a checkmark.

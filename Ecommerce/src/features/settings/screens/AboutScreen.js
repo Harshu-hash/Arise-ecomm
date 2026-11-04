@@ -24,18 +24,18 @@ const AboutScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>About Flipkart</Text>
+        <Text style={styles.headerTitle}>About Arise</Text>
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.logoBox}>
           <Icon name="shopping-bag" size={30} color={COLORS.primary} />
         </View>
-        <Text style={styles.appName}>Flipkart</Text>
+        <Text style={styles.appName}>Arise</Text>
         <Text style={styles.versionText}>Version 1.0.0</Text>
 
         <Text style={styles.description}>
-          Flipkart is India's leading e-commerce marketplace, offering a wide range of products
+          Arise is a multi-vendor marketplace connecting customers with eligible sellers and products
           across categories including electronics, fashion, home essentials and more — delivered
           to your doorstep with trusted quality and secure payments.
         </Text>
@@ -50,7 +50,7 @@ const AboutScreen = ({ navigation }) => {
           ))}
         </View>
 
-        <Text style={styles.copyright}>© 2026 Flipkart Internet Private Limited</Text>
+        <Text style={styles.copyright}>© 2026 Arise Marketplace. All rights reserved.</Text>
       </ScrollView>
     </View>
   );

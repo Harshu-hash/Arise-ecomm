@@ -1,1 +1,5 @@
-﻿// Query/mutation definitions for 'offers'.
+export {
+  useGetPromotionQuery,
+  useGetPromotionProductsQuery,
+  useGetPromotionsQuery,
+} from './offers.api';

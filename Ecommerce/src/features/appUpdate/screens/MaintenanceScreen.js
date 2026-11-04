@@ -1,30 +1,26 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { StyleSheet, Text, View } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
 
-const MaintenanceScreen = () => {
+const MaintenanceScreen = ({ message, onRetry }) => {
   const [checking, setChecking] = useState(false);
-
-  const handleRetry = () => {
+  const retry = () => {
     setChecking(true);
-    setTimeout(() => setChecking(false), 1000);
+    Promise.resolve(onRetry?.()).finally(() => setChecking(false));
   };
-
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.background} />
-      <View style={styles.iconCircle}>
-        <Icon name="tool" size={40} color={COLORS.warning} />
-      </View>
+      <Icon name="tool" size={44} color={COLORS.warning} />
       <Text style={styles.title}>Under Maintenance</Text>
       <Text style={styles.message}>
-        Arise is currently undergoing scheduled maintenance. We'll be back shortly — thanks for your patience.
+        {message || 'Arise is undergoing scheduled maintenance. Please try again shortly.'}
       </Text>
-      <AppButton title="Retry" onPress={handleRetry} loading={checking} size="lg" style={styles.cta} />
+      <AppButton title="Retry" onPress={retry} loading={checking} size="lg" />
     </View>
   );
 };
@@ -35,33 +31,15 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.background,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: SPACING.xxl,
+    padding: SPACING.xxl,
   },
-  iconCircle: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: COLORS.etaGoldLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.xl,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: COLORS.textPrimary,
-  },
+  title: { fontSize: 20, fontWeight: '800', color: COLORS.textPrimary, marginTop: SPACING.l },
   message: {
     fontSize: 13.5,
     color: COLORS.textSecondary,
     textAlign: 'center',
-    marginTop: SPACING.m,
+    marginVertical: SPACING.l,
     lineHeight: 19,
   },
-  cta: {
-    marginTop: SPACING.xxl,
-    alignSelf: 'center',
-  },
 });
-
 export default MaintenanceScreen;

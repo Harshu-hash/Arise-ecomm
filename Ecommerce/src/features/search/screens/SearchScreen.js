@@ -1,36 +1,31 @@
-import React, { useState } from 'react';
-import {
-  View,
-  Text,
-  Image,
-  StyleSheet,
-  TextInput,
-  TouchableOpacity,
-  FlatList,
-} from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, StyleSheet, TextInput, TouchableOpacity, FlatList } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { GradientBackground, StatusBarManager } from '../../../shared/components';
-import {
-  TRENDING_SEARCHES,
-  SEARCH_SUGGESTIONS,
-  ASK_AI_SUGGESTIONS,
-  RECENT_SEARCHES_SEED,
-} from '../constants/searchData';
+import { useGetSearchSuggestionsQuery } from '../api/search.query';
+import { searchHistoryStorage } from '../storage/searchHistoryStorage';
 
 const HighlightedText = ({ text, query }) => {
   const idx = query ? text.toLowerCase().indexOf(query.toLowerCase()) : -1;
   if (idx === -1) {
-    return <Text style={styles.suggestionText} numberOfLines={1}>{text}</Text>;
+    return (
+      <Text style={styles.suggestionText} numberOfLines={1}>
+        {text}
+      </Text>
+    );
   }
   const before = text.slice(0, idx);
   const match = text.slice(idx, idx + query.length);
   const after = text.slice(idx + query.length);
   return (
     <Text style={styles.suggestionText} numberOfLines={1}>
-      <Text style={styles.suggestionMatch}>{before}{match}</Text>
+      <Text style={styles.suggestionMatch}>
+        {before}
+        {match}
+      </Text>
       {after}
     </Text>
   );
@@ -39,20 +34,27 @@ const HighlightedText = ({ text, query }) => {
 const SearchScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState(route?.params?.initialQuery || '');
-  const [recentSearches, setRecentSearches] = useState(RECENT_SEARCHES_SEED);
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+  const [recentSearches, setRecentSearches] = useState(() => searchHistoryStorage.get());
+  const { data, error, isFetching, refetch } = useGetSearchSuggestionsQuery(debouncedQuery);
 
-  const filteredSuggestions = query.trim()
-    ? SEARCH_SUGGESTIONS.filter((s) => s.text.toLowerCase().includes(query.trim().toLowerCase()))
-    : SEARCH_SUGGESTIONS;
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(query.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [query]);
 
-  const runSearch = (text) => {
+  const filteredSuggestions = data?.suggestions ?? [];
+  const trendingSearches = data?.trending ?? [];
+  const askAiSuggestions = data?.prompts ?? [];
+
+  const runSearch = text => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setRecentSearches((prev) => [trimmed, ...prev.filter((r) => r.toLowerCase() !== trimmed.toLowerCase())].slice(0, 8));
+    setRecentSearches(searchHistoryStorage.add(trimmed));
     navigation && navigation.navigate('SearchResults', { query: trimmed });
   };
 
-  const handleSuggestionPress = (item) => runSearch(item.text);
+  const handleSuggestionPress = item => runSearch(item.text);
 
   return (
     <View style={styles.container}>
@@ -60,14 +62,17 @@ const SearchScreen = ({ navigation, route }) => {
 
       {/* Search Header Bar */}
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity
-          onPress={() => navigation && navigation.goBack()}
-          style={styles.backBtn}>
+        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
 
         <View style={styles.searchInputBox}>
-          <Icon name="search" size={18} color={COLORS.textSecondary} style={{ marginRight: SPACING.s }} />
+          <Icon
+            name="search"
+            size={18}
+            color={COLORS.textSecondary}
+            style={{ marginRight: SPACING.s }}
+          />
           <TextInput
             autoFocus
             value={query}
@@ -92,17 +97,28 @@ const SearchScreen = ({ navigation, route }) => {
           {recentSearches.length > 0 ? (
             <View style={{ marginBottom: SPACING.xl }}>
               <View style={styles.trendingHeader}>
-                <Icon name="clock" size={16} color={COLORS.textSecondary} style={{ marginRight: SPACING.s }} />
+                <Icon
+                  name="clock"
+                  size={16}
+                  color={COLORS.textSecondary}
+                  style={{ marginRight: SPACING.s }}
+                />
                 <Text style={styles.trendingTitle}>Recent Searches</Text>
               </View>
               <View style={styles.chipsContainer}>
-                {recentSearches.map((item) => (
+                {recentSearches.map(item => (
                   <TouchableOpacity
                     key={item}
                     activeOpacity={0.8}
                     onPress={() => runSearch(item)}
-                    style={styles.trendingChip}>
-                    <Icon name="clock" size={12} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                    style={styles.trendingChip}
+                  >
+                    <Icon
+                      name="clock"
+                      size={12}
+                      color={COLORS.textSecondary}
+                      style={{ marginRight: 6 }}
+                    />
                     <Text style={styles.chipText}>{item}</Text>
                   </TouchableOpacity>
                 ))}
@@ -111,18 +127,29 @@ const SearchScreen = ({ navigation, route }) => {
           ) : null}
 
           <View style={styles.trendingHeader}>
-            <Icon name="trending-up" size={18} color={COLORS.primary} style={{ marginRight: SPACING.s }} />
+            <Icon
+              name="trending-up"
+              size={18}
+              color={COLORS.primary}
+              style={{ marginRight: SPACING.s }}
+            />
             <Text style={styles.trendingTitle}>Trending Searches</Text>
           </View>
 
           <View style={styles.chipsContainer}>
-            {TRENDING_SEARCHES.map((item) => (
+            {trendingSearches.map(item => (
               <TouchableOpacity
                 key={item}
                 activeOpacity={0.8}
                 onPress={() => runSearch(item)}
-                style={styles.trendingChip}>
-                <Icon name="search" size={12} color={COLORS.textSecondary} style={{ marginRight: 6 }} />
+                style={styles.trendingChip}
+              >
+                <Icon
+                  name="search"
+                  size={12}
+                  color={COLORS.textSecondary}
+                  style={{ marginRight: 6 }}
+                />
                 <Text style={styles.chipText}>{item}</Text>
               </TouchableOpacity>
             ))}
@@ -132,26 +159,40 @@ const SearchScreen = ({ navigation, route }) => {
         /* Autocomplete Suggestions */
         <FlatList
           data={filteredSuggestions}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={
-            <TouchableOpacity
-              activeOpacity={0.7}
-              onPress={() => runSearch(query)}
-              style={styles.searchForRow}>
-              <Icon name="search" size={16} color={COLORS.textSecondary} />
-              <Text style={styles.searchForText}>
-                Search for <Text style={styles.searchForQuery}>"{query}"</Text>
-              </Text>
-            </TouchableOpacity>
+            <>
+              <TouchableOpacity
+                activeOpacity={0.7}
+                onPress={() => runSearch(query)}
+                style={styles.searchForRow}
+              >
+                <Icon name="search" size={16} color={COLORS.textSecondary} />
+                <Text style={styles.searchForText}>
+                  Search for <Text style={styles.searchForQuery}>"{query}"</Text>
+                </Text>
+              </TouchableOpacity>
+              {isFetching ? <Text style={styles.searchStatus}>Loading suggestions...</Text> : null}
+              {error ? (
+                <TouchableOpacity onPress={refetch} style={styles.searchForRow}>
+                  <Text style={styles.searchStatus}>Suggestions unavailable. Tap to retry.</Text>
+                </TouchableOpacity>
+              ) : null}
+            </>
           }
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() => handleSuggestionPress(item)}
-              style={styles.suggestionRow}>
-              <Image source={{ uri: item.image }} style={styles.suggestionThumb} resizeMode="cover" />
+              style={styles.suggestionRow}
+            >
+              <Image
+                source={{ uri: item.image }}
+                style={styles.suggestionThumb}
+                resizeMode="cover"
+              />
 
               <View style={styles.suggestionTextBlock}>
                 <HighlightedText text={item.text} query={query} />
@@ -161,7 +202,8 @@ const SearchScreen = ({ navigation, route }) => {
                       styles.suggestionCategory,
                       item.type === 'chevron' && styles.suggestionCategoryPlain,
                     ]}
-                    numberOfLines={1}>
+                    numberOfLines={1}
+                  >
                     {item.category}
                   </Text>
                 ) : null}
@@ -182,12 +224,13 @@ const SearchScreen = ({ navigation, route }) => {
               </View>
 
               <View style={styles.askAiChips}>
-                {ASK_AI_SUGGESTIONS.map((suggestion) => (
+                {askAiSuggestions.map(suggestion => (
                   <TouchableOpacity
                     key={suggestion}
                     activeOpacity={0.8}
                     onPress={() => runSearch(suggestion)}
-                    style={styles.aiPillOuter}>
+                    style={styles.aiPillOuter}
+                  >
                     <GradientBackground colors={['#B133F0', '#E91E8C']} id="ai_pill_border" />
                     <View style={styles.aiPillInner}>
                       <Text style={styles.aiPillText}>{suggestion}</Text>
@@ -282,6 +325,12 @@ const styles = StyleSheet.create({
   searchForQuery: {
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  searchStatus: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.s,
   },
   suggestionRow: {
     flexDirection: 'row',

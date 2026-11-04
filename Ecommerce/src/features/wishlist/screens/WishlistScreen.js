@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -14,70 +14,53 @@ import {
 } from '../../../shared/components';
 import PressableScale from '../../../shared/ui/PressableScale';
 import { haptics } from '../../../utils/haptics';
-
-const INITIAL_WISHLIST = [
-  {
-    id: 'w1',
-    name: 'boAt Airdopes 141 Bluetooth Truly Wireless Earbuds',
-    image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=500&q=80',
-    price: 1299,
-    mrp: 4490,
-    rating: 4.2,
-    ratingCount: 128,
-    inStock: true,
-  },
-  {
-    id: 'w2',
-    name: 'Samsung Galaxy M14 5G (ICY Silver, 128 GB)',
-    image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=500&q=80',
-    price: 12999,
-    mrp: 16999,
-    rating: 4.3,
-    ratingCount: 3421,
-    inStock: true,
-  },
-  {
-    id: 'w3',
-    name: 'LIFE FIT Diary Collection Notebook A5 Unruled 150 Pages',
-    image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=500&q=80',
-    price: 298,
-    mrp: 795,
-    rating: 5,
-    ratingCount: 3,
-    inStock: true,
-  },
-  {
-    id: 'w4',
-    name: 'Titan Analog Watch for Women with Steel Strap',
-    image: 'https://images.unsplash.com/photo-1524805444758-089113d48a6d?auto=format&fit=crop&w=500&q=80',
-    price: 2495,
-    mrp: 3995,
-    rating: 4.5,
-    ratingCount: 612,
-    inStock: false,
-  },
-  {
-    id: 'w5',
-    name: 'Nike Revolution 6 Running Shoes for Men',
-    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?auto=format&fit=crop&w=500&q=80',
-    price: 2799,
-    mrp: 4995,
-    rating: 4.4,
-    ratingCount: 894,
-    inStock: true,
-  },
-];
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useGetWishlistQuery,
+  useMoveWishlistItemToCartMutation,
+  useRemoveWishlistItemMutation,
+} from '../api/wishlist.query';
 
 const SUGGESTED_PRODUCTS = [
-  { id: 'sg1', name: 'HAYATCRAFT HANDMADE Diary', image: 'https://images.unsplash.com/photo-1531346878377-a5be20888e57?auto=format&fit=crop&w=400&q=80', price: 162, mrp: 999, discountPct: 84, rating: 4.2 },
-  { id: 'sg2', name: 'Portable Bluetooth Speaker', image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=400&q=80', price: 899, mrp: 1999, discountPct: 55, rating: 4.1 },
-  { id: 'sg3', name: 'Wireless Charging Pad', image: 'https://images.unsplash.com/photo-1622957461294-2ce6b6d33d20?auto=format&fit=crop&w=400&q=80', price: 499, mrp: 999, discountPct: 50, rating: 4.0 },
+  {
+    id: 'h2',
+    name: 'LIFE FIT Diary Collection',
+    image:
+      'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
+    price: 298,
+    mrp: 795,
+    discountPct: 63,
+    rating: 5,
+  },
+  {
+    id: 'e3',
+    name: 'Portable Bluetooth Speaker',
+    image:
+      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=400&q=80',
+    price: 899,
+    mrp: 1999,
+    discountPct: 55,
+    rating: 4.1,
+  },
+  {
+    id: 'e4',
+    name: 'Wireless Charging Pad',
+    image:
+      'https://images.unsplash.com/photo-1622957461294-2ce6b6d33d20?auto=format&fit=crop&w=400&q=80',
+    price: 499,
+    mrp: 999,
+    discountPct: 50,
+    rating: 3.9,
+  },
 ];
 
 const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
-  const discountPct = item.mrp && item.mrp > item.price
-    ? Math.round(((item.mrp - item.price) / item.mrp) * 100)
-    : null;
+  const discountPct =
+    item.mrp && item.mrp > item.price
+      ? Math.round(((item.mrp - item.price) / item.mrp) * 100)
+      : null;
   const heartScale = useSharedValue(1);
 
   const heartAnimatedStyle = useAnimatedStyle(() => ({
@@ -107,7 +90,8 @@ const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
           activeOpacity={0.7}
           onPress={handleRemove}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-          style={styles.heartBtn}>
+          style={styles.heartBtn}
+        >
           <Animated.View style={heartAnimatedStyle}>
             <Icon name="heart" size={16} color={COLORS.offerRed} style={{ marginTop: -1 }} />
           </Animated.View>
@@ -120,9 +104,16 @@ const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
         ) : null}
       </View>
 
-      <Text style={styles.name} numberOfLines={2}>{item.name}</Text>
+      <Text style={styles.name} numberOfLines={2}>
+        {item.name}
+      </Text>
 
-      <RatingBadge variant="stars" rating={item.rating} count={item.ratingCount} style={styles.ratingRow} />
+      <RatingBadge
+        variant="stars"
+        rating={item.rating}
+        count={item.ratingCount}
+        style={styles.ratingRow}
+      />
 
       <PriceBlock price={item.price} mrp={item.mrp} style={styles.priceBlock} />
 
@@ -130,8 +121,13 @@ const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
         disabled={!item.inStock}
         haptic={item.inStock ? 'medium' : false}
         onPress={onMoveToCart}
-        style={[styles.moveBtn, !item.inStock && styles.moveBtnDisabled]}>
-        <Icon name="shopping-cart" size={13} color={item.inStock ? COLORS.white : COLORS.textTertiary} />
+        style={[styles.moveBtn, !item.inStock && styles.moveBtnDisabled]}
+      >
+        <Icon
+          name="shopping-cart"
+          size={13}
+          color={item.inStock ? COLORS.white : COLORS.textTertiary}
+        />
         <Text style={[styles.moveBtnText, !item.inStock && styles.moveBtnTextDisabled]}>
           {item.inStock ? 'Move to Cart' : 'Notify Me'}
         </Text>
@@ -142,9 +138,31 @@ const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
 
 const WishlistScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [wishlist, setWishlist] = useState(INITIAL_WISHLIST);
+  const toast = useToast();
+  const { data, error, isLoading, isFetching, refetch } = useGetWishlistQuery();
+  const [removeWishlistItem] = useRemoveWishlistItemMutation();
+  const [moveWishlistItemToCart] = useMoveWishlistItemToCartMutation();
+  const wishlist = data?.items ?? [];
 
-  const removeItem = (id) => setWishlist((prev) => prev.filter((item) => item.id !== id));
+  const removeItem = async id => {
+    try {
+      await removeWishlistItem(id).unwrap();
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not remove this item. Please try again.');
+    }
+  };
+
+  const moveToCart = async id => {
+    try {
+      await moveWishlistItemToCart(id).unwrap();
+      toast.show('Moved to cart', { icon: 'shopping-cart' });
+    } catch (mutationError) {
+      toast.show(mutationError.message || 'Could not move this item to cart.');
+    }
+  };
+
+  if (isLoading) return <FullScreenLoader message="Loading wishlist..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -173,6 +191,8 @@ const WishlistScreen = ({ navigation }) => {
         <FlatList
           data={[]}
           keyExtractor={() => 'empty'}
+          refreshing={isFetching}
+          onRefresh={refetch}
           ListEmptyComponent={
             <View>
               <View style={styles.emptyPanel}>
@@ -184,7 +204,8 @@ const WishlistScreen = ({ navigation }) => {
                 <PressableScale
                   haptic="medium"
                   onPress={() => navigation && navigation.navigate('MainTabs', { screen: 'Home' })}
-                  style={styles.shopNowBtn}>
+                  style={styles.shopNowBtn}
+                >
                   <Text style={styles.shopNowText}>Start Shopping</Text>
                 </PressableScale>
               </View>
@@ -195,7 +216,9 @@ const WishlistScreen = ({ navigation }) => {
                   data={SUGGESTED_PRODUCTS}
                   showRating
                   style={{ marginTop: SPACING.m }}
-                  onPressItem={(product) => navigation && navigation.navigate('ProductDetail', { product })}
+                  onPressItem={product =>
+                    navigation && navigation.navigate('ProductDetail', { productId: product.id })
+                  }
                 />
               </View>
             </View>
@@ -204,17 +227,21 @@ const WishlistScreen = ({ navigation }) => {
       ) : (
         <FlatList
           data={wishlist}
-          keyExtractor={(item) => item.id}
+          keyExtractor={item => item.id}
           numColumns={2}
           showsVerticalScrollIndicator={false}
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.gridContent}
+          refreshing={isFetching}
+          onRefresh={refetch}
           renderItem={({ item }) => (
             <WishlistCard
               item={item}
               onRemove={() => removeItem(item.id)}
-              onMoveToCart={() => removeItem(item.id)}
-              onPress={() => navigation && navigation.navigate('ProductDetail', { product: item })}
+              onMoveToCart={() => moveToCart(item.id)}
+              onPress={() =>
+                navigation && navigation.navigate('ProductDetail', { productId: item.id })
+              }
             />
           )}
           ListFooterComponent={
@@ -224,7 +251,9 @@ const WishlistScreen = ({ navigation }) => {
                 data={SUGGESTED_PRODUCTS}
                 showRating
                 style={{ marginTop: SPACING.m, paddingHorizontal: 0 }}
-                onPressItem={(product) => navigation && navigation.navigate('ProductDetail', { product })}
+                onPressItem={product =>
+                  navigation && navigation.navigate('ProductDetail', { productId: product.id })
+                }
               />
             </View>
           }

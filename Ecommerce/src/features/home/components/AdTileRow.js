@@ -6,15 +6,24 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 /** 3-column ad tile row — image with a colored bottom banner strip, label below the tile. */
 const AdTileRow = ({ tiles, onPressTile }) => (
   <View style={styles.row}>
-    {tiles.map((tile) => (
-      <TouchableOpacity key={tile.id} activeOpacity={0.85} onPress={() => onPressTile && onPressTile(tile)} style={styles.tile}>
+    {tiles.map(tile => (
+      <TouchableOpacity
+        key={tile.id}
+        activeOpacity={0.85}
+        onPress={() => onPressTile && onPressTile(tile)}
+        style={styles.tile}
+      >
         <View style={styles.imageBox}>
           <Image source={{ uri: tile.image }} style={styles.image} resizeMode="cover" />
           <View style={styles.banner}>
-            <Text style={styles.bannerText} numberOfLines={1}>{tile.bannerText}</Text>
+            <Text style={styles.bannerText} numberOfLines={1}>
+              {tile.bannerText}
+            </Text>
           </View>
         </View>
-        <Text style={styles.label} numberOfLines={1}>{tile.label}</Text>
+        <Text style={styles.label} numberOfLines={1}>
+          {tile.label}
+        </Text>
       </TouchableOpacity>
     ))}
   </View>

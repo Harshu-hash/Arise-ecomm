@@ -1,1 +1,1 @@
-﻿// Query/mutation definitions for 'flashSale'.
+export { useGetCurrentFlashSaleQuery } from './flashSale.api';

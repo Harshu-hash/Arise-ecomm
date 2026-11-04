@@ -57,10 +57,13 @@ const AdSheetCard = ({ banners }) => {
       // the real slide it stands in for, so the loop can keep advancing forever.
       if (index === 0 || index === paddedBanners.length - 1) {
         const realTarget = index === 0 ? realLength : 1;
-        setTimeout(() => {
-          paddedIndexRef.current = realTarget;
-          listRef.current?.scrollToIndex({ index: realTarget, animated: false });
-        }, animated ? 380 : 0);
+        setTimeout(
+          () => {
+            paddedIndexRef.current = realTarget;
+            listRef.current?.scrollToIndex({ index: realTarget, animated: false });
+          },
+          animated ? 380 : 0,
+        );
       }
     } else {
       setDisplayIndex(index);
@@ -78,7 +81,7 @@ const AdSheetCard = ({ banners }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isLoopable, realLength]);
 
-  const handleMomentumScrollEnd = (e) => {
+  const handleMomentumScrollEnd = e => {
     const paddedIndex = Math.round(e.nativeEvent.contentOffset.x / CARD_WIDTH);
     goToPaddedIndex(paddedIndex, false);
   };
@@ -98,7 +101,11 @@ const AdSheetCard = ({ banners }) => {
           keyExtractor={(item, index) => `${item.id}-${index}`}
           initialScrollIndex={isLoopable ? 1 : 0}
           onMomentumScrollEnd={handleMomentumScrollEnd}
-          getItemLayout={(data, index) => ({ length: CARD_WIDTH, offset: CARD_WIDTH * index, index })}
+          getItemLayout={(data, index) => ({
+            length: CARD_WIDTH,
+            offset: CARD_WIDTH * index,
+            index,
+          })}
           renderItem={({ item }) => (
             <Image
               source={typeof item.image === 'string' ? { uri: item.image } : item.image}

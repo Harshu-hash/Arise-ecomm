@@ -2,7 +2,7 @@
 
 ## What Is This?
 
-Money flows through many hands in a quick commerce platform — customers pay, sellers earn, riders earn, and the platform takes its share. This document explains how admins manage all financial operations: wallets, payouts, cash collection, and financial reporting.
+Money flows through many hands in a marketplace platform — customers pay, sellers earn, riders earn, and the platform takes its share. This document explains how admins manage all financial operations: wallets, payouts, cash collection, and financial reporting.
 
 ---
 

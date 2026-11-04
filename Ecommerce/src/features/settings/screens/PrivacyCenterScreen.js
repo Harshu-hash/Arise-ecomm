@@ -8,6 +8,13 @@ import { StatusBarManager, AccountListRow } from '../../../shared/components';
 
 const PRIVACY_ROWS = [
   {
+    id: 'communications',
+    icon: 'mail',
+    label: 'Communication Preferences',
+    subtitle: 'Choose order, offer and recommendation messages',
+    route: 'CommunicationPreferences',
+  },
+  {
     id: 'permissions',
     icon: 'toggle-right',
     label: 'Manage App Permissions',
@@ -67,7 +74,7 @@ const PrivacyCenterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.listGroup}>
-          {PRIVACY_ROWS.map((row) => (
+          {PRIVACY_ROWS.map(row => (
             <AccountListRow
               key={row.id}
               icon={row.icon}

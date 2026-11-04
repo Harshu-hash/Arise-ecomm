@@ -1,271 +1,196 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { StatusBarManager, AccountListRow } from '../../../shared/components';
-import { HELP_CATEGORIES } from '../constants/helpData';
-
-const QUICK_ACTIONS = [
-  { id: 'track', icon: 'map-pin', label: 'Track Order' },
-  { id: 'cancel', icon: 'x-circle', label: 'Cancel Order' },
-  { id: 'return', icon: 'refresh-ccw', label: 'Return / Refund' },
-  { id: 'ticket', icon: 'file-text', label: 'Report a Problem' },
-];
-
+import { StatusBarManager } from '../../../shared/components';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetHelpCategoriesQuery, useLazySearchHelpQuery } from '../api/support.api';
 const HelpCenterScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-
-  const handleQuickAction = (id) => {
-    if (!navigation) return;
-    if (id === 'track') navigation.navigate('OrderHelp', { intent: 'track' });
-    if (id === 'cancel') navigation.navigate('OrderHelp', { intent: 'cancel' });
-    if (id === 'return') navigation.navigate('OrderHelp', { intent: 'return' });
-    if (id === 'ticket') navigation.navigate('RaiseTicket', {});
-  };
-
+  const insets = useSafeAreaInsets(),
+    categories = useGetHelpCategoriesQuery(),
+    [search, { data: results, isFetching }] = useLazySearchHelpQuery(),
+    [query, setQuery] = useState('');
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (query.trim().length >= 2) search(query.trim());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [query, search]);
+  if (categories.isLoading) return <FullScreenLoader message="Loading Help Center..." />;
+  if (categories.error)
+    return (
+      <ErrorState
+        title="Help Center unavailable"
+        message={categories.error.message}
+        onRetry={categories.refetch}
+      />
+    );
+  const searching = query.trim().length >= 2;
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Help Center</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.searchBar}
-          onPress={() => navigation && navigation.navigate('OrderHelp', {})}>
-          <Icon name="search" size={16} color={COLORS.textTertiary} />
-          <Text style={styles.searchPlaceholder}>Search for help (orders, refunds, returns...)</Text>
-        </TouchableOpacity>
-
-        <View style={styles.quickGrid}>
-          {QUICK_ACTIONS.map((action) => (
+      <View style={styles.search}>
+        <Icon name="search" size={16} color={COLORS.textTertiary} />
+        <TextInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder="Search help articles"
+          placeholderTextColor={COLORS.textTertiary}
+          style={styles.input}
+        />
+      </View>
+      {searching ? (
+        <FlatList
+          data={results?.items || []}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+          ListEmptyComponent={
+            isFetching ? (
+              <Text style={styles.empty}>Searching...</Text>
+            ) : (
+              <Text style={styles.empty}>No matching help articles.</Text>
+            )
+          }
+          renderItem={({ item }) => (
             <TouchableOpacity
-              key={action.id}
-              activeOpacity={0.8}
-              style={styles.quickCard}
-              onPress={() => handleQuickAction(action.id)}>
-              <View style={styles.quickIconBox}>
-                <Icon name={action.icon} size={18} color={COLORS.primary} />
+              style={styles.article}
+              onPress={() => navigation.navigate('HelpArticle', { articleId: item.id })}
+            >
+              <View style={styles.grow}>
+                <Text style={styles.articleTitle}>{item.title}</Text>
+                <Text style={styles.articleSummary}>{item.summary}</Text>
               </View>
-              <Text style={styles.quickLabel}>{action.label}</Text>
+              <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
             </TouchableOpacity>
-          ))}
-        </View>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.ticketsRow}
-          onPress={() => navigation && navigation.navigate('MyTickets')}>
-          <Icon name="clipboard" size={18} color={COLORS.primary} />
-          <Text style={styles.ticketsRowText}>View My Support Tickets</Text>
-          <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
-        </TouchableOpacity>
-
-        <Text style={styles.sectionTitle}>Browse Help Topics</Text>
-        <View style={styles.listGroup}>
-          {HELP_CATEGORIES.map((category) => (
-            <AccountListRow
-              key={category.id}
-              icon={category.icon}
-              label={category.title}
-              subtitle={category.subtitle}
-              onPress={() => navigation && navigation.navigate('HelpCategory', { categoryId: category.id })}
-            />
-          ))}
-        </View>
-
-        <View style={styles.contactCard}>
-          <Icon name="life-buoy" size={22} color={COLORS.primary} />
-          <Text style={styles.contactTitle}>Still need help?</Text>
-          <Text style={styles.contactSubtitle}>
-            Our support team is available 24x7 to assist you with any query.
-          </Text>
-          <View style={styles.contactBtnRow}>
+          )}
+        />
+      ) : (
+        <FlatList
+          data={categories.data}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.list}
+          ListHeaderComponent={
+            <View>
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('MyTickets')}
+                  style={styles.action}
+                >
+                  <Icon name="clipboard" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>My Tickets</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('RaiseTicket', {})}
+                  style={styles.action}
+                >
+                  <Icon name="plus-circle" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>Raise Ticket</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={styles.section}>Browse Help Topics</Text>
+            </View>
+          }
+          renderItem={({ item }) => (
             <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.chatBtn}
-              onPress={() => navigation && navigation.navigate('LiveChat', {})}>
-              <Icon name="message-circle" size={15} color={COLORS.white} />
-              <Text style={styles.chatBtnText}>Chat Now</Text>
+              style={styles.category}
+              onPress={() => navigation.navigate('HelpCategory', { categoryId: item.id })}
+            >
+              <View style={styles.icon}>
+                <Icon name={item.icon} size={18} color={COLORS.primary} />
+              </View>
+              <View style={styles.grow}>
+                <Text style={styles.categoryTitle}>{item.title}</Text>
+                <Text style={styles.categorySubtitle}>{item.subtitle}</Text>
+              </View>
+              <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
             </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.85}
-              style={styles.callBtn}
-              onPress={() => navigation && navigation.navigate('ContactUs')}>
-              <Icon name="phone" size={15} color={COLORS.primary} />
-              <Text style={styles.callBtnText}>Contact Us</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </ScrollView>
+          )}
+        />
+      )}
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  searchBar: {
+  headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.textPrimary },
+  search: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.mutedBg,
-    borderRadius: RADIUS.s,
-    paddingHorizontal: SPACING.m,
-    paddingVertical: SPACING.m,
     gap: SPACING.s,
-    marginBottom: SPACING.xl,
-  },
-  searchPlaceholder: {
-    fontSize: 13,
-    color: COLORS.textTertiary,
-    flex: 1,
-  },
-  quickGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.s,
-    marginBottom: SPACING.l,
-  },
-  quickCard: {
-    width: '47.5%',
-    flexDirection: 'row',
-    alignItems: 'center',
+    margin: SPACING.l,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
     paddingHorizontal: SPACING.m,
+    backgroundColor: COLORS.surface,
+  },
+  input: { flex: 1, color: COLORS.textPrimary },
+  list: { paddingHorizontal: SPACING.l, paddingBottom: SPACING.xxxl },
+  actions: { flexDirection: 'row', gap: SPACING.s },
+  action: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
     gap: SPACING.s,
-  },
-  quickIconBox: {
-    width: 34,
-    height: 34,
-    borderRadius: RADIUS.s,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  quickLabel: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    flex: 1,
-  },
-  ticketsRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    paddingHorizontal: SPACING.m,
-    gap: SPACING.s,
-    marginBottom: SPACING.xl,
-  },
-  ticketsRowText: {
-    flex: 1,
-    fontSize: 13.5,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  sectionTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: SPACING.s,
-  },
-  listGroup: {
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    marginBottom: SPACING.xl,
-  },
-  contactCard: {
-    alignItems: 'center',
-    backgroundColor: COLORS.primaryLight,
-    borderRadius: RADIUS.m,
-    padding: SPACING.xl,
-  },
-  contactTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginTop: SPACING.s,
-    marginBottom: 4,
-  },
-  contactSubtitle: {
-    fontSize: 12.5,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 18,
-    marginBottom: SPACING.l,
-  },
-  contactBtnRow: {
-    flexDirection: 'row',
-    gap: SPACING.m,
-    alignSelf: 'stretch',
-  },
-  chatBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    gap: SPACING.xs,
-  },
-  chatBtnText: {
-    color: COLORS.white,
-    fontSize: 13.5,
-    fontWeight: '700',
-  },
-  callBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.primary,
     borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    gap: SPACING.xs,
+    padding: SPACING.m,
   },
-  callBtnText: {
-    color: COLORS.primary,
-    fontSize: 13.5,
+  actionText: { fontSize: 12.5, fontWeight: '700', color: COLORS.primary },
+  section: {
+    fontSize: 15,
     fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginTop: SPACING.xl,
+    marginBottom: SPACING.s,
   },
+  category: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.m,
+    paddingVertical: SPACING.m,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  icon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: COLORS.primaryLight,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  grow: { flex: 1 },
+  categoryTitle: { fontSize: 13.5, fontWeight: '700', color: COLORS.textPrimary },
+  categorySubtitle: { fontSize: 11.5, color: COLORS.textSecondary, marginTop: 2 },
+  article: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: SPACING.m,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  articleTitle: { fontSize: 13.5, fontWeight: '700', color: COLORS.textPrimary },
+  articleSummary: { fontSize: 11.5, color: COLORS.textSecondary, marginTop: 3 },
+  empty: { textAlign: 'center', color: COLORS.textSecondary, padding: SPACING.xl },
 });
-
 export default HelpCenterScreen;

@@ -1,245 +1,98 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
-import Svg, { Defs, LinearGradient, Stop, Rect } from 'react-native-svg';
 import { COLORS } from '../../../constants/colors';
-import { SPACING, RADIUS } from '../../../constants/spacing';
+import { RADIUS, SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import EmptyState from '../../../shared/EmptyState/EmptyState';
 import { useToast } from '../../../contexts/ToastContext';
 import { haptics } from '../../../utils/haptics';
-
-const COUPON_BANNER = require('../../../assets/images/coupon_banner.png');
-
-const COUPONS = [
-  {
-    id: 'c1',
-    code: 'WELCOME50',
-    title: 'Flat ₹50 off',
-    subtitle: 'On your first order above ₹199',
-    expiry: 'Expires 30 Sep',
-  },
-  {
-    id: 'c2',
-    code: 'FRESH20',
-    title: '20% off on Grocery',
-    subtitle: 'Max discount ₹100 · Min order ₹499',
-    expiry: 'Expires 15 Oct',
-  },
-  {
-    id: 'c3',
-    code: 'FASHION150',
-    title: 'Flat ₹150 off Fashion',
-    subtitle: 'On orders above ₹999',
-    expiry: 'Expires 05 Oct',
-  },
-  {
-    id: 'c4',
-    code: 'SUPER10',
-    title: '10% cashback',
-    subtitle: 'On UPI payments · Max ₹75',
-    expiry: 'Expires 20 Oct',
-  },
-];
+import { useGetAvailableCouponsQuery } from '../api/coupons.api';
 
 const CouponsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
-  const [copiedId, setCopiedId] = useState(null);
   const toast = useToast();
+  const [copiedId, setCopiedId] = useState(null);
+  const { data, isLoading, error, refetch } = useGetAvailableCouponsQuery();
 
-  const handleBack = () => {
-    if (navigation && navigation.canGoBack()) {
-      navigation.goBack();
-    } else {
-      navigation && navigation.navigate('MainTabs', { screen: 'Home' });
-    }
-  };
+  if (isLoading) return <FullScreenLoader message="Loading coupons..." />;
+  if (error && !data) return <ErrorState message={error.message} onRetry={refetch} />;
 
-  const handleCopy = (coupon) => {
+  const coupons = data?.items || [];
+  const copy = coupon => {
     setCopiedId(coupon.id);
     haptics.success();
-    toast.show(`${coupon.code} copied`, { icon: 'check', variant: 'success' });
+    toast.show(`${coupon.code} ready to use`, { icon: 'check', variant: 'success' });
   };
 
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={handleBack} style={styles.backBtn} activeOpacity={0.7}>
+        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.iconButton}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Your Coupons</Text>
-        <View style={styles.backBtn} />
+        <Text style={styles.title}>Available Coupons</Text>
+        <View style={styles.iconButton} />
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        <View style={styles.bannerContainer}>
-          <Image source={COUPON_BANNER} style={styles.bannerImage} resizeMode="contain" />
-          <Svg
-            style={StyleSheet.absoluteFill}
-            width="100%"
-            height="100%"
-            viewBox="0 0 100 100"
-            preserveAspectRatio="none"
-            pointerEvents="none">
-            <Defs>
-              <LinearGradient id="headerWhiteBlend" x1="0%" y1="0%" x2="0%" y2="100%">
-                <Stop offset="0%" stopColor="#FFFFFF" stopOpacity="0.9" />
-                <Stop offset="12%" stopColor="#FFFFFF" stopOpacity="0.5" />
-                <Stop offset="25%" stopColor="#FFFFFF" stopOpacity="0.15" />
-                <Stop offset="40%" stopColor="#FFFFFF" stopOpacity="0" />
-              </LinearGradient>
-            </Defs>
-            <Rect x="0" y="0" width="100" height="100" fill="url(#headerWhiteBlend)" />
-          </Svg>
-        </View>
-
-        <View style={styles.couponsList}>
-          {COUPONS.map((coupon) => (
-            <View key={coupon.id} style={styles.couponCard}>
-              <View style={styles.couponIconWrap}>
-                <Icon name="gift" size={20} color={COLORS.primary} />
-              </View>
-
-              <View style={styles.couponBody}>
-                <Text style={styles.couponTitle}>{coupon.title}</Text>
-                <Text style={styles.couponSubtitle}>{coupon.subtitle}</Text>
-
-                <View style={styles.couponBottomRow}>
-                  <View style={styles.codeChip}>
-                    <Text style={styles.codeChipText}>{coupon.code}</Text>
-                  </View>
-                  <Text style={styles.expiryText}>{coupon.expiry}</Text>
+      {!coupons.length ? (
+        <EmptyState icon="tag" title="No coupons available" message="New offers will appear here." />
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          {coupons.map(coupon => (
+            <View key={coupon.id} style={styles.card}>
+              <View style={styles.copyRow}>
+                <View style={styles.textBox}>
+                  <Text style={styles.cardTitle}>{coupon.title}</Text>
+                  <Text style={styles.subtitle}>{coupon.subtitle}</Text>
+                  <Text style={styles.expiry}>{coupon.expiry}</Text>
                 </View>
+                <TouchableOpacity style={styles.copyButton} onPress={() => copy(coupon)}>
+                  <Text style={styles.copyText}>{copiedId === coupon.id ? 'Copied' : coupon.code}</Text>
+                </TouchableOpacity>
               </View>
-
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => handleCopy(coupon)}
-                style={styles.copyBtn}>
-                <Text style={styles.copyBtnText}>
-                  {copiedId === coupon.id ? 'Copied' : 'Copy'}
-                </Text>
-              </TouchableOpacity>
+              <Text style={styles.policy}>
+                Final eligibility and savings are calculated by the cart service.
+              </Text>
             </View>
           ))}
-        </View>
-      </ScrollView>
+        </ScrollView>
+      )}
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    flex: 1,
-    textAlign: 'center',
-    fontSize: 16,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingBottom: 32,
-  },
-  bannerContainer: {
-    width: '108%',
-    marginLeft: '-4%',
-    aspectRatio: 1368 / 1149,
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-  },
-  couponsList: {
+  iconButton: { width: 32, height: 32, alignItems: 'center', justifyContent: 'center' },
+  title: { flex: 1, textAlign: 'center', fontSize: 16, fontWeight: '700', color: COLORS.textPrimary },
+  content: { padding: SPACING.l },
+  card: {
     padding: SPACING.l,
-  },
-  couponCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    marginBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.m,
-    padding: SPACING.m,
-    marginBottom: SPACING.m,
-    backgroundColor: COLORS.surface,
   },
-  couponIconWrap: {
-    width: 40,
-    height: 40,
-    borderRadius: RADIUS.round,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: SPACING.m,
-  },
-  couponBody: {
-    flex: 1,
-  },
-  couponTitle: {
-    fontSize: 14.5,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-  },
-  couponSubtitle: {
-    fontSize: 12.5,
-    color: COLORS.textSecondary,
-    marginTop: 2,
-  },
-  couponBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: SPACING.s,
-    gap: SPACING.s,
-  },
-  codeChip: {
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderStyle: 'dashed',
-    borderRadius: RADIUS.xs,
-    paddingHorizontal: SPACING.s,
-    paddingVertical: 3,
-  },
-  codeChipText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: COLORS.primary,
-    letterSpacing: 0.5,
-  },
-  expiryText: {
-    fontSize: 11.5,
-    color: COLORS.textTertiary,
-  },
-  copyBtn: {
-    borderWidth: 1,
-    borderColor: COLORS.primary,
-    borderRadius: RADIUS.s,
-    paddingHorizontal: SPACING.m,
-    paddingVertical: 6,
-    marginLeft: SPACING.s,
-  },
-  copyBtnText: {
-    fontSize: 12.5,
-    fontWeight: '700',
-    color: COLORS.primary,
-  },
+  copyRow: { flexDirection: 'row', alignItems: 'center' },
+  textBox: { flex: 1, marginRight: SPACING.m },
+  cardTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
+  subtitle: { marginTop: SPACING.xs, color: COLORS.textSecondary, fontSize: 12 },
+  expiry: { marginTop: SPACING.s, color: COLORS.textTertiary, fontSize: 11 },
+  copyButton: { padding: SPACING.s, borderRadius: RADIUS.s, backgroundColor: COLORS.primaryLight },
+  copyText: { color: COLORS.primary, fontWeight: '700', fontSize: 12 },
+  policy: { marginTop: SPACING.m, color: COLORS.textTertiary, fontSize: 11 },
 });
 
 export default CouponsScreen;

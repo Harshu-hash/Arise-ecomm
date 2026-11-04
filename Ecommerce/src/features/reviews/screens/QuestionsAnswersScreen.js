@@ -1,174 +1,213 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import {
+  FlatList,
+  RefreshControl,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useToast } from '../../../contexts/ToastContext';
+import {
+  useCreateQuestionMutation,
+  useGetMyQuestionsQuery,
+  useGetProductQuestionsQuery,
+} from '../api/reviews.api';
 
-const QUESTIONS = [
-  {
-    id: 'q1',
-    product: 'boAt Airdopes 141 Bluetooth Truly Wireless Earbuds',
-    question: 'Does this support fast charging?',
-    answer: 'Yes, 10 minutes of charging gives around 2 hours of playback.',
-    answersCount: 3,
-    date: '20 Aug 2026',
-  },
-  {
-    id: 'q2',
-    product: 'Samsung Galaxy M14 5G (ICY Silver, 128 GB)',
-    question: 'Is the box a genuine Samsung India warranty unit?',
-    answer: null,
-    answersCount: 0,
-    date: '05 Jul 2026',
-  },
-];
-
-const QuestionsAnswersScreen = ({ navigation }) => {
-  const insets = useSafeAreaInsets();
-
+const QuestionsAnswersScreen = ({ navigation, route }) => {
+  const insets = useSafeAreaInsets(),
+    toast = useToast(),
+    productId = route?.params?.productId,
+    productName = route?.params?.productName;
+  const mine = useGetMyQuestionsQuery({ limit: 20 }, { skip: !!productId }),
+    product = useGetProductQuestionsQuery({ productId, limit: 20 }, { skip: !productId }),
+    query = productId ? product : mine;
+  const [text, setText] = useState('');
+  const [createQuestion, { isLoading: isCreating }] = useCreateQuestionMutation();
+  const submit = async () => {
+    try {
+      const created = await createQuestion({ productId, body: text }).unwrap();
+      setText('');
+      toast.show('Question submitted for moderation', { variant: 'success', icon: 'check' });
+      navigation.navigate('QuestionDetail', { questionId: created.id });
+    } catch (error) {
+      toast.show(error.message || 'Could not submit question', { variant: 'error' });
+    }
+  };
+  if (query.isLoading) return <FullScreenLoader message="Loading questions..." />;
+  if (query.error)
+    return (
+      <ErrorState
+        title="Could not load questions"
+        message={query.error.message}
+        onRetry={query.refetch}
+      />
+    );
+  const questions = query.data?.items || [];
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Questions & Answers</Text>
+        <View style={styles.grow}>
+          <Text style={styles.headerTitle}>{productId ? 'Product Questions' : 'My Questions'}</Text>
+          {productName ? (
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {productName}
+            </Text>
+          ) : null}
+        </View>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {QUESTIONS.map((item) => (
+      {productId ? (
+        <View style={styles.ask}>
+          <TextInput
+            value={text}
+            onChangeText={setText}
+            maxLength={500}
+            placeholder="Ask about this product"
+            placeholderTextColor={COLORS.textTertiary}
+            style={styles.input}
+          />
           <TouchableOpacity
-            key={item.id}
-            activeOpacity={0.7}
+            disabled={text.trim().length < 5 || isCreating}
+            onPress={submit}
+            style={[styles.send, (text.trim().length < 5 || isCreating) && styles.disabled]}
+          >
+            <Icon name="send" size={16} color={COLORS.white} />
+          </TouchableOpacity>
+        </View>
+      ) : null}
+      <FlatList
+        data={questions}
+        keyExtractor={item => item.id}
+        contentContainerStyle={questions.length ? styles.list : styles.emptyList}
+        refreshControl={<RefreshControl refreshing={query.isFetching} onRefresh={query.refetch} />}
+        ListEmptyComponent={
+          <View style={styles.empty}>
+            <Icon name="help-circle" size={36} color={COLORS.textTertiary} />
+            <Text style={styles.emptyTitle}>No questions yet</Text>
+            <Text style={styles.emptyText}>
+              {productId
+                ? 'Ask the first question about this product.'
+                : 'Questions you ask will appear here.'}
+            </Text>
+          </View>
+        }
+        renderItem={({ item }) => (
+          <TouchableOpacity
             style={styles.card}
-            onPress={() => navigation && navigation.navigate('QuestionDetail', { question: item })}>
-            <Text style={styles.productName} numberOfLines={1}>{item.product}</Text>
-
-            <View style={styles.questionRow}>
-              <Icon name="help-circle" size={15} color={COLORS.primary} style={{ marginRight: SPACING.s }} />
-              <Text style={styles.questionText}>{item.question}</Text>
-            </View>
-
+            onPress={() => navigation.navigate('QuestionDetail', { questionId: item.id })}
+          >
+            <Text style={styles.productName} numberOfLines={1}>
+              {item.product}
+            </Text>
+            <Text style={styles.question}>Q: {item.question}</Text>
             {item.answer ? (
-              <View style={styles.answerRow}>
-                <Icon name="corner-down-right" size={14} color={COLORS.textTertiary} style={{ marginRight: SPACING.s }} />
-                <Text style={styles.answerText}>{item.answer}</Text>
-              </View>
+              <Text style={styles.answer} numberOfLines={2}>
+                A: {item.answer}
+              </Text>
             ) : (
-              <View style={styles.pendingPill}>
-                <Text style={styles.pendingText}>Awaiting answers</Text>
-              </View>
+              <Text style={styles.pending}>
+                {item.moderationStatus === 'PENDING' ? 'Pending moderation' : 'Awaiting answers'}
+              </Text>
             )}
-
-            <View style={styles.cardBottomRow}>
-              <Text style={styles.dateText}>{item.date}</Text>
-              <Text style={styles.answersCountText}>
+            <View style={styles.meta}>
+              <Text style={styles.metaText}>{item.date}</Text>
+              <Text style={styles.count}>
                 {item.answersCount} {item.answersCount === 1 ? 'answer' : 'answers'}
               </Text>
             </View>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
+        )}
+      />
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
+  grow: { flex: 1 },
+  headerTitle: { fontSize: 20, fontWeight: '600', color: COLORS.textPrimary },
+  subtitle: { fontSize: 11, color: COLORS.textTertiary },
+  ask: {
+    flexDirection: 'row',
+    gap: SPACING.s,
+    padding: SPACING.m,
+    backgroundColor: COLORS.surface,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
-  headerTitle: {
-    fontSize: 20,
-    fontWeight: '500',
+  input: {
+    flex: 1,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.round,
+    paddingHorizontal: SPACING.l,
     color: COLORS.textPrimary,
   },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
+  send: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: COLORS.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disabled: { backgroundColor: COLORS.border },
+  list: { padding: SPACING.l, paddingBottom: SPACING.xxxl },
+  emptyList: { flexGrow: 1 },
+  empty: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: SPACING.xl },
+  emptyTitle: { fontSize: 17, fontWeight: '700', color: COLORS.textPrimary, marginTop: SPACING.m },
+  emptyText: {
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginTop: SPACING.s,
   },
   card: {
+    backgroundColor: COLORS.surface,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.m,
     padding: SPACING.l,
-    marginBottom: SPACING.l,
+    marginBottom: SPACING.m,
   },
   productName: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '600',
     color: COLORS.textTertiary,
-    marginBottom: SPACING.m,
     textTransform: 'uppercase',
-  },
-  questionRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
     marginBottom: SPACING.s,
   },
-  questionText: {
-    flex: 1,
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    lineHeight: 19,
-  },
-  answerRow: {
+  question: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, lineHeight: 20 },
+  answer: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 19, marginTop: SPACING.s },
+  pending: { fontSize: 12, color: COLORS.textTertiary, marginTop: SPACING.s },
+  meta: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: SPACING.m,
-  },
-  answerText: {
-    flex: 1,
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
-  },
-  pendingPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.mutedBg,
-    borderRadius: RADIUS.xs,
-    paddingHorizontal: SPACING.s,
-    paddingVertical: 4,
-    marginBottom: SPACING.m,
-  },
-  pendingText: {
-    fontSize: 11.5,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  cardBottomRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     paddingTop: SPACING.m,
+    marginTop: SPACING.m,
   },
-  dateText: {
-    fontSize: 11.5,
-    color: COLORS.textTertiary,
-  },
-  answersCountText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.primary,
-  },
+  metaText: { fontSize: 11, color: COLORS.textTertiary },
+  count: { fontSize: 12, fontWeight: '700', color: COLORS.primary },
 });
-
 export default QuestionsAnswersScreen;

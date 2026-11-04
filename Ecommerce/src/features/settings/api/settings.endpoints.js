@@ -1,1 +1,1 @@
-﻿// Endpoint path constants for 'settings'.
+export const SETTINGS_ENDPOINTS = { adPreferences: '/me/ad-preferences' };

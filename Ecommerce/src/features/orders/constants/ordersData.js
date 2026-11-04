@@ -8,14 +8,13 @@ export const ORDER_STATUS = {
   OUT_FOR_DELIVERY: 'Out for Delivery',
   DELIVERED: 'Delivered',
   CANCELLED: 'Cancelled',
-  RETURNED: 'Returned',
 };
 
 export const ORDER_JOURNEY_STEPS = [
   'Order placed',
-  'Shop preparing',
-  'Finding delivery partner',
-  'Delivery partner assigned',
+  'Packed by seller',
+  'Shipped',
+  'In transit',
   'Out for delivery',
   'Delivered',
 ];
@@ -46,7 +45,8 @@ export const MOCK_ORDERS = [
         qty: 1,
         price: 1299,
         mrp: 2490,
-        image: 'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
+        image:
+          'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
       },
     ],
     priceDetails: {
@@ -91,7 +91,8 @@ export const MOCK_ORDERS = [
         qty: 1,
         price: 12999,
         mrp: 15999,
-        image: 'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=400&q=80',
+        image:
+          'https://images.unsplash.com/photo-1598327105666-5b89351aff97?auto=format&fit=crop&w=400&q=80',
       },
     ],
     priceDetails: {
@@ -136,7 +137,8 @@ export const MOCK_ORDERS = [
         qty: 1,
         price: 298,
         mrp: 795,
-        image: 'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
+        image:
+          'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
       },
     ],
     priceDetails: {
@@ -181,7 +183,8 @@ export const MOCK_ORDERS = [
         qty: 1,
         price: 349,
         mrp: 899,
-        image: 'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=400&q=80',
+        image:
+          'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=400&q=80',
       },
     ],
     priceDetails: {
@@ -205,15 +208,20 @@ export const MOCK_ORDERS = [
 
 export const STATUS_FILTERS = ['All', 'Processing', 'Delivered', 'Cancelled'];
 
-export const getOrderStatusGroup = (status) => {
+export const getOrderStatusGroup = status => {
   if (status === ORDER_STATUS.DELIVERED) return 'Delivered';
-  if (status === ORDER_STATUS.CANCELLED || status === ORDER_STATUS.RETURNED) return 'Cancelled';
+  if (status === ORDER_STATUS.CANCELLED) return 'Cancelled';
   return 'Processing';
 };
 
 export const PAYMENT_METHODS = [
   { id: 'upi', icon: 'smartphone', title: 'UPI', subtitle: 'Pay by any UPI app' },
-  { id: 'card', icon: 'credit-card', title: 'Credit / Debit Card', subtitle: 'Visa, Mastercard, RuPay & more' },
+  {
+    id: 'card',
+    icon: 'credit-card',
+    title: 'Credit / Debit Card',
+    subtitle: 'Visa, Mastercard, RuPay & more',
+  },
   { id: 'netbanking', icon: 'globe', title: 'Net Banking', subtitle: 'All major banks supported' },
   { id: 'wallet', icon: 'gift', title: 'Wallet', subtitle: 'Balance: ₹500' },
   { id: 'cod', icon: 'truck', title: 'Cash on Delivery', subtitle: 'Pay when your order arrives' },

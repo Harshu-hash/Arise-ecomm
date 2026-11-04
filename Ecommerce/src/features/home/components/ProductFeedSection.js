@@ -15,7 +15,11 @@ const ProductFeedCard = ({ product, onPress }) => {
   const badgeStyle = badge ? BADGE_STYLES[badge] : null;
 
   return (
-    <TouchableOpacity activeOpacity={0.85} onPress={() => onPress && onPress(product)} style={styles.card}>
+    <TouchableOpacity
+      activeOpacity={0.85}
+      onPress={() => onPress && onPress(product)}
+      style={styles.card}
+    >
       <View style={[styles.imageBox, { aspectRatio: aspectRatio || 1 }]}>
         <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
         {badgeStyle ? (
@@ -34,7 +38,8 @@ const ProductFeedCard = ({ product, onPress }) => {
       ) : null}
 
       <Text style={styles.title} numberOfLines={1}>
-        <Text style={styles.brand}>{brand}</Text>{` ${title}`}
+        <Text style={styles.brand}>{brand}</Text>
+        {` ${title}`}
       </Text>
 
       <PriceBlock price={price} mrp={mrp} discountPct={0} style={styles.priceBlock} />
@@ -57,12 +62,12 @@ const ProductFeedSection = ({ products, onPressProduct }) => {
       <Text style={styles.sectionTitle}>You May Also Like</Text>
       <View style={styles.grid}>
         <View style={styles.column}>
-          {leftColumn.map((product) => (
+          {leftColumn.map(product => (
             <ProductFeedCard key={product.id} product={product} onPress={onPressProduct} />
           ))}
         </View>
         <View style={styles.column}>
-          {rightColumn.map((product) => (
+          {rightColumn.map(product => (
             <ProductFeedCard key={product.id} product={product} onPress={onPressProduct} />
           ))}
         </View>

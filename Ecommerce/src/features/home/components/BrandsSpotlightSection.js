@@ -15,20 +15,25 @@ const BrandsSpotlightSection = ({ brands, onPressBrand, onSeeAll }) => (
       ) : null}
     </View>
     <View style={styles.row}>
-      {brands.map((brand) => (
+      {brands.map(brand => (
         <TouchableOpacity
           key={brand.id}
           activeOpacity={0.85}
           onPress={() => onPressBrand && onPressBrand(brand)}
-          style={styles.card}>
+          style={styles.card}
+        >
           <View style={styles.imageBox}>
             <Image source={{ uri: brand.image }} style={styles.image} resizeMode="cover" />
             <View style={styles.adTag}>
               <Text style={styles.adTagText}>AD</Text>
             </View>
           </View>
-          <Text style={styles.discount} numberOfLines={1}>{brand.discount}</Text>
-          <Text style={styles.subtitle} numberOfLines={1}>{brand.subtitle}</Text>
+          <Text style={styles.discount} numberOfLines={1}>
+            {brand.discount}
+          </Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {brand.subtitle}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>

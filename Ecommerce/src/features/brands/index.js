@@ -1,1 +1,2 @@
-﻿// Public API of the 'brands' feature. Other features may ONLY import from this file.
+export { default as BrandsScreen } from './screens/BrandsScreen';
+export { useGetBrandsQuery, useLazyGetBrandsQuery } from './api/brands.query';

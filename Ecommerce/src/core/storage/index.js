@@ -1,1 +1,2 @@
-﻿// core/storage - infrastructure module. No business logic allowed here.
+export { preferencesStorage } from './mmkvStorage';
+export { secureSessionStorage } from './secureSessionStorage';

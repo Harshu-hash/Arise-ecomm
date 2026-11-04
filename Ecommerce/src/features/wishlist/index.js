@@ -1,1 +1,7 @@
-﻿// Public API of the 'wishlist' feature. Other features may ONLY import from this file.
+export { default as WishlistScreen } from './screens/WishlistScreen';
+export {
+  useAddWishlistItemMutation,
+  useGetWishlistQuery,
+  useMoveWishlistItemToCartMutation,
+  useRemoveWishlistItemMutation,
+} from './api/wishlist.query';

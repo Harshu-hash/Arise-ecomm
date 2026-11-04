@@ -1,305 +1,259 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
+import {
+  Image,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import { launchImageLibrary } from 'react-native-image-picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
-import { TICKET_SUBJECTS } from '../constants/helpData';
-
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetOrdersQuery } from '@features/orders';
+import { useUploadSupportAttachmentMutation } from '@features/media';
+import { useCreateTicketMutation, useGetTicketSubjectsQuery } from '../api/support.api';
+import { useToast } from '../../../contexts/ToastContext';
 const RaiseTicketScreen = ({ navigation, route }) => {
-  const insets = useSafeAreaInsets();
-  const order = route?.params?.order;
-  const [subjectId, setSubjectId] = useState(route?.params?.subjectId || null);
-  const [description, setDescription] = useState('');
-  const [submitted, setSubmitted] = useState(false);
-  const ticketId = `HLP-${Math.floor(10000 + Math.random() * 89999)}`;
-
-  if (submitted) {
+  const insets = useSafeAreaInsets(),
+    toast = useToast(),
+    subjects = useGetTicketSubjectsQuery(),
+    orders = useGetOrdersQuery({ limit: 20 }),
+    [create, { isLoading: isSubmitting }] = useCreateTicketMutation(),
+    [upload, { isLoading: isUploading }] = useUploadSupportAttachmentMutation(),
+    [subjectCode, setSubjectCode] = useState(route?.params?.subjectId || null),
+    [description, setDescription] = useState(''),
+    [orderId, setOrderId] = useState(route?.params?.order?.id || route?.params?.orderId || null),
+    [attachments, setAttachments] = useState([]);
+  if (subjects.isLoading || orders.isLoading)
+    return <FullScreenLoader message="Loading support options..." />;
+  if (subjects.error || orders.error)
     return (
-      <View style={styles.container}>
-        <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-        <View style={styles.successWrap}>
-          <View style={styles.successIconCircle}>
-            <Icon name="check" size={32} color={COLORS.white} />
-          </View>
-          <Text style={styles.successTitle}>Ticket Raised</Text>
-          <Text style={styles.ticketIdText}>#{ticketId}</Text>
-          <Text style={styles.successSubtitle}>
-            Our support team will review your issue and respond within 24 hours. You can track the
-            status anytime from My Support Tickets.
-          </Text>
-          <TouchableOpacity
-            activeOpacity={0.85}
-            style={styles.primaryBtn}
-            onPress={() => navigation && navigation.navigate('MyTickets')}>
-            <Text style={styles.primaryBtnText}>View My Tickets</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            style={styles.secondaryBtn}
-            onPress={() => navigation && navigation.navigate('HelpCenter')}>
-            <Text style={styles.secondaryBtnText}>Back to Help Center</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
+      <ErrorState
+        title="Support form unavailable"
+        message={(subjects.error || orders.error)?.message}
+        onRetry={() => {
+          subjects.refetch();
+          orders.refetch();
+        }}
+      />
     );
-  }
-
+  const selected = subjects.data.find(item => item.code === subjectCode);
+  const pick = async () => {
+    try {
+      const result = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 3 - attachments.length,
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.8,
+        includeBase64: false,
+      });
+      if (result.didCancel) return;
+      if (result.errorCode) {
+        toast.show(
+          result.errorCode === 'permission'
+            ? 'Photo access was denied.'
+            : result.errorMessage || 'Could not select photos.',
+          { variant: 'error' },
+        );
+        return;
+      }
+      for (const [index, asset] of (result.assets || []).entries()) {
+        if (!asset.uri || !asset.type || !asset.fileName || !asset.fileSize) continue;
+        const media = await upload({ uploadKey: `support-${Date.now()}-${index}`, asset }).unwrap();
+        setAttachments(current => [...current, media].slice(0, 3));
+      }
+    } catch (error) {
+      toast.show(error.message || 'Could not upload attachment', { variant: 'error' });
+    }
+  };
+  const submit = async () => {
+    try {
+      const ticket = await create({
+        subjectCode,
+        description,
+        orderId: selected?.requiresOrder ? orderId : null,
+        attachmentMediaIds: attachments.map(item => item.id),
+      }).unwrap();
+      toast.show('Support ticket created', { variant: 'success', icon: 'check' });
+      navigation.replace('TicketDetail', { ticketId: ticket.id });
+    } catch (error) {
+      toast.show(error.message || 'Could not create ticket', { variant: 'error' });
+    }
+  };
+  const valid =
+    selected &&
+    description.trim().length >= 10 &&
+    (!selected.requiresOrder || orderId) &&
+    !isUploading;
   return (
     <View style={styles.container}>
       <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
-
       <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) }]}>
-        <TouchableOpacity onPress={() => navigation && navigation.goBack()} style={styles.backBtn}>
+        <TouchableOpacity onPress={navigation.goBack}>
           <Icon name="arrow-left" size={20} color={COLORS.textPrimary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Raise a Ticket</Text>
       </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {order ? (
-          <View style={styles.orderCard}>
-            <Image source={{ uri: order.image }} style={styles.image} resizeMode="cover" />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.orderName} numberOfLines={2}>{order.name}</Text>
-              <Text style={styles.orderMeta}>{order.id}</Text>
-            </View>
-          </View>
-        ) : null}
-
-        <Text style={styles.sectionTitle}>What is this about?</Text>
-        <View style={styles.subjectGrid}>
-          {TICKET_SUBJECTS.map((subject) => (
+      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+        <Text style={styles.section}>What is this about?</Text>
+        <View style={styles.chips}>
+          {subjects.data.map(item => (
             <TouchableOpacity
-              key={subject.id}
-              activeOpacity={0.8}
-              onPress={() => setSubjectId(subject.id)}
-              style={[styles.subjectChip, subjectId === subject.id && styles.subjectChipActive]}>
-              <Icon
-                name={subject.icon}
-                size={14}
-                color={subjectId === subject.id ? COLORS.primary : COLORS.textSecondary}
-              />
-              <Text style={[styles.subjectChipText, subjectId === subject.id && styles.subjectChipTextActive]}>
-                {subject.label}
+              key={item.code}
+              onPress={() => setSubjectCode(item.code)}
+              style={[styles.chip, subjectCode === item.code && styles.chipActive]}
+            >
+              <Text style={[styles.chipText, subjectCode === item.code && styles.chipTextActive]}>
+                {item.label}
               </Text>
             </TouchableOpacity>
           ))}
         </View>
-
-        <Text style={styles.sectionTitle}>Describe your issue</Text>
+        {selected?.requiresOrder ? (
+          <>
+            <Text style={styles.section}>Choose an order</Text>
+            {orders.data.items.map(order => (
+              <TouchableOpacity
+                key={order.id}
+                onPress={() => setOrderId(order.id)}
+                style={[styles.order, orderId === order.id && styles.orderActive]}
+              >
+                <Text style={styles.orderId}>{order.id}</Text>
+                <Text style={styles.orderName} numberOfLines={1}>
+                  {order.name}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </>
+        ) : null}
+        <Text style={styles.section}>Describe your issue</Text>
         <TextInput
-          style={styles.textArea}
           value={description}
           onChangeText={setDescription}
+          maxLength={4000}
           multiline
-          placeholder="Please share as much detail as possible so we can help you faster"
+          placeholder="Include at least 10 characters"
           placeholderTextColor={COLORS.textTertiary}
+          style={styles.area}
         />
-
-        <TouchableOpacity activeOpacity={0.7} style={styles.attachRow}>
-          <Icon name="paperclip" size={16} color={COLORS.primary} />
-          <Text style={styles.attachText}>Add Photo (optional)</Text>
-        </TouchableOpacity>
+        <View style={styles.attachHeader}>
+          <Text style={styles.section}>Photos (optional)</Text>
+          {attachments.length < 3 ? (
+            <TouchableOpacity disabled={isUploading} onPress={pick}>
+              <Text style={styles.add}>{isUploading ? 'Uploading...' : 'Add photos'}</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        <View style={styles.images}>
+          {attachments.map((item, index) => (
+            <View key={item.id}>
+              <Image source={{ uri: item.thumbnailUrl }} style={styles.image} />
+              <TouchableOpacity
+                style={styles.remove}
+                onPress={() =>
+                  setAttachments(current => current.filter((_, position) => position !== index))
+                }
+              >
+                <Icon name="x" size={11} color={COLORS.white} />
+              </TouchableOpacity>
+            </View>
+          ))}
+        </View>
       </ScrollView>
-
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
         <TouchableOpacity
-          activeOpacity={0.85}
-          disabled={!subjectId || !description.trim()}
-          style={[styles.submitBtn, (!subjectId || !description.trim()) && styles.submitBtnDisabled]}
-          onPress={() => setSubmitted(true)}>
-          <Text style={styles.submitBtnText}>Submit Ticket</Text>
+          disabled={!valid || isSubmitting}
+          onPress={submit}
+          style={[styles.button, (!valid || isSubmitting) && styles.disabled]}
+        >
+          <Text style={styles.buttonText}>{isSubmitting ? 'Submitting...' : 'Submit Ticket'}</Text>
         </TouchableOpacity>
       </View>
     </View>
   );
 };
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.background,
-  },
+  container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.surface,
+    gap: SPACING.m,
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.m,
+    backgroundColor: COLORS.surface,
   },
-  backBtn: {
-    marginRight: SPACING.m,
-  },
-  headerTitle: {
-    fontSize: 19,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  scrollContent: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.l,
-    paddingBottom: SPACING.xxxl,
-  },
-  orderCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.mutedBg,
-    borderRadius: RADIUS.m,
-    padding: SPACING.m,
-    gap: SPACING.m,
-    marginBottom: SPACING.xl,
-  },
-  image: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.s,
-    backgroundColor: COLORS.white,
-  },
-  orderName: {
-    fontSize: 12.5,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    lineHeight: 16,
-    marginBottom: 2,
-  },
-  orderMeta: {
-    fontSize: 11,
-    color: COLORS.textTertiary,
-  },
-  sectionTitle: {
-    fontSize: 14,
+  headerTitle: { fontSize: 19, fontWeight: '600', color: COLORS.textPrimary },
+  content: { padding: SPACING.l, paddingBottom: SPACING.xxxl },
+  section: {
+    fontSize: 13.5,
     fontWeight: '700',
     color: COLORS.textPrimary,
-    marginBottom: SPACING.m,
+    marginTop: SPACING.m,
+    marginBottom: SPACING.s,
   },
-  subjectGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: SPACING.s,
-    marginBottom: SPACING.xl,
-  },
-  subjectChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  chips: { flexDirection: 'row', flexWrap: 'wrap', gap: SPACING.s },
+  chip: {
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.round,
     paddingHorizontal: SPACING.m,
     paddingVertical: SPACING.s,
-    gap: 6,
   },
-  subjectChipActive: {
-    borderColor: COLORS.primary,
-    backgroundColor: COLORS.primaryLight,
-  },
-  subjectChipText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.textSecondary,
-  },
-  subjectChipTextActive: {
-    color: COLORS.primary,
-  },
-  textArea: {
+  chipActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  chipText: { fontSize: 12, color: COLORS.textSecondary },
+  chipTextActive: { color: COLORS.primary, fontWeight: '700' },
+  order: {
+    padding: SPACING.m,
     borderWidth: 1,
     borderColor: COLORS.border,
     borderRadius: RADIUS.s,
-    paddingHorizontal: SPACING.m,
-    paddingVertical: SPACING.m,
-    fontSize: 13.5,
-    color: COLORS.textPrimary,
-    minHeight: 120,
+    marginBottom: SPACING.s,
+  },
+  orderActive: { borderColor: COLORS.primary, backgroundColor: COLORS.primaryLight },
+  orderId: { fontSize: 11, fontWeight: '700', color: COLORS.textPrimary },
+  orderName: { fontSize: 12, color: COLORS.textSecondary, marginTop: 2 },
+  area: {
+    minHeight: 130,
     textAlignVertical: 'top',
-    marginBottom: SPACING.m,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.s,
+    padding: SPACING.m,
+    color: COLORS.textPrimary,
   },
-  attachRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: SPACING.s,
-  },
-  attachText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: COLORS.primary,
+  attachHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  add: { fontSize: 12.5, fontWeight: '700', color: COLORS.primary, marginTop: SPACING.m },
+  images: { flexDirection: 'row', gap: SPACING.s },
+  image: { width: 66, height: 66, borderRadius: RADIUS.s },
+  remove: {
+    position: 'absolute',
+    right: -5,
+    top: -5,
+    backgroundColor: COLORS.error,
+    borderRadius: 10,
+    padding: 3,
   },
   footer: {
-    paddingHorizontal: SPACING.l,
-    paddingTop: SPACING.m,
+    padding: SPACING.l,
     borderTopWidth: 1,
     borderTopColor: COLORS.border,
     backgroundColor: COLORS.surface,
   },
-  submitBtn: {
+  button: {
     backgroundColor: COLORS.primary,
+    padding: SPACING.m,
     borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
     alignItems: 'center',
   },
-  submitBtnDisabled: {
-    backgroundColor: COLORS.border,
-  },
-  submitBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  successWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: SPACING.xl,
-  },
-  successIconCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
-    backgroundColor: COLORS.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: SPACING.l,
-  },
-  successTitle: {
-    fontSize: 19,
-    fontWeight: '700',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  ticketIdText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: COLORS.primary,
-    marginBottom: SPACING.l,
-  },
-  successSubtitle: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
-    lineHeight: 19,
-    marginBottom: SPACING.xxl,
-  },
-  primaryBtn: {
-    alignSelf: 'stretch',
-    backgroundColor: COLORS.primary,
-    borderRadius: RADIUS.s,
-    paddingVertical: SPACING.m,
-    alignItems: 'center',
-    marginBottom: SPACING.m,
-  },
-  primaryBtnText: {
-    color: COLORS.white,
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  secondaryBtn: {
-    paddingVertical: SPACING.s,
-  },
-  secondaryBtnText: {
-    color: COLORS.primary,
-    fontSize: 13.5,
-    fontWeight: '600',
-  },
+  disabled: { backgroundColor: COLORS.border },
+  buttonText: { color: COLORS.white, fontWeight: '700' },
 });
-
 export default RaiseTicketScreen;

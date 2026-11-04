@@ -1,13 +1,22 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
+import ErrorState from '../../../shared/ErrorState/ErrorState';
+import { useGetSupportChannelsQuery } from '@features/support';
+
+const channelIcons = { PHONE: 'phone', EMAIL: 'mail', CHAT: 'message-circle', URL: 'external-link' };
 
 const ContactUsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { data, error, isLoading, refetch } = useGetSupportChannelsQuery();
+
+  if (isLoading) return <FullScreenLoader message="Loading support options..." />;
+  if (error || !data) return <ErrorState message={error?.message} onRetry={refetch} />;
 
   return (
     <View style={styles.container}>
@@ -23,47 +32,31 @@ const ContactUsScreen = ({ navigation }) => {
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.hoursCard}>
           <Icon name="clock" size={18} color={COLORS.primary} />
-          <Text style={styles.hoursText}>Support available 24x7, every day of the week</Text>
+          <Text style={styles.hoursText}>{data.availabilityLabel}</Text>
         </View>
+
+        {data.channels.filter(channel => channel.enabled).map(channel => (
+          <TouchableOpacity
+            key={channel.id}
+            activeOpacity={0.8}
+            style={styles.optionRow}
+            onPress={() => Linking.openURL(channel.href)}>
+            <View style={styles.optionIconBox}>
+              <Icon name={channelIcons[channel.type]} size={19} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.optionTitle}>{channel.label}</Text>
+              <Text style={styles.optionSubtitle}>{channel.description}</Text>
+            </View>
+            <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
+          </TouchableOpacity>
+        ))}
 
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('LiveChat', {})}>
-          <View style={styles.optionIconBox}>
-            <Icon name="message-circle" size={19} color={COLORS.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Chat with us</Text>
-            <Text style={styles.optionSubtitle}>Get instant help from FlipBot or an agent</Text>
-          </View>
-          <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
-        </TouchableOpacity>
-
-        <View style={styles.optionRow}>
-          <View style={styles.optionIconBox}>
-            <Icon name="phone" size={19} color={COLORS.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Call us</Text>
-            <Text style={styles.optionSubtitle}>1800-208-9898 (toll free)</Text>
-          </View>
-        </View>
-
-        <View style={styles.optionRow}>
-          <View style={styles.optionIconBox}>
-            <Icon name="mail" size={19} color={COLORS.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Email us</Text>
-            <Text style={styles.optionSubtitle}>support@flipkart-clone.example</Text>
-          </View>
-        </View>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('RaiseTicket', {})}>
+          onPress={() => navigation && navigation.navigate('RaiseTicket', {})}
+        >
           <View style={styles.optionIconBox}>
             <Icon name="file-text" size={19} color={COLORS.primary} />
           </View>
@@ -77,7 +70,8 @@ const ContactUsScreen = ({ navigation }) => {
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('MyTickets')}>
+          onPress={() => navigation && navigation.navigate('MyTickets')}
+        >
           <View style={styles.optionIconBox}>
             <Icon name="clipboard" size={19} color={COLORS.primary} />
           </View>
@@ -91,7 +85,8 @@ const ContactUsScreen = ({ navigation }) => {
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('HelpCenter')}>
+          onPress={() => navigation && navigation.navigate('HelpCenter')}
+        >
           <View style={styles.optionIconBox}>
             <Icon name="help-circle" size={19} color={COLORS.primary} />
           </View>
