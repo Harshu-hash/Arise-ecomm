@@ -32,11 +32,11 @@ describe('seller account seed', () => {
     expect(pub.storeName).toBeTruthy();
   });
 
-  it('a mid-onboarding seller is gated to the wizard', () => {
+  it('a pending seller is gated to application status', () => {
     const pending = find('sellerUsers', (u) => u.email === 'newseller@arise.test');
     const pub = publicUser(pending);
     expect(pub.onboardingComplete).toBe(false);
-    expect(pub.defaultLanding).toBe('/onboarding');
+    expect(pub.defaultLanding).toBe('/application-status');
     expect(find('sellerOnboarding', (o) => o.sellerId === pending.sellerId)).toBeTruthy();
   });
 });

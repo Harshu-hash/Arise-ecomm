@@ -43,13 +43,8 @@ export function RequirePermission({ perm, mode = 'any', children }) {
  */
 export function RequireActiveSeller() {
   const user = useSessionStore((s) => s.user);
-  if (user && !user.onboardingComplete) return <Navigate to="/onboarding" replace />;
+  if (user && !user.onboardingComplete) return <Navigate to="/application-status" replace />;
   return <Outlet />;
 }
 
 /** The inverse: once onboarding is complete, the wizard redirects home. */
-export function RequireOnboarding() {
-  const user = useSessionStore((s) => s.user);
-  if (user?.onboardingComplete) return <Navigate to="/" replace />;
-  return <Outlet />;
-}

@@ -106,6 +106,16 @@ function findDuplicates(seller) {
 function approvalBlockers(seller) {
   const bundle = reviewBundle(seller);
   const blockers = [];
+  const application = applicationFor(seller.id);
+  if (application?.flowVersion === 'QUICK_COMMERCE_V1') {
+    const required = ['TRADE_LICENSE', 'GST_CERTIFICATE', 'ID_PROOF'];
+    for (const type of required) {
+      if (!bundle.documents.some((document) => document.type === type)) {
+        blockers.push(`${type.replace(/_/g, ' ').toLowerCase()} has not been uploaded`);
+      }
+    }
+    return blockers;
+  }
   const required = ['GST_CERTIFICATE', 'PAN_CARD', 'CANCELLED_CHEQUE', 'ADDRESS_PROOF'];
 
   for (const type of required) {

@@ -1,4 +1,4 @@
-import { LockOutlined, MailOutlined } from '@ant-design/icons';
+import { LockOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Button, Divider, Form, Input, Space, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -35,10 +35,21 @@ export default function LoginPage() {
     setLoading(true);
     setFormError(null);
     try {
-      const result = await sellerAuthApi.login({ email: values.email.trim(), password: values.password });
+      const result = await sellerAuthApi.login({ emailOrPhone: values.identifier.trim(), password: values.password });
       setChallenge(result);
       setStage(result.stage);
     } catch (e) {
+      if (e instanceof ApiError && e.status === 403 && e.details?.applicationStatus) {
+        const application = {
+          applicationStatus: e.details.applicationStatus,
+          rejectionReason: e.details.rejectionReason,
+          email: e.details.email,
+          storeName: e.details.storeName,
+        };
+        sessionStorage.setItem('sellerApplication', JSON.stringify(application));
+        navigate('/application-status', { state: application });
+        return;
+      }
       setFormError(e instanceof ApiError ? e.message : 'Could not sign you in.');
     } finally {
       setLoading(false);
@@ -105,14 +116,11 @@ export default function LoginPage() {
 
       <Form layout="vertical" requiredMark={false} onFinish={submit} disabled={loading}>
         <Form.Item
-          name="email"
-          label="Email"
-          rules={[
-            { required: true, message: 'Enter your email.' },
-            { type: 'email', message: 'That does not look like an email address.' },
-          ]}
+          name="identifier"
+          label="Email or phone"
+          rules={[{ required: true, message: 'Enter your email or phone.' }]}
         >
-          <Input autoFocus size="large" prefix={<MailOutlined style={{ opacity: 0.45 }} />} placeholder="you@store.test" autoComplete="username" />
+          <Input autoFocus size="large" prefix={<UserOutlined style={{ opacity: 0.45 }} />} placeholder="you@store.test or 10-digit phone" autoComplete="username" />
         </Form.Item>
 
         <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Enter your password.' }]}>
@@ -146,8 +154,7 @@ export default function LoginPage() {
             <Typography.Text style={{ fontSize: 12 }}>
               Owner <Typography.Text code>owner@arise.test</Typography.Text>, sub-users{' '}
               <Typography.Text code>catalog@arise.test</Typography.Text> /{' '}
-              <Typography.Text code>orders@arise.test</Typography.Text>, mid-onboarding{' '}
-              <Typography.Text code>newseller@arise.test</Typography.Text> — all password{' '}
+              <Typography.Text code>orders@arise.test</Typography.Text>. Pending applications cannot sign in. All passwords{' '}
               <Typography.Text code>Arise@123456</Typography.Text>.
             </Typography.Text>
           }

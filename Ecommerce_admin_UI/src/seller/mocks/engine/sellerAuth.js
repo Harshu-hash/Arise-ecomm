@@ -118,7 +118,7 @@ export function publicUser(user) {
     notifyEmail: user.notifyEmail ?? true,
     notifyInPanel: user.notifyInPanel ?? true,
     lastLoginAt: user.lastLoginAt ?? null,
-    defaultLanding: onboardingComplete ? '/' : '/onboarding',
+    defaultLanding: onboardingComplete ? '/' : '/application-status',
   };
 }
 

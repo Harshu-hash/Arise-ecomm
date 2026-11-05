@@ -31,6 +31,44 @@ function makeCode() {
   return String(Math.floor(100000 + Math.random() * 900000));
 }
 
+function makeRegistrationCode() {
+  return String(Math.floor(1000 + Math.random() * 9000));
+}
+
+function normalisePhone(value) {
+  return String(value ?? '').replace(/\D/g, '').slice(-10);
+}
+
+function registrationChallenge(kind, target) {
+  return insert('authChallenges', {
+    id: id('ROTP', 6),
+    userId: null,
+    audience: 'SELLER_REGISTRATION',
+    stage: `verify_${kind}`,
+    target,
+    code: makeRegistrationCode(),
+    expiresAt: new Date(mockNow() + CHALLENGE_TTL_MS).toISOString(),
+    attempts: 0,
+    consumedAt: null,
+    verifiedAt: null,
+    verificationToken: null,
+  });
+}
+
+function verifiedRegistrationToken(token, kind, target) {
+  return find(
+    'authChallenges',
+    (challenge) =>
+      challenge.audience === 'SELLER_REGISTRATION' &&
+      challenge.stage === `verify_${kind}` &&
+      challenge.target === target &&
+      challenge.verificationToken === token &&
+      challenge.verifiedAt &&
+      !challenge.consumedAt &&
+      new Date(challenge.expiresAt).getTime() > mockNow(),
+  );
+}
+
 function makeBackupCodes() {
   return Array.from({ length: 8 }, () => ({
     code: `${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(),
@@ -106,7 +144,9 @@ export const sellerAuthHandlers = [
     if (injected) return injected;
 
     const body = await request.json();
-    const email = String(body?.email ?? '').trim().toLowerCase();
+    const identifier = String(body?.emailOrPhone ?? body?.email ?? '').trim();
+    const email = identifier.toLowerCase();
+    const phone = normalisePhone(identifier);
 
     if (db.sellerUsers.length === 0) {
       return conflict(
@@ -115,8 +155,11 @@ export const sellerAuthHandlers = [
       );
     }
 
-    const user = find('sellerUsers', (u) => u.email.toLowerCase() === email);
-    const generic = () => unauthorized('Email or password is incorrect.');
+    const user = find(
+      'sellerUsers',
+      (u) => u.email.toLowerCase() === email || (phone.length === 10 && normalisePhone(u.phone) === phone),
+    );
+    const generic = () => unauthorized('Email/phone or password is incorrect.');
     if (!user) return generic();
 
     if (user.status === 'SUSPENDED') {
@@ -127,7 +170,71 @@ export const sellerAuthHandlers = [
     if (user.status === 'INVITED' || user.status === 'DEACTIVATED') return generic();
     if (user.password !== body?.password) return generic();
 
+    const seller = findById('sellers', user.sellerId);
+    const application = find('sellerOnboarding', (row) => row.sellerId === user.sellerId);
+    const applicationStatus = application?.status ?? seller?.status ?? 'UNDER_REVIEW';
+    if (!['APPROVED', 'ACTIVE'].includes(applicationStatus) || !['APPROVED', 'ACTIVE'].includes(seller?.status)) {
+      return forbidden('Login is enabled only after your seller application is approved.', {
+        details: {
+          applicationStatus,
+          rejectionReason: application?.rejectionReason ?? seller?.rejectionReason ?? null,
+          email: user.email,
+          storeName: seller?.storeName ?? user.storeName,
+        },
+      });
+    }
+
     return ok(challengePayload(user));
+  }),
+
+  /* ----------------------------------------- registration uniqueness check */
+  mswHttp.post(`${SELLER_BASE}/auth/register/check-exists`, async ({ request }) => {
+    const body = await request.json();
+    const kind = body?.kind === 'phone' ? 'phone' : 'email';
+    const value = kind === 'phone'
+      ? normalisePhone(body?.value)
+      : String(body?.value ?? '').trim().toLowerCase();
+    const exists = kind === 'phone'
+      ? find('sellerUsers', (user) => normalisePhone(user.phone) === value)
+      : find('sellerUsers', (user) => user.email.toLowerCase() === value);
+    return ok({ exists: Boolean(exists) });
+  }),
+
+  /* ------------------------------------------------ registration OTP send */
+  mswHttp.post(`${SELLER_BASE}/auth/register/send-otp`, async ({ request }) => {
+    const body = await request.json();
+    const kind = body?.kind === 'phone' ? 'phone' : 'email';
+    const target = kind === 'phone'
+      ? normalisePhone(body?.value)
+      : String(body?.value ?? '').trim().toLowerCase();
+    if ((kind === 'phone' && target.length !== 10) || (kind === 'email' && !target.includes('@'))) {
+      return validationFailed({ value: `Enter a valid ${kind}.` });
+    }
+    const duplicate = kind === 'phone'
+      ? find('sellerUsers', (user) => normalisePhone(user.phone) === target)
+      : find('sellerUsers', (user) => user.email.toLowerCase() === target);
+    if (duplicate) return conflict(`This ${kind} is already registered.`, `${kind.toUpperCase()}_TAKEN`);
+    const challenge = registrationChallenge(kind, target);
+    scheduleSave();
+    return ok({ challengeId: challenge.id, expiresInSeconds: CHALLENGE_TTL_MS / 1000, devHint: { code: challenge.code } });
+  }),
+
+  /* ---------------------------------------------- registration OTP verify */
+  mswHttp.post(`${SELLER_BASE}/auth/register/verify-otp`, async ({ request }) => {
+    const body = await request.json();
+    const challenge = findById('authChallenges', body?.challengeId);
+    if (!challenge || challenge.audience !== 'SELLER_REGISTRATION' || challenge.consumedAt || new Date(challenge.expiresAt).getTime() <= mockNow()) {
+      return unauthorized('This verification code expired. Request a new code.');
+    }
+    if (String(body?.code ?? '').trim() !== challenge.code) {
+      const attempts = challenge.attempts + 1;
+      update('authChallenges', challenge.id, { attempts, ...(attempts >= MAX_CODE_ATTEMPTS ? { consumedAt: mockNowIso() } : {}) });
+      return validationFailed({ code: 'That code is not correct.' }, 'That code is not correct.');
+    }
+    const verificationToken = `svt_${id('TOKEN', 8)}_${Math.random().toString(36).slice(2, 10)}`;
+    update('authChallenges', challenge.id, { verifiedAt: mockNowIso(), verificationToken });
+    scheduleSave();
+    return ok({ verificationToken, kind: challenge.stage.replace('verify_', ''), value: challenge.target });
   }),
 
   /* ------------------------------------------------------------ 2FA verify */
@@ -179,14 +286,46 @@ export const sellerAuthHandlers = [
     const injected = await simulateNetwork('/auth/register');
     if (injected) return injected;
 
-    const body = await request.json();
+    const contentType = request.headers.get('content-type') ?? '';
+    let body;
+    if (contentType.includes('application/json')) body = await request.json();
+    else {
+      try {
+        body = Object.fromEntries((await request.formData()).entries());
+      } catch (error) {
+        return badRequest(`Could not parse multipart application: ${error.message}`, 'MULTIPART_INVALID');
+      }
+    }
     const email = String(body?.email ?? '').trim().toLowerCase();
-    const storeName = String(body?.storeName ?? '').trim();
+    const phone = normalisePhone(body?.phone);
+    const storeName = String(body?.shopName ?? '').trim();
     const fieldErrors = {};
-    if (!storeName) fieldErrors.storeName = 'Enter your store name.';
+    const ownerName = String(body?.name ?? '').trim();
+    if (!ownerName) fieldErrors.name = 'Enter the owner name.';
+    else if (ownerName.length > 50 || !/^[A-Za-z ]+$/.test(ownerName)) fieldErrors.name = 'Use at most 50 letters and spaces.';
+    if (!storeName) fieldErrors.shopName = 'Enter your shop or business name.';
     if (!email || !email.includes('@')) fieldErrors.email = 'Enter a valid email.';
+    if (phone.length !== 10) fieldErrors.phone = 'Enter a 10-digit contact number.';
     const pwErrors = passwordPolicyErrors(body?.password);
     if (pwErrors.length) fieldErrors.password = `Password needs ${pwErrors.join(', ')}.`;
+    if (!String(body?.locality ?? '').trim()) fieldErrors.locality = 'Enter the locality or area.';
+    if (!/^\d{6}$/.test(String(body?.pincode ?? ''))) fieldErrors.pincode = 'Enter a 6-digit pincode.';
+    if (!String(body?.city ?? '').trim()) fieldErrors.city = 'Enter the city.';
+    if (!String(body?.state ?? '').trim()) fieldErrors.state = 'Enter the state.';
+    if (!String(body?.address ?? '').trim()) fieldErrors.address = 'Enter the full address.';
+    const lat = Number(body?.lat);
+    const lng = Number(body?.lng);
+    const radiusKm = Number(body?.radiusKm);
+    if (!Number.isFinite(lat) || lat < -90 || lat > 90) fieldErrors.lat = 'Enter a valid latitude.';
+    if (!Number.isFinite(lng) || lng < -180 || lng > 180) fieldErrors.lng = 'Enter a valid longitude.';
+    if (!Number.isFinite(radiusKm) || radiusKm < 1 || radiusKm > 100) fieldErrors.radiusKm = 'Enter a service radius from 1 to 100 km.';
+    if (!verifiedRegistrationToken(body?.emailVerificationToken, 'email', email)) fieldErrors.email = 'Verify this email again.';
+    if (!verifiedRegistrationToken(body?.phoneVerificationToken, 'phone', phone)) fieldErrors.phone = 'Verify this phone again.';
+    for (const [field, label] of [['tradeLicense', 'Trade license'], ['gstCertificate', 'GST certificate'], ['idProof', 'ID proof']]) {
+      if (!body[field] || !body[field].name || body[field].size === 0) fieldErrors[field] = `${label} is required.`;
+      else if (!['application/pdf', 'image/jpeg', 'image/png'].includes(body[field].type)) fieldErrors[field] = `${label} must be a PDF, JPG or PNG.`;
+      else if (body[field].size > 20 * 1024 * 1024) fieldErrors[field] = `${label} must be 20 MB or smaller.`;
+    }
     if (Object.keys(fieldErrors).length) return validationFailed(fieldErrors);
 
     if (find('sellerUsers', (u) => u.email.toLowerCase() === email)) {
@@ -195,20 +334,30 @@ export const sellerAuthHandlers = [
       });
     }
 
-    // A fresh seller + a DRAFT onboarding application, both in the shared DB so
-    // the admin "Onboarding Applications" screen can review it once submitted.
+    if (find('sellerUsers', (u) => normalisePhone(u.phone) === phone)) {
+      return conflict('An account with this phone already exists.', 'PHONE_TAKEN', {
+        fieldErrors: { phone: 'This phone is already registered.' },
+      });
+    }
+
+    // The reference flow creates a submitted application, not an authenticated
+    // half-configured account. Admin approval is the gate that unlocks login.
     const sellerId = id('SEL', 4);
     insert('sellers', {
       id: sellerId,
       storeName,
-      legalName: body?.legalName || `${storeName} Pvt Ltd`,
-      status: 'ONBOARDING',
+      legalName: storeName,
+      status: 'UNDER_REVIEW',
       tier: 'BRONZE',
       gstin: null,
       pan: null,
-      city: body?.city ?? null,
-      state: body?.state ?? null,
-      pincode: body?.pincode ?? null,
+      city: String(body?.city ?? '').trim(),
+      state: String(body?.state ?? '').trim(),
+      pincode: String(body?.pincode ?? '').trim(),
+      phone,
+      address: String(body?.address ?? '').trim(),
+      locality: String(body?.locality ?? '').trim(),
+      location: { lat, lng, radiusKm },
       rating: null,
       liveListings: 0,
       gmv30dPaise: 0,
@@ -223,17 +372,15 @@ export const sellerAuthHandlers = [
       joinedAt: null,
       version: 1,
     });
-    insert('sellerOnboarding', {
+    const application = insert('sellerOnboarding', {
       id: id('ONB', 4),
       sellerId,
-      status: 'DRAFT',
-      step: 0,
-      business: { storeName, legalName: body?.legalName || `${storeName} Pvt Ltd`, category: null },
-      tax: { gstin: null, pan: null },
-      bank: null,
-      pickup: null,
-      agreementAcceptedAt: null,
-      submittedAt: null,
+      flowVersion: 'QUICK_COMMERCE_V1',
+      status: 'UNDER_REVIEW',
+      step: 3,
+      business: { storeName, legalName: storeName, ownerName },
+      location: { address: body.address, locality: body.locality, pincode: body.pincode, city: body.city, state: body.state, lat, lng, radiusKm },
+      submittedAt: mockNowIso(),
       createdAt: mockNowIso(),
       updatedAt: mockNowIso(),
       version: 1,
@@ -241,9 +388,9 @@ export const sellerAuthHandlers = [
     const user = insert('sellerUsers', {
       id: id('SUSR', 4),
       sellerId,
-      name: body?.name || storeName,
+      name: ownerName,
       email,
-      phone: body?.phone ?? null,
+      phone,
       password: body.password,
       avatarColor: '#2874F0',
       status: 'ACTIVE',
@@ -255,13 +402,37 @@ export const sellerAuthHandlers = [
       twoFactorEnrolled: false,
       twoFactorSecret: `ARISESELLER${sellerId.replace(/[^A-Z0-9]/gi, '')}`,
       backupCodes: makeBackupCodes(),
-      lastLoginAt: mockNowIso(),
+      lastLoginAt: null,
       createdAt: mockNowIso(),
       version: 1,
     });
 
+    const docs = [
+      ['tradeLicense', 'TRADE_LICENSE', 'Trade license'],
+      ['gstCertificate', 'GST_CERTIFICATE', 'GST certificate'],
+      ['idProof', 'ID_PROOF', 'Identity proof'],
+    ];
+    for (const [field, type, label] of docs) {
+      const file = body[field];
+      insert('kycDocuments', {
+        id: id('DOC', 6), sellerId, applicationId: application.id, sectionKey: 'documents', type, label,
+        fileName: file.name, mimeType: file.type || 'application/octet-stream', sizeBytes: file.size,
+        uploadedAt: mockNowIso(), status: 'PENDING', rejectionReason: null, version: 1,
+      });
+    }
+    for (const token of [body.emailVerificationToken, body.phoneVerificationToken]) {
+      const challenge = find('authChallenges', (item) => item.verificationToken === token);
+      if (challenge) update('authChallenges', challenge.id, { consumedAt: mockNowIso() });
+    }
     scheduleSave();
-    return created(challengePayload(user, 'enrol_2fa'));
+    return created({
+      applicationId: application.id,
+      applicationStatus: 'UNDER_REVIEW',
+      email: user.email,
+      storeName,
+      submittedAt: application.submittedAt,
+      message: 'Application submitted. Login is enabled only after admin approval.',
+    });
   }),
 
   /* --------------------------------------------------------------- refresh */

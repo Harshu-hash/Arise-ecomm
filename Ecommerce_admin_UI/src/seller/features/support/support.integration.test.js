@@ -66,20 +66,18 @@ describe('seller support, settings & the final hand-offs', () => {
     await expect(supportApi.detail(foreignTicket.id)).rejects.toMatchObject({ status: 404 });
   });
 
-  it('requires a newly registered owner to enrol 2FA before issuing a session', async () => {
-    const challenge = await sellerAuthApi.register({
-      storeName: 'Secure Store',
-      name: 'Secure Owner',
-      email: 'secure-owner@arise.test',
-      phone: '9999999999',
-      password: 'Arise@123456',
-    });
-    expect(challenge.stage).toBe('enrol_2fa');
-    expect(challenge.accessToken).toBeUndefined();
-
-    const session = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code: challenge.devHint.code });
-    expect(session.user.email).toBe('secure-owner@arise.test');
-    expect(session.backupCodes).toHaveLength(8);
+  it('does not issue a session when a seller submits a new application', async () => {
+    const emailOtp = await sellerAuthApi.sendRegistrationOtp({ kind: 'email', value: 'secure-owner@arise.test' });
+    const emailToken = await sellerAuthApi.verifyRegistrationOtp({ challengeId: emailOtp.challengeId, code: emailOtp.devHint.code });
+    const phoneOtp = await sellerAuthApi.sendRegistrationOtp({ kind: 'phone', value: '9999999999' });
+    const phoneToken = await sellerAuthApi.verifyRegistrationOtp({ challengeId: phoneOtp.challengeId, code: phoneOtp.devHint.code });
+    const form = new FormData();
+    Object.entries({ name: 'Secure Owner', shopName: 'Secure Store', email: 'secure-owner@arise.test', phone: '9999999999', password: 'Arise@123456', locality: 'Vesu', pincode: '395007', city: 'Surat', state: 'Gujarat', address: '10 Ring Road', lat: '21.17', lng: '72.83', radiusKm: '5', emailVerificationToken: emailToken.verificationToken, phoneVerificationToken: phoneToken.verificationToken }).forEach(([key, value]) => form.append(key, value));
+    ['tradeLicense', 'gstCertificate', 'idProof'].forEach((key) => form.append(key, new File([key], `${key}.pdf`, { type: 'application/pdf' })));
+    const application = await sellerAuthApi.register(form);
+    expect(application).toMatchObject({ applicationStatus: 'UNDER_REVIEW', email: 'secure-owner@arise.test' });
+    expect(application.accessToken).toBeUndefined();
+    await expect(sellerAuthApi.login({ emailOrPhone: application.email, password: 'Arise@123456' })).rejects.toMatchObject({ status: 403 });
   });
 
   it('inviting a sub-user creates an INVITED account usable via accept-invite', async () => {

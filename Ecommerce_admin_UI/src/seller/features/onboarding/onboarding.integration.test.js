@@ -1,14 +1,14 @@
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { setApiBaseUrl } from '@core/api/axiosInstance';
-import { authApi } from '@core/auth/authApi';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { mediaApi } from '@core/api/foundationApi';
 import { handlers as adminHandlers } from '@mocks/handlers';
+import { db } from '@mocks/db/store';
 import { resetSettings, updateSettings } from '@mocks/engine/settings';
 import { seedAll } from '@mocks/seed';
 import { DEMO_PASSWORD } from '@mocks/seed/adminUsers';
-import { onboardingApi } from '@seller/features/onboarding/api/onboarding.api';
+import { sellerAuthApi } from '@seller/features/auth/api/auth.api';
 import { sellerDashboardApi } from '@seller/features/dashboard/api/dashboard.api';
 import { settingsApi } from '@seller/features/settings/api/settings.api';
 import { sellerHandlers } from '@seller/mocks/handlers';
@@ -41,18 +41,15 @@ async function upload(name) {
   return mediaApi.get(intent.mediaId);
 }
 
-async function completeApplication() {
-  const [gst, pan, signatory, cheque, address] = await Promise.all(['gst', 'pan', 'signatory', 'cheque', 'address'].map(upload));
-  await onboardingApi.save({
-    business: { storeName: 'Nova Essentials', legalName: 'Nova Essentials Pvt Ltd', businessType: 'Private Limited', registeredAddress: '10 Ring Road, Surat', category: 'Home & Kitchen' },
-    tax: { gstin: '24AAAAA0000A1Z5', pan: 'AAAAA0000A' },
-    signatory: { name: 'Nova Owner', email: 'newseller@arise.test', phone: '+91 9000000004', contactVerified: true },
-    bank: { accountName: 'Nova Essentials Pvt Ltd', accountNumber: '12345678901234', ifsc: 'HDFC0001234', bankName: 'HDFC Bank' },
-    pickup: { line1: '10 Ring Road', city: 'Surat', state: 'Gujarat', pincode: '395007', serviceable: true },
-    documents: { GST_CERTIFICATE: gst, PAN_CARD: pan, SIGNATORY_ID: signatory, CANCELLED_CHEQUE: cheque, ADDRESS_PROOF: address },
-  });
-  const agreement = await onboardingApi.agreement();
-  await onboardingApi.acceptAgreement(agreement.version);
+async function apply(email = 'applicant@arise.test', phone = '9999999991') {
+  const emailOtp = await sellerAuthApi.sendRegistrationOtp({ kind: 'email', value: email });
+  const emailVerified = await sellerAuthApi.verifyRegistrationOtp({ challengeId: emailOtp.challengeId, code: emailOtp.devHint.code });
+  const phoneOtp = await sellerAuthApi.sendRegistrationOtp({ kind: 'phone', value: phone });
+  const phoneVerified = await sellerAuthApi.verifyRegistrationOtp({ challengeId: phoneOtp.challengeId, code: phoneOtp.devHint.code });
+  const form = new FormData();
+  Object.entries({ name: 'Quick Owner', shopName: 'Quick Mart', email, phone, password: 'Arise@123456', locality: 'Vesu', pincode: '395007', city: 'Surat', state: 'Gujarat', address: '10 Ring Road', lat: '21.1702', lng: '72.8311', radiusKm: '5', emailVerificationToken: emailVerified.verificationToken, phoneVerificationToken: phoneVerified.verificationToken }).forEach(([key, value]) => form.append(key, value));
+  ['tradeLicense', 'gstCertificate', 'idProof'].forEach((field) => form.append(field, new File([field], `${field}.pdf`, { type: 'application/pdf' })));
+  return sellerAuthApi.register(form);
 }
 
 describe('S10 seller onboarding and verified identity', () => {
@@ -61,51 +58,29 @@ describe('S10 seller onboarding and verified identity', () => {
   afterEach(() => { server.resetHandlers(); useSessionStore.getState().setAnonymous(); });
   afterAll(() => { server.close(); setApiBaseUrl('/api/admin/v1'); });
 
-  it('submits durable documents, records an agreement receipt and becomes read-only', async () => {
-    await signInSeller('newseller@arise.test');
-    await completeApplication();
-    const submitted = await onboardingApi.submit();
-    expect(submitted.status).toBe('UNDER_REVIEW');
-    const status = await onboardingApi.status();
-    expect(status.sections.every((section) => section.state === 'UNDER_REVIEW')).toBe(true);
-    expect(status.documents).toHaveLength(5);
-    expect(status.documents.every((document) => document.mediaId && !document.previewUrl?.startsWith('blob:'))).toBe(true);
-    expect(status.agreementAcceptance).toMatchObject({ agreementVersion: status.agreement.version });
-    await expect(onboardingApi.save({ business: { legalName: 'Changed silently' } })).rejects.toMatchObject({ code: 'UNDER_REVIEW' });
+  it('creates one submitted application with verified contacts and three mandatory documents', async () => {
+    const submitted = await apply();
+    expect(submitted).toMatchObject({ applicationStatus: 'UNDER_REVIEW', email: 'applicant@arise.test' });
+    const user = db.sellerUsers.find((row) => row.email === submitted.email);
+    const application = db.sellerOnboarding.find((row) => row.sellerId === user.sellerId);
+    expect(application).toMatchObject({ status: 'UNDER_REVIEW', flowVersion: 'QUICK_COMMERCE_V1', step: 3 });
+    expect(db.kycDocuments.filter((document) => document.sellerId === user.sellerId).map((document) => document.type)).toEqual(['TRADE_LICENSE', 'GST_CERTIFICATE', 'ID_PROOF']);
   });
 
-  it('projects an admin document rejection and resubmits only its section', async () => {
-    const user = await signInSeller('newseller@arise.test');
-    await completeApplication(); await onboardingApi.submit();
-    const admin = await signInAdmin();
-    const before = await onboardingApi.status();
-    const cheque = before.documents.find((document) => document.type === 'CANCELLED_CHEQUE');
-    const rejected = await adminCall(`/sellers/${user.sellerId}/documents/${cheque.id}/decide`, { method: 'POST', token: admin.accessToken, body: { approve: false, reason: 'Account holder name is unreadable.' } });
-    expect(rejected.status).toBe(200);
-    const correction = await onboardingApi.status();
-    expect(correction.status).toBe('CLARIFICATION_REQUIRED');
-    expect(correction.sections.find((section) => section.key === 'bank')).toMatchObject({ state: 'CLARIFICATION_REQUIRED', adminReason: 'Account holder name is unreadable.' });
-    const replacement = await upload('clear-cheque');
-    await onboardingApi.resubmitSection('bank', { documents: { CANCELLED_CHEQUE: replacement } });
-    const resubmitted = await onboardingApi.status();
-    expect(resubmitted.sections.find((section) => section.key === 'bank').state).toBe('SUBMITTED');
-    expect(resubmitted.documents.find((document) => document.type === 'CANCELLED_CHEQUE').version).toBe(2);
-    expect(resubmitted.sections.filter((section) => section.key !== 'bank').every((section) => section.state === 'UNDER_REVIEW')).toBe(true);
+  it('blocks pending login and carries status details for the public pending page', async () => {
+    await apply();
+    await expect(sellerAuthApi.login({ emailOrPhone: 'applicant@arise.test', password: 'Arise@123456' })).rejects.toMatchObject({ status: 403, details: { applicationStatus: 'UNDER_REVIEW' } });
   });
 
-  it('lets admin approval unlock the active seller panel without a manual state edit', async () => {
-    const user = await signInSeller('newseller@arise.test');
-    await completeApplication(); await onboardingApi.submit();
+  it('lets one admin approval unlock login and first-time 2FA enrolment', async () => {
+    await apply();
+    const user = db.sellerUsers.find((row) => row.email === 'applicant@arise.test');
     const admin = await signInAdmin();
-    const status = await onboardingApi.status();
-    for (const document of status.documents) {
-      const decision = await adminCall(`/sellers/${user.sellerId}/documents/${document.id}/decide`, { method: 'POST', token: admin.accessToken, body: { approve: true } });
-      expect(decision.status).toBe(200);
-    }
     const approved = await adminCall(`/sellers/${user.sellerId}/application/approve`, { method: 'POST', token: admin.accessToken, body: { tier: 'BRONZE' } });
     expect(approved.status).toBe(200);
-    expect((await onboardingApi.status()).status).toBe('APPROVED');
-    expect((await authApi.me()).onboardingComplete).toBe(true);
+    const challenge = await sellerAuthApi.login({ emailOrPhone: 'applicant@arise.test', password: 'Arise@123456' });
+    expect(challenge.stage).toBe('enrol_2fa');
+    expect(challenge.accessToken).toBeUndefined();
   });
 
   it('surfaces expired documents on profile and dashboard and supports renewal', async () => {

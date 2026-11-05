@@ -6,7 +6,6 @@ import {
   RequireActiveSeller,
   RequireAnonymous,
   RequireAuth,
-  RequireOnboarding,
   RequirePermission,
 } from './guards';
 import SessionBootstrap from './SessionBootstrap';
@@ -19,7 +18,6 @@ const ResetPasswordPage = lazy(() => import('@seller/features/auth/pages/ResetPa
 const AcceptInvitePage = lazy(() => import('@seller/features/auth/pages/AcceptInvitePage'));
 const ChangePasswordPage = lazy(() => import('@seller/features/auth/pages/ChangePasswordPage'));
 
-const OnboardingPage = lazy(() => import('@seller/features/onboarding/pages/OnboardingPage'));
 const OnboardingStatusPage = lazy(
   () => import('@seller/features/onboarding/pages/OnboardingStatusPage'),
 );
@@ -239,6 +237,7 @@ export const router = createBrowserRouter(
               children: [
                 { path: '/login', element: <LoginPage /> },
                 { path: '/register', element: <RegisterPage /> },
+                { path: '/application-status', element: <OnboardingStatusPage /> },
                 { path: '/forgot-password', element: <ForgotPasswordPage /> },
                 { path: '/reset-password', element: <ResetPasswordPage /> },
                 { path: '/accept-invite', element: <AcceptInvitePage /> },
@@ -250,15 +249,6 @@ export const router = createBrowserRouter(
           element: <RequireAuth />,
           children: [
             { path: '/change-password', element: <ChangePasswordPage /> },
-            {
-              // Onboarding is reachable while the account is incomplete; once
-              // complete it redirects home.
-              element: <RequireOnboarding />,
-              children: [
-                { path: '/onboarding', element: <OnboardingPage /> },
-                { path: '/onboarding/status', element: <OnboardingStatusPage /> },
-              ],
-            },
             {
               // The main shell: active sellers only.
               element: <RequireActiveSeller />,
