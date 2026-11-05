@@ -17,7 +17,7 @@
  * accounts that no longer matched the documented sign-in credentials, with no
  * way to recover from inside the app.
  */
-export const SNAPSHOT_VERSION = 12;
+export const SNAPSHOT_VERSION = 22;
 
 /** Every collection the mock backend holds. Later phases fill in more. */
 export const COLLECTIONS = [
@@ -31,6 +31,9 @@ export const COLLECTIONS = [
   'approvalRequests',
   'auditEvents',
   'jobs',
+  'mediaResources',
+  'mediaUploads',
+  'idempotencyRecords',
   'adminAlerts',
   'savedViews',
   'settings',
@@ -64,6 +67,7 @@ export const COLLECTIONS = [
   'inventoryLedger',
   'inboundConsignments',
   'inboundLines',
+  'inboundDisputes',
   'stockAdjustments',
   'removalOrders',
   'pincodes',
@@ -73,6 +77,7 @@ export const COLLECTIONS = [
   'ndrRecords',
   'weightDisputes',
   'shippingFeeRules',
+  'fulfilmentDocuments',
   // Orders & customers (Phase 2)
   'customers',
   'customerAddresses',
@@ -88,6 +93,9 @@ export const COLLECTIONS = [
   'orderExceptions',
   'shipments',
   'returns',
+  'returnEvents',
+  'returnDisputes',
+  'replacements',
   'payments',
   'refunds',
   // Finance (Phase 4)
@@ -101,6 +109,9 @@ export const COLLECTIONS = [
   'codRemittances',
   'invoices',
   'reconciliationRuns',
+  'financeDocuments',
+  'financeDisputes',
+  'commissionRuleHistory',
   'taxSummaries',
   'giftCardPrograms',
   'giftCards',
@@ -111,6 +122,12 @@ export const COLLECTIONS = [
   'questions',
   'answers',
   'abuseReports',
+  'customerConversations',
+  'customerMessages',
+  'supportIncidents',
+  'customerFunnelEvents',
+  'sellerRecommendations',
+  'sellerReportTemplates',
   'chatSessions',
   'chatMessages',
   'macros',
@@ -168,6 +185,17 @@ export const COLLECTIONS = [
   'sellerUsers',
   'sellerSessions',
   'sellerOnboarding',
+  'sellerApplicationSections',
+  'sellerAgreementAcceptances',
+  'sellerChangeRequests',
+  'sellerReportSchedules',
+  'sellerRoles',
+  'sellerApiKeys',
+  'sellerWebhooks',
+  'sellerWebhookDeliveries',
+  'sellerNotificationPolicies',
+  'sellerSecurityEvents',
+  'sellerStepUpChallenges',
 ];
 
 function emptyDb() {

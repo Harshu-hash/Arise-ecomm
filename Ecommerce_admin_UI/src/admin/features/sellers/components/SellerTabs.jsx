@@ -1,4 +1,5 @@
-import { App, Button, Descriptions, Empty, Flex, Input, Space, Table, Tabs, Tag, Typography } from 'antd';
+/* eslint-disable max-lines */
+import { App, Button, Descriptions, Empty, Flex, Input, List, Space, Table, Tabs, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { formatPercent } from '@core/utils/money';
@@ -7,6 +8,7 @@ import DocumentViewer from '@ui/components/DocumentViewer';
 import MaskedValue from '@ui/components/MaskedValue';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
+import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import VerificationPanel from './VerificationPanel';
 
 /** Metric against the threshold sellers are actually managed to. */
@@ -28,10 +30,11 @@ function Metric({ label, value, threshold, suffix = '%' }) {
   );
 }
 
-export default function SellerTabs({ seller, meta, onAddNote, addingNote }) {
+export default function SellerTabs({ seller, meta, onAddNote, addingNote, onDecideChange, decidingChange }) {
   const { message } = App.useApp();
   const [note, setNote] = useState('');
-  const { documents, bank, addresses, penalties, claims, notes, brandRequests, counts } = meta;
+  const [changeDecision, setChangeDecision] = useState(null);
+  const { documents, bank, addresses, penalties, claims, notes, brandRequests, changeRequests = [], counts } = meta;
 
   const submitNote = async () => {
     if (!note.trim()) {
@@ -43,8 +46,20 @@ export default function SellerTabs({ seller, meta, onAddNote, addingNote }) {
   };
 
   return (
+    <>
     <Tabs
+      defaultActiveKey="overview"
       items={[
+        {
+          key: 'identity-changes',
+          label: `Identity changes (${changeRequests.length})`,
+          children: changeRequests.length ? <List
+            dataSource={changeRequests}
+            renderItem={(request) => <List.Item actions={request.status === 'UNDER_REVIEW' ? [<Button key="approve" type="link" onClick={() => setChangeDecision({ request, approve: true })}>Approve</Button>, <Button key="reject" type="link" danger onClick={() => setChangeDecision({ request, approve: false })}>Reject</Button>] : []}>
+              <List.Item.Meta title={`${request.currentValue} → ${request.proposedValue}`} description={<Space direction="vertical" size={0}><span>{request.reason}</span><Tag color={request.status === 'APPROVED' ? 'green' : request.status === 'REJECTED' ? 'red' : 'gold'}>{request.status}</Tag></Space>} />
+            </List.Item>}
+          /> : <Empty description="No verified identity changes" />,
+        },
         {
           key: 'overview',
           label: 'Overview',
@@ -247,5 +262,17 @@ export default function SellerTabs({ seller, meta, onAddNote, addingNote }) {
         },
       ]}
     />
+      <ConfirmActionModal
+        open={Boolean(changeDecision)}
+        onCancel={() => setChangeDecision(null)}
+        onConfirm={async (values) => { await onDecideChange(changeDecision.request.id, changeDecision.approve, values.reason); setChangeDecision(null); }}
+        loading={decidingChange}
+        title={`${changeDecision?.approve ? 'Approve' : 'Reject'} legal-name change?`}
+        description={changeDecision ? `${changeDecision.request.currentValue} → ${changeDecision.request.proposedValue}` : ''}
+        reasonRequired={!changeDecision?.approve}
+        showNote={false}
+        danger={changeDecision?.approve === false}
+      />
+    </>
   );
 }

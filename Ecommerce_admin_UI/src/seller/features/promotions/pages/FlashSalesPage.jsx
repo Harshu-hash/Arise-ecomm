@@ -6,6 +6,7 @@ import { paiseToRupees, rupeesToPaise } from '@core/utils/money';
 import DateText from '@ui/components/DateText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import ErrorState from '@ui/components/ErrorState';
 import { promotionsApi, promotionsKeys } from '../api/promotions.api';
 
 export default function FlashSalesPage() {
@@ -16,8 +17,10 @@ export default function FlashSalesPage() {
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
 
-  const { data: sales = [], isLoading } = useQuery({ queryKey: promotionsKeys.flashSales, queryFn: promotionsApi.flashSales });
-  const { data: listings = [] } = useQuery({ queryKey: ['seller', 'promo', 'listings-source'], queryFn: promotionsApi.myLiveListings, enabled: Boolean(sale) });
+  const salesQuery = useQuery({ queryKey: promotionsKeys.flashSales, queryFn: promotionsApi.flashSales });
+  const listingsQuery = useQuery({ queryKey: ['seller', 'promo', 'listings-source'], queryFn: promotionsApi.myLiveListings, enabled: Boolean(sale) });
+  const sales = salesQuery.data ?? [];
+  const listings = listingsQuery.data ?? [];
 
   const submit = async (values) => {
     setSaving(true);
@@ -37,6 +40,8 @@ export default function FlashSalesPage() {
     }
   };
 
+  if (salesQuery.isError) return <ErrorState error={salesQuery.error} onRetry={salesQuery.refetch} title="Could not load flash sales" />;
+
   return (
     <Flex vertical gap={16}>
       <PageHeader
@@ -51,7 +56,7 @@ export default function FlashSalesPage() {
           <Col xs={24} sm={12} lg={8} key={s.id}>
             <Card
               size="small"
-              loading={isLoading}
+              loading={salesQuery.isLoading}
               title={s.name}
               extra={<StatusTag domain="flashSale" code={s.status} />}
               actions={s.nominationsOpen ? [<Button key="nom" type="link" onClick={() => setSale(s)}>Nominate a listing</Button>] : undefined}
@@ -71,12 +76,15 @@ export default function FlashSalesPage() {
         <Form form={form} layout="vertical" onFinish={submit}>
           <Form.Item name="offerId" label="Listing" rules={[{ required: true, message: 'Pick a listing.' }]}>
             <Select
+              loading={listingsQuery.isLoading}
+              status={listingsQuery.isError ? 'error' : undefined}
               showSearch
               optionFilterProp="label"
               placeholder="Select a live listing"
               options={listings.map((l) => ({ value: l.id, label: `${l.productTitle} — ₹${paiseToRupees(l.sellingPricePaise)}` }))}
             />
           </Form.Item>
+          {listingsQuery.isError && <Typography.Text type="danger">Could not load live listings. Close and retry the nomination.</Typography.Text>}
           <Form.Item name="flashPrice" label="Flash-sale price (₹)" rules={[{ required: true, message: 'Enter the flash price.' }]}>
             <InputNumber style={{ width: '100%' }} min={1} prefix="₹" />
           </Form.Item>

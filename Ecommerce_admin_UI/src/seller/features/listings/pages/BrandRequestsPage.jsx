@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Flex, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Flex, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import DataTable from '@ui/components/DataTable/DataTable';
@@ -18,7 +18,8 @@ export default function BrandRequestsPage() {
   const [submitting, setSubmitting] = useState(false);
   const state = useUrlTableState({ defaultSort: '-submittedAt' });
 
-  const { data: brands = [] } = useQuery({ queryKey: listingKeys.brands, queryFn: listingsApi.brands });
+  const brandsQuery = useQuery({ queryKey: listingKeys.brands, queryFn: listingsApi.brands });
+  const brands = brandsQuery.data ?? [];
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: listingKeys.brandRequests(state.queryParams),
     url: '/brand-requests',
@@ -61,11 +62,48 @@ export default function BrandRequestsPage() {
       <DataTable
         tableId="seller-brand-requests"
         columns={[
-          { key: 'brandName', title: 'Brand', dataIndex: 'brandName', priority: 1, render: (v, r) => <Space><Typography.Text strong>{v}</Typography.Text>{r.brandId ? null : <Tag>New brand</Tag>}</Space> },
-          { key: 'requestType', title: 'Type', dataIndex: 'requestType', priority: 2, render: (v) => <Tag>{v}</Tag> },
-          { key: 'submittedAt', title: 'Submitted', dataIndex: 'submittedAt', priority: 2, sorter: true, render: (v) => <DateText value={v} /> },
-          { key: 'status', title: 'Status', dataIndex: 'status', priority: 1, render: (v) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag> },
-          { key: 'decisionReason', title: 'Note', dataIndex: 'decisionReason', priority: 3, ellipsis: true, render: (v) => v ?? '—' },
+          {
+            key: 'brandName',
+            title: 'Brand',
+            dataIndex: 'brandName',
+            priority: 1,
+            render: (v, r) => (
+              <Space>
+                <Typography.Text strong>{v}</Typography.Text>
+                {r.brandId ? null : <Tag>New brand</Tag>}
+              </Space>
+            ),
+          },
+          {
+            key: 'requestType',
+            title: 'Type',
+            dataIndex: 'requestType',
+            priority: 2,
+            render: (v) => <Tag>{v}</Tag>,
+          },
+          {
+            key: 'submittedAt',
+            title: 'Submitted',
+            dataIndex: 'submittedAt',
+            priority: 2,
+            sorter: true,
+            render: (v) => <DateText value={v} />,
+          },
+          {
+            key: 'status',
+            title: 'Status',
+            dataIndex: 'status',
+            priority: 1,
+            render: (v) => <Tag color={STATUS_COLOR[v] ?? 'default'}>{v}</Tag>,
+          },
+          {
+            key: 'decisionReason',
+            title: 'Note',
+            dataIndex: 'decisionReason',
+            priority: 3,
+            ellipsis: true,
+            render: (v) => v ?? '—',
+          },
         ]}
         rows={rows}
         meta={meta}
@@ -73,36 +111,75 @@ export default function BrandRequestsPage() {
         error={error}
         onRetry={refetch}
         tableState={state}
-        emptyProps={{ title: 'No brand requests yet', description: 'Request authorisation for a gated brand, or ask for a new one to be added.' }}
+        emptyProps={{
+          title: 'No brand requests yet',
+          description: 'Request authorisation for a gated brand, or ask for a new one to be added.',
+        }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
             <Flex justify="space-between" align="flex-start" gap={8}>
-              <Space><Typography.Text strong>{row.brandName}</Typography.Text>{!row.brandId && <Tag>New brand</Tag>}</Space>
+              <Space>
+                <Typography.Text strong>{row.brandName}</Typography.Text>
+                {!row.brandId && <Tag>New brand</Tag>}
+              </Space>
               <Tag color={STATUS_COLOR[row.status] ?? 'default'}>{row.status}</Tag>
             </Flex>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>{row.requestType}</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              {row.requestType}
+            </Typography.Text>
           </Flex>
         )}
       />
 
-      <Modal title="Request a brand" open={open} onCancel={() => setOpen(false)} onOk={() => form.submit()} okText="Submit request" confirmLoading={submitting}>
+      <Modal
+        title="Request a brand"
+        open={open}
+        onCancel={() => setOpen(false)}
+        onOk={() => form.submit()}
+        okText="Submit request"
+        confirmLoading={submitting}
+      >
+        {brandsQuery.isError && (
+          <Alert
+            type="warning"
+            showIcon
+            message="Existing brands could not be loaded"
+            description="You can still request a new brand, or retry loading the catalogue."
+            action={
+              <Button size="small" onClick={() => brandsQuery.refetch()}>
+                Retry
+              </Button>
+            }
+            style={{ marginBottom: 16 }}
+          />
+        )}
         <Form form={form} layout="vertical" onFinish={submit}>
-          <Form.Item name="brandId" label="Existing brand" extra="Pick a brand to request authorisation, or leave blank to request a new brand.">
+          <Form.Item
+            name="brandId"
+            label="Existing brand"
+            extra="Pick a brand to request authorisation, or leave blank to request a new brand."
+          >
             <Select
               showSearch
               allowClear
+              loading={brandsQuery.isLoading || brandsQuery.isFetching}
+              disabled={brandsQuery.isError}
               placeholder="Search brands"
               optionFilterProp="label"
-              options={brands.map((b) => ({ value: b.id, label: b.gated ? `${b.name} (gated)` : b.name }))}
+              options={brands.map((b) => ({
+                value: b.id,
+                label: b.gated ? `${b.name} (gated)` : b.name,
+              }))}
             />
           </Form.Item>
-          <Form.Item
-            noStyle
-            shouldUpdate={(prev, cur) => prev.brandId !== cur.brandId}
-          >
+          <Form.Item noStyle shouldUpdate={(prev, cur) => prev.brandId !== cur.brandId}>
             {({ getFieldValue }) =>
               !getFieldValue('brandId') && (
-                <Form.Item name="brandName" label="New brand name" rules={[{ required: true, message: 'Enter the brand name.' }]}>
+                <Form.Item
+                  name="brandName"
+                  label="New brand name"
+                  rules={[{ required: true, message: 'Enter the brand name.' }]}
+                >
                   <Input placeholder="Brand to add" />
                 </Form.Item>
               )

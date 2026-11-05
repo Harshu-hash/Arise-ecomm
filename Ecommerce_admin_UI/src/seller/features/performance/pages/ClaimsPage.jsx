@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Flex, Form, Input, InputNumber, Modal, Select, Space, Typography } from 'antd';
+import { App, Button, Descriptions, Drawer, Flex, Form, Input, InputNumber, List, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
@@ -8,6 +8,7 @@ import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
 import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
+import DocumentUpload from '@ui/components/DocumentUpload';
 import { performanceApi, performanceKeys } from '../api/performance.api';
 import { CLAIM_TYPE_OPTIONS } from '../claimTypes';
 
@@ -16,6 +17,8 @@ export default function ClaimsPage() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [evidence, setEvidence] = useState([]);
+  const [selected, setSelected] = useState(null);
   const state = useUrlTableState({ defaultSort: '-submittedAt' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
@@ -27,10 +30,11 @@ export default function ClaimsPage() {
   const submit = async (values) => {
     setSaving(true);
     try {
-      await performanceApi.createClaim(values);
+      await performanceApi.createClaim({ ...values, evidenceMediaIds: evidence.map((item) => item.mediaId) });
       message.success('Claim submitted.');
       setOpen(false);
       form.resetFields();
+      setEvidence([]);
       refetch();
     } catch (e) {
       message.error(e?.message ?? 'Could not submit the claim.');
@@ -76,6 +80,7 @@ export default function ClaimsPage() {
         error={error}
         onRetry={refetch}
         tableState={state}
+        onRowClick={setSelected}
         emptyProps={{ title: 'No claims yet', description: 'File a claim when stock is lost or damaged by Arise or a courier.' }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
@@ -99,14 +104,19 @@ export default function ClaimsPage() {
           <Form.Item name="orderId" label="Order ID" rules={[{ required: true, message: 'Enter the order ID.' }]}>
             <Input placeholder="e.g. ORD-80123" />
           </Form.Item>
+          <Form.Item name="returnId" label="Return ID"><Input placeholder="Optional linked return" /></Form.Item>
           <Form.Item name="amountClaimed" label="Amount claimed (₹)" rules={[{ required: true, message: 'Enter the amount.' }]}>
             <InputNumber style={{ width: '100%' }} min={1} prefix="₹" />
           </Form.Item>
-          <Form.Item name="evidence" label="Evidence" rules={[{ required: true, message: 'Describe the evidence you have.' }]}>
-            <Input.TextArea rows={3} placeholder="e.g. Courier POD shows no delivery scan; tracking stalled on 12 Oct." />
-          </Form.Item>
+          <Form.Item name="evidence" label="What does the evidence show?"><Input.TextArea rows={3} /></Form.Item>
+          <Form.Item label="Attachments" required><DocumentUpload value={evidence} onChange={setEvidence} maxCount={5} label="Claim evidence" /></Form.Item>
         </Form>
       </Modal>
+      <Drawer title={selected?.id} open={Boolean(selected)} onClose={() => setSelected(null)} width={480}>
+        {selected && <Flex vertical gap={16}><Descriptions column={1} size="small" items={[
+          { key: 'order', label: 'Order', children: selected.orderId }, { key: 'return', label: 'Return', children: selected.returnId ?? '—' }, { key: 'adjustment', label: 'Payout adjustment', children: selected.payoutAdjustmentId ? <Tag color="green">{selected.payoutAdjustmentId}</Tag> : 'Pending decision' },
+        ]} /><List header="Linked entities" dataSource={selected.linkedEntities ?? []} renderItem={(item) => <List.Item>{item.type}: {item.id}</List.Item>} /><List header="Timeline" dataSource={selected.timeline ?? []} renderItem={(item) => <List.Item><List.Item.Meta title={item.type} description={`${item.actorName} · ${new Date(item.at).toLocaleString()}${item.note ? ` · ${item.note}` : ''}`} /></List.Item>} /></Flex>}
+      </Drawer>
     </Flex>
   );
 }

@@ -1,4 +1,4 @@
-import { api } from '@core/api/axiosInstance';
+import { api, http } from '@core/api/axiosInstance';
 
 export const ordersApi = {
   detail: (id) => api.get(`/orders/${id}`).then((r) => r.data),
@@ -8,7 +8,23 @@ export const ordersApi = {
   dispatch: (id) => api.post(`/orders/${id}/dispatch`, {}).then((r) => r.data),
   action: (id, action) => api.post(`/orders/${id}/${action}`, {}).then((r) => r.data),
   cancel: (id, reason) => api.post(`/orders/${id}/cancel`, { reason }).then((r) => r.data),
-  bulk: (action, ids) => api.post('/orders/bulk', { action, ids }).then((r) => r.data),
+  bulk: (action, selection) =>
+    api
+      .post('/orders/bulk', {
+        action,
+        selection: Array.isArray(selection) ? { mode: 'SELECTED', ids: selection } : selection,
+      })
+      .then((r) => r.data),
+  createPackages: (id, packages) =>
+    api.post(`/orders/${id}/packages`, { packages }).then((r) => r.data),
+  split: (id, itemIds) => api.post(`/orders/${id}/split`, { itemIds }).then((r) => r.data),
+  scan: (id, barcode, purpose) =>
+    api.post(`/orders/${id}/scan`, { barcode, purpose }).then((r) => r.data),
+  documents: (id) => api.get(`/orders/${id}/documents`).then((r) => r.data),
+  generateDocument: (id, type) =>
+    api.post(`/orders/${id}/documents/${type}`, {}).then((r) => r.data),
+  downloadDocument: (url) =>
+    http.get(url, { responseType: 'blob' }).then((response) => response.data),
 };
 
 export const orderKeys = {

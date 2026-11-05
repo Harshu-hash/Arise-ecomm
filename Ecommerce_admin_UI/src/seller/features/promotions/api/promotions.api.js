@@ -7,6 +7,8 @@ export const promotionsApi = {
   deals: () => api.get('/promotions/deals').then((r) => r.data),
   coupons: (params) => api.get('/promotions/coupons', params).then((r) => r.data),
   createCoupon: (payload) => api.post('/promotions/coupons', payload).then((r) => r.data),
+  updateCoupon: (id, payload) => api.patch(`/promotions/coupons/${id}`, payload).then((r) => r.data),
+  couponAction: (id, action, payload = {}) => api.post(`/promotions/coupons/${id}/${action}`, payload).then((r) => r.data),
   myLiveListings: () => api.get('/listings', { pageSize: 200, status: 'LIVE' }).then((r) => r.data),
 };
 

@@ -1,6 +1,11 @@
 import { useEffect, useRef } from 'react';
+import { IS_MOCK } from '@core/config/env';
 import { authApi } from './authApi';
 import { useSessionStore } from './sessionStore';
+
+export function shouldAttemptSessionRefresh(isMock, refreshToken) {
+  return !isMock || Boolean(refreshToken);
+}
 
 /**
  * Restores the session on first load. A stored refresh token is exchanged for
@@ -16,7 +21,10 @@ export function useBootstrapSession() {
     started.current = true;
 
     const { refreshToken, setAuthenticated, setAnonymous } = useSessionStore.getState();
-    if (!refreshToken) {
+    // Mock mode persists a development-only refresh token. Live mode uses a
+    // Secure HttpOnly cookie, so JavaScript must attempt refresh even though
+    // no token is visible in the store.
+    if (!shouldAttemptSessionRefresh(IS_MOCK, refreshToken)) {
       setAnonymous();
       return;
     }

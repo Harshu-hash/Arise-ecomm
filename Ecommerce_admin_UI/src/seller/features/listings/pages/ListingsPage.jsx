@@ -29,7 +29,10 @@ export default function ListingsPage() {
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: listingKeys.list({ ...state.queryParams, tab: state.tab }),
     url: '/listings',
-    params: { ...state.queryParams, ...(state.tab && state.tab !== 'all' ? { status: state.tab } : {}) },
+    params: {
+      ...state.queryParams,
+      ...(state.tab && state.tab !== 'all' ? { status: state.tab } : {}),
+    },
   });
 
   return (
@@ -46,7 +49,11 @@ export default function ListingsPage() {
               </Button>
             </Can>
             <Can perm="listings.product.create">
-              <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate('/listings/new')}>
+              <Button
+                type="primary"
+                icon={<PlusOutlined />}
+                onClick={() => navigate('/listings/new')}
+              >
                 Add product
               </Button>
             </Can>
@@ -56,9 +63,18 @@ export default function ListingsPage() {
 
       <FilterBar
         schema={[
-          { key: 'status', label: 'Status', kind: 'multiSelect', options: statusOptions('listing'), width: 220 },
           {
-            key: 'fulfillmentType', label: 'Fulfilment', kind: 'select', width: 160,
+            key: 'status',
+            label: 'Status',
+            kind: 'multiSelect',
+            options: statusOptions('listing'),
+            width: 220,
+          },
+          {
+            key: 'fulfillmentType',
+            label: 'Fulfilment',
+            kind: 'select',
+            width: 160,
             options: [
               { value: 'SELLER', label: 'Self-ship' },
               { value: 'ARISE', label: 'Fulfilled by Arise' },
@@ -66,6 +82,9 @@ export default function ListingsPage() {
           },
         ]}
         tableState={state}
+        savedViews
+        exportJob={{ resource: 'listings', label: 'Export listings' }}
+        exportPerm="exports.job.create"
         searchPlaceholder="Search title, SKU or brand"
       />
 
@@ -80,7 +99,10 @@ export default function ListingsPage() {
         tableState={state}
         tabs={TABS}
         onRowClick={(row) => navigate(`/listings/${row.id}`)}
-        emptyProps={{ title: 'No listings yet', description: 'Add your first product to start selling.' }}
+        emptyProps={{
+          title: 'No listings yet',
+          description: 'Add your first product to start selling.',
+        }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
             <Flex justify="space-between" align="flex-start" gap={8}>

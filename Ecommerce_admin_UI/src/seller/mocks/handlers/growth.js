@@ -1,5 +1,8 @@
 import { http as mswHttp } from 'msw';
-import { db, findById } from '@mocks/db/store';
+import { db, filter, findById, update } from '@mocks/db/store';
+import { writeAudit } from '@mocks/engine/audit';
+import { evaluateCoupon } from '@mocks/engine/coupons';
+import { mockNowIso } from '@mocks/engine/settings';
 import { scheduleSave } from '@mocks/persistence';
 import { parseListQuery, listResult } from '@mocks/engine/list';
 import { badRequest, conflict, created, notFound, ok, okList, unauthorized } from '@mocks/engine/respond';
@@ -18,6 +21,7 @@ import {
   sellerNominations,
   transitionCampaign,
   updateCampaignBudget,
+  updateCampaignTargeting,
   walletFor,
 } from '@seller/mocks/engine/sellerGrowth';
 import { SELLER_BASE } from './auth';
@@ -91,6 +95,30 @@ export const sellerGrowthHandlers = [
     return ok(updated);
   }),
 
+  mswHttp.patch(`${SELLER_BASE}/ads/campaigns/:id/targeting`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const campaign = ownCampaign(c.user, params.id);
+    if (!campaign) return notFound('That campaign is not on your account.');
+    const { error, campaign: updated } = updateCampaignTargeting(campaign, await request.json());
+    if (error) return badRequest(error, 'TARGETING_INVALID');
+    writeAudit({ actor: c.user, action: 'ad_campaign.targeting_update', entityType: 'adCampaign', entityId: campaign.id, entityLabel: campaign.name });
+    scheduleSave();
+    return ok(updated);
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/ads/campaigns/:id/report`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const campaign = ownCampaign(c.user, params.id);
+    if (!campaign) return notFound('That campaign is not on your account.');
+    const detail = campaignDetail(campaign);
+    const totals = detail.daily.reduce((acc, row) => ({ impressions: acc.impressions + (row.impressions ?? 0), clicks: acc.clicks + (row.clicks ?? 0), spendPaise: acc.spendPaise + (row.spendPaise ?? 0), attributedRevenuePaise: acc.attributedRevenuePaise + (row.adGmvPaise ?? 0) }), { impressions: 0, clicks: 0, spendPaise: 0, attributedRevenuePaise: 0 });
+    const productRows = detail.products.map((product, index) => ({ ...product, impressions: Math.round(totals.impressions / Math.max(1, detail.products.length)), clicks: Math.round(totals.clicks / Math.max(1, detail.products.length)), spendPaise: Math.round(totals.spendPaise / Math.max(1, detail.products.length)), attributedRevenuePaise: Math.round(totals.attributedRevenuePaise / Math.max(1, detail.products.length)), orders: Math.max(0, Math.round((totals.clicks / Math.max(1, detail.products.length)) * 0.05) + (index % 2)) }));
+    const searchTerms = (detail.group?.keywords ?? []).map((keyword, index) => ({ term: keyword.term, matchType: keyword.matchType, clicks: Math.max(1, Math.round(totals.clicks / Math.max(1, detail.group.keywords.length)) - index), spendPaise: Math.round(totals.spendPaise / Math.max(1, detail.group.keywords.length)), attributedRevenuePaise: Math.round(totals.attributedRevenuePaise / Math.max(1, detail.group.keywords.length)) }));
+    return ok({ campaignId: campaign.id, totals, productRows, searchTerms, attributionDefinition: 'An order is attributed when the shopper clicked this campaign before ordering within the platform attribution window.' });
+  }),
+
   mswHttp.post(`${SELLER_BASE}/ads/campaigns/:id/submit`, campaignAction('submit')),
   mswHttp.post(`${SELLER_BASE}/ads/campaigns/:id/pause`, campaignAction('pause')),
   mswHttp.post(`${SELLER_BASE}/ads/campaigns/:id/resume`, campaignAction('resume')),
@@ -101,6 +129,24 @@ export const sellerGrowthHandlers = [
     const c = ctx(request);
     if (c.response) return c.response;
     return ok(walletFor(c.user.sellerId));
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/ads/billing`, async ({ request }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const campaignIds = new Set(db.adCampaigns.filter((row) => row.sellerId === c.user.sellerId).map((row) => row.id));
+    const spendLedger = db.adDailyStats.filter((row) => campaignIds.has(row.campaignId)).map((row) => ({ id: `BILL-${row.campaignId}-${row.date}`, campaignId: row.campaignId, date: row.date, type: 'AD_SPEND', amountPaise: row.spendPaise ?? 0 }));
+    const billedSpendPaise = spendLedger.reduce((sum, row) => sum + row.amountPaise, 0);
+    const wallet = db.advertiserWallets.find((row) => row.sellerId === c.user.sellerId);
+    return ok({ billedSpendPaise, ledgerSpendPaise: billedSpendPaise, variancePaise: 0, reconciled: true, attributionDefinition: 'Attributed revenue uses orders placed after an ad click within the platform attribution window; billing uses valid clicks.', spendLedger, walletLedger: wallet ? filter('advertiserLedger', (row) => row.walletId === wallet.id) : [], invoices: filter('adInvoices', (row) => row.sellerId === c.user.sellerId) });
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/ads/invoices/:id/download`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const invoice = findById('adInvoices', params.id);
+    if (!invoice || invoice.sellerId !== c.user.sellerId) return notFound('Invoice not found.');
+    return ok({ filename: `${invoice.invoiceNo.replaceAll('/', '-')}.pdf`, mimeType: 'application/pdf', url: `data:application/pdf;base64,JVBERi0xLjQKJcTl8uXrCg==`, expiresAt: new Date(Date.now() + 300000).toISOString() });
   }),
 
   mswHttp.post(`${SELLER_BASE}/ads/wallet/recharge`, async ({ request }) => {
@@ -167,6 +213,34 @@ export const sellerGrowthHandlers = [
     if (error) return badRequest(error, 'COUPON_INVALID');
     scheduleSave();
     return created(coupon);
+  }),
+
+  mswHttp.patch(`${SELLER_BASE}/promotions/coupons/:id`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const coupon = findById('coupons', params.id);
+    if (!coupon || coupon.sellerId !== c.user.sellerId) return notFound('Coupon not found.');
+    const body = await request.json();
+    update('coupons', coupon.id, { name: body.name ?? coupon.name, endsAt: body.endsAt ?? coupon.endsAt, totalLimit: Number(body.totalLimit) || coupon.totalLimit, budgetPaise: Number(body.budgetPaise) || coupon.budgetPaise, version: (coupon.version ?? 0) + 1 });
+    writeAudit({ actor: c.user, action: 'coupon.edit', entityType: 'coupon', entityId: coupon.id, entityLabel: coupon.code }); scheduleSave();
+    return ok(findById('coupons', coupon.id));
+  }),
+
+  mswHttp.post(`${SELLER_BASE}/promotions/coupons/:id/:action`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const coupon = findById('coupons', params.id);
+    if (!coupon || coupon.sellerId !== c.user.sellerId) return notFound('Coupon not found.');
+    if (params.action === 'preview') {
+      const body = await request.json();
+      const amountPaise = Math.round(Number(body?.amountRupees ?? 2000) * 100);
+      return ok({ coupon, amountPaise, result: evaluateCoupon(coupon, { customerId: null, items: [{ sellerId: c.user.sellerId, productId: 'PREVIEW', categoryId: null, brandId: null, pricePaise: amountPaise, qty: 1 }], paymentMethod: body?.paymentMethod ?? 'UPI', platform: 'WEB', fulfillmentType: 'SELLER' }) });
+    }
+    if (!['pause', 'resume', 'end'].includes(params.action)) return notFound('Coupon action not found.');
+    const status = params.action === 'pause' ? 'PAUSED' : params.action === 'resume' ? 'ACTIVE' : 'EXPIRED';
+    update('coupons', coupon.id, { status, ...(params.action === 'end' ? { endsAt: mockNowIso() } : {}), version: (coupon.version ?? 0) + 1 });
+    writeAudit({ actor: c.user, action: `coupon.${params.action}`, entityType: 'coupon', entityId: coupon.id, entityLabel: coupon.code }); scheduleSave();
+    return ok(findById('coupons', coupon.id));
   }),
 ];
 

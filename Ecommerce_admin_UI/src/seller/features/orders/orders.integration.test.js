@@ -6,21 +6,28 @@ import { db, filter, find, findById, update } from '@mocks/db/store';
 import { seedAll } from '@mocks/seed';
 import { sellerHandlers } from '@seller/mocks/handlers';
 import { seedSellerAccounts } from '@seller/mocks/seed/sellerAccounts';
-import { sellerAuthApi } from '../auth/api/auth.api';
+import { signInSeller } from '@seller/test/signInSeller';
 import { ordersApi } from './api/orders.api';
 
 const server = setupServer(...sellerHandlers);
 
 async function signIn() {
-  const payload = await sellerAuthApi.login({ email: 'owner@arise.test', password: 'Arise@123456' });
-  useSessionStore.getState().setAuthenticated(payload);
-  return payload.user;
+  return signInSeller();
 }
 
 /** Force a SELLER shipment for `sellerId` to a clean PLACED start state. */
 function freshPlacedShipment(sellerId) {
-  const shipment = find('shipments', (s) => s.sellerId === sellerId && s.fulfillmentType === 'SELLER');
-  update('shipments', shipment.id, { status: 'PLACED', awb: null, courierId: null, courierName: null, invoiceNo: null });
+  const shipment = find(
+    'shipments',
+    (s) => s.sellerId === sellerId && s.fulfillmentType === 'SELLER',
+  );
+  update('shipments', shipment.id, {
+    status: 'PLACED',
+    awb: null,
+    courierId: null,
+    courierName: null,
+    invoiceNo: null,
+  });
   for (const item of filter('orderItems', (i) => i.shipmentId === shipment.id)) {
     update('orderItems', item.id, { status: 'PLACED' });
   }
@@ -77,12 +84,16 @@ describe('seller order fulfilment (confirm → dispatch)', () => {
     expect(items.every((i) => i.status === 'SHIPPED')).toBe(true);
     const itemIds = new Set(items.map((i) => i.id));
     const events = filter('orderEvents', (e) => itemIds.has(e.itemId) && e.actorType === 'SELLER');
-    expect(events.map((e) => e.status)).toEqual(expect.arrayContaining(['ACCEPTED', 'PACKED', 'MANIFESTED', 'SHIPPED']));
+    expect(events.map((e) => e.status)).toEqual(
+      expect.arrayContaining(['ACCEPTED', 'PACKED', 'MANIFESTED', 'SHIPPED']),
+    );
   });
 
   it('refuses an out-of-order transition', async () => {
     const shipmentId = freshPlacedShipment(sellerId);
-    await expect(ordersApi.dispatch(shipmentId)).rejects.toMatchObject({ code: 'ILLEGAL_TRANSITION' });
+    await expect(ordersApi.dispatch(shipmentId)).rejects.toMatchObject({
+      code: 'ILLEGAL_TRANSITION',
+    });
   });
 
   it('cancels a prepaid order and creates a refund', async () => {

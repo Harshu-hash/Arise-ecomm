@@ -45,7 +45,7 @@ export function campaignDetail(c) {
     const p = findById('products', pid);
     return { id: pid, title: p?.title ?? pid, image: p?.images?.[0] ?? null, status: p?.status };
   });
-  return { ...campaignRow(c), group: group ? { id: group.id, targetingType: group.targetingType, defaultBidPaise: group.defaultBidPaise, keywords: group.keywords ?? [] } : null, products, daily };
+  return { ...campaignRow(c), group: group ? { id: group.id, targetingType: group.targetingType, defaultBidPaise: group.defaultBidPaise, keywords: group.keywords ?? [], negativeKeywords: group.negativeKeywords ?? [] } : null, products, daily };
 }
 
 export function createCampaign(seller, body) {
@@ -109,6 +109,22 @@ export function updateCampaignBudget(c, body) {
   if (Number(body?.dailyBudgetPaise) > 0) patch.dailyBudgetPaise = Number(body.dailyBudgetPaise);
   if (Number(body?.totalBudgetPaise) > 0) patch.totalBudgetPaise = Number(body.totalBudgetPaise);
   update('adCampaigns', c.id, patch);
+  return { campaign: campaignDetail(findById('adCampaigns', c.id)) };
+}
+
+export function updateCampaignTargeting(c, body) {
+  const group = find('adGroups', (row) => row.campaignId === c.id);
+  if (!group) return { error: 'This campaign has no ad group.' };
+  const patch = {};
+  if (body?.targetingType && ['AUTOMATIC', 'MANUAL'].includes(body.targetingType)) patch.targetingType = body.targetingType;
+  if (Array.isArray(body?.keywords)) patch.keywords = body.keywords.map((keyword) => ({ term: String(keyword.term ?? keyword).trim(), matchType: keyword.matchType ?? 'BROAD', bidPaise: Number(keyword.bidPaise) || group.defaultBidPaise })).filter((keyword) => keyword.term);
+  if (Array.isArray(body?.negativeKeywords)) patch.negativeKeywords = body.negativeKeywords.map((keyword) => String(keyword.term ?? keyword).trim()).filter(Boolean);
+  if (Number(body?.defaultBidPaise) > 0) patch.defaultBidPaise = Number(body.defaultBidPaise);
+  update('adGroups', group.id, patch);
+  const campaignPatch = {};
+  if (body?.startDate) campaignPatch.startDate = body.startDate;
+  if (Object.hasOwn(body ?? {}, 'endDate')) campaignPatch.endDate = body.endDate;
+  if (Object.keys(campaignPatch).length) update('adCampaigns', c.id, campaignPatch);
   return { campaign: campaignDetail(findById('adCampaigns', c.id)) };
 }
 

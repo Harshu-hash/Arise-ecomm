@@ -1,6 +1,12 @@
-import { db, filter, findById, id, update } from '@mocks/db/store';
+import { db, filter, findById, id, insert, update } from '@mocks/db/store';
 import { mockNow, mockNowIso } from '@mocks/engine/settings';
-import { CANCELLABLE, canTransition, createRefund, recordEvent, refreshOrder } from '@mocks/engine/orderState';
+import {
+  CANCELLABLE,
+  canTransition,
+  createRefund,
+  recordEvent,
+  refreshOrder,
+} from '@mocks/engine/orderState';
 import { maskPhone } from '@core/utils/mask';
 
 /**
@@ -17,14 +23,18 @@ const DISPATCH_SLA_HOURS = 24;
 /** The next fulfilment step a shipment is waiting on (SELLER-fulfilled only). */
 export function nextActionFor(status, fulfillmentType) {
   if (fulfillmentType === 'ARISE') return null; // Arise picks, packs and ships FBA orders.
-  return { PLACED: 'confirm', ACCEPTED: 'pack', PACKED: 'manifest', MANIFESTED: 'dispatch' }[status] ?? null;
+  return (
+    { PLACED: 'confirm', ACCEPTED: 'pack', PACKED: 'manifest', MANIFESTED: 'dispatch' }[status] ??
+    null
+  );
 }
 
 /** Coarse bucket for the seller's order tabs. */
 export function stageFor(status) {
   if (status === 'PLACED' || status === 'ON_HOLD') return 'NEW';
   if (['ACCEPTED', 'PACKED', 'MANIFESTED'].includes(status)) return 'PROCESSING';
-  if (['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'UNDELIVERED'].includes(status)) return 'SHIPPED';
+  if (['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY', 'UNDELIVERED'].includes(status))
+    return 'SHIPPED';
   if (status === 'DELIVERED') return 'DELIVERED';
   if (status === 'CANCELLED') return 'CANCELLED';
   if (status?.startsWith('RTO')) return 'RTO';
@@ -32,7 +42,10 @@ export function stageFor(status) {
 }
 
 function activeItems(shipmentId) {
-  return filter('orderItems', (i) => i.shipmentId === shipmentId && !['CANCELLED', 'PAYMENT_FAILED'].includes(i.status));
+  return filter(
+    'orderItems',
+    (i) => i.shipmentId === shipmentId && !['CANCELLED', 'PAYMENT_FAILED'].includes(i.status),
+  );
 }
 
 /** One seller order row: a shipment joined with its items and order context. */
@@ -41,8 +54,12 @@ export function shipmentRow(shipment, { revealContact = false } = {}) {
   const items = filter('orderItems', (i) => i.shipmentId === shipment.id);
   const active = items.filter((i) => !['CANCELLED', 'PAYMENT_FAILED'].includes(i.status));
   const totalPaise = active.reduce((n, i) => n + i.linePaise, 0);
-  const dispatchByAt = order ? new Date(new Date(order.placedAt).getTime() + DISPATCH_SLA_HOURS * 3600_000).toISOString() : null;
-  const preShip = ['PLACED', 'ON_HOLD', 'ACCEPTED', 'PACKED', 'MANIFESTED'].includes(shipment.status);
+  const dispatchByAt = order
+    ? new Date(new Date(order.placedAt).getTime() + DISPATCH_SLA_HOURS * 3600_000).toISOString()
+    : null;
+  const preShip = ['PLACED', 'ON_HOLD', 'ACCEPTED', 'PACKED', 'MANIFESTED'].includes(
+    shipment.status,
+  );
   return {
     id: shipment.id,
     orderId: shipment.orderId,
@@ -60,6 +77,8 @@ export function shipmentRow(shipment, { revealContact = false } = {}) {
     courierName: shipment.courierName ?? null,
     awb: shipment.awb ?? null,
     invoiceNo: shipment.invoiceNo ?? null,
+    packages: shipment.packages ?? [],
+    scans: shipment.scans ?? [],
     itemCount: active.length,
     totalPaise,
     dispatchByAt,
@@ -102,7 +121,8 @@ const FLOW = {
  * or { shipment } on success. Mutates items, the shipment and the order.
  */
 export function advanceShipment(shipment, action, actorName) {
-  if (shipment.fulfillmentType === 'ARISE') return { error: 'Arise fulfils this order; you do not need to process it.' };
+  if (shipment.fulfillmentType === 'ARISE')
+    return { error: 'Arise fulfils this order; you do not need to process it.' };
   const step = FLOW[action];
   if (!step) return { error: 'Unknown action.' };
 
@@ -121,6 +141,24 @@ export function advanceShipment(shipment, action, actorName) {
     patch.courierName = courier?.name ?? 'Arise Express';
     patch.awb = shipment.awb ?? `AWB${String(mockNow()).slice(-10)}`;
     patch.manifestedAt = mockNowIso();
+    const manifest = insert('manifests', {
+      id: id('MFT', 5),
+      originType: 'SELLER',
+      originId: shipment.sellerId,
+      originName: shipment.sellerName,
+      originCity: order?.address?.city ?? 'Origin',
+      courierId: courier?.id ?? null,
+      courierName: courier?.name ?? 'Arise Express',
+      date: mockNowIso().slice(0, 10),
+      slot: '13:00–16:00',
+      shipmentCount: 1,
+      pickedUpCount: 0,
+      status: 'SCHEDULED',
+      attempts: 1,
+      vehicleNo: null,
+      version: 1,
+    });
+    patch.manifestId = manifest.id;
   }
   if (action === 'dispatch') {
     patch.lastScanAt = mockNowIso();
@@ -129,7 +167,14 @@ export function advanceShipment(shipment, action, actorName) {
 
   for (const item of items) {
     update('orderItems', item.id, { status: step.to });
-    recordEvent({ orderId: order.id, itemId: item.id, status: step.event, actorType: 'SELLER', actorName, note: null });
+    recordEvent({
+      orderId: order.id,
+      itemId: item.id,
+      status: step.event,
+      actorType: 'SELLER',
+      actorName,
+      note: null,
+    });
   }
   update('shipments', shipment.id, patch);
   refreshOrder(order.id);
@@ -145,8 +190,19 @@ export function cancelShipment(shipment, reason, actor) {
   }
   const order = findById('orders', shipment.orderId);
   for (const item of items) {
-    update('orderItems', item.id, { status: 'CANCELLED', cancelledBy: 'SELLER', cancelReason: reason ?? 'Cancelled by seller' });
-    recordEvent({ orderId: order.id, itemId: item.id, status: 'CANCELLED', actorType: 'SELLER', actorName: actor?.name, note: reason });
+    update('orderItems', item.id, {
+      status: 'CANCELLED',
+      cancelledBy: 'SELLER',
+      cancelReason: reason ?? 'Cancelled by seller',
+    });
+    recordEvent({
+      orderId: order.id,
+      itemId: item.id,
+      status: 'CANCELLED',
+      actorType: 'SELLER',
+      actorName: actor?.name,
+      note: reason,
+    });
   }
   update('shipments', shipment.id, { status: 'CANCELLED' });
 
@@ -154,7 +210,14 @@ export function cancelShipment(shipment, reason, actor) {
   let refund = null;
   if (order.paymentMethod !== 'COD') {
     const amount = items.reduce((n, i) => n + i.linePaise, 0);
-    refund = createRefund({ order, items, type: 'CANCELLATION', amountPaise: amount, actor, reason });
+    refund = createRefund({
+      order,
+      items,
+      type: 'CANCELLATION',
+      amountPaise: amount,
+      actor,
+      reason,
+    });
   }
   refreshOrder(order.id);
   return { shipment: findById('shipments', shipment.id), refund };
@@ -163,7 +226,9 @@ export function cancelShipment(shipment, reason, actor) {
 export function orderTimeline(shipmentId) {
   const items = filter('orderItems', (i) => i.shipmentId === shipmentId);
   const itemIds = new Set(items.map((i) => i.id));
-  return filter('orderEvents', (e) => itemIds.has(e.itemId)).sort((a, b) => new Date(a.at) - new Date(b.at));
+  return filter('orderEvents', (e) => itemIds.has(e.itemId)).sort(
+    (a, b) => new Date(a.at) - new Date(b.at),
+  );
 }
 
 export { id };

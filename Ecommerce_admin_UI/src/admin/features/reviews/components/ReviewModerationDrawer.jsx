@@ -50,6 +50,8 @@ export default function ReviewModerationDrawer({ reviewId, onClose, onChanged })
           <Typography.Paragraph strong style={{ marginBottom: 0 }}>{review.title}</Typography.Paragraph>
           <Typography.Paragraph>{review.text}</Typography.Paragraph>
 
+          {review.sellerReply && <Alert type={review.sellerReply.status === 'PENDING' ? 'info' : review.sellerReply.status === 'PUBLISHED' ? 'success' : 'warning'} showIcon message={`Seller reply · ${review.sellerReply.status}`} description={<><Typography.Paragraph style={{ marginBottom: 8 }}>{review.sellerReply.text}</Typography.Paragraph>{review.sellerReply.status === 'PENDING' && <Space><Button size="small" type="primary" onClick={() => act.mutate(() => reviewsApi.moderateSellerReply(review.id, 'PUBLISHED'))}>Publish reply</Button><Button size="small" danger onClick={() => act.mutate(() => reviewsApi.moderateSellerReply(review.id, 'REJECTED', 'Reply does not meet public-content policy.'))}>Reject reply</Button></Space>}</>} />}
+
           {review.media?.length > 0 && (
             <Image.PreviewGroup>
               <Flex gap={8}>

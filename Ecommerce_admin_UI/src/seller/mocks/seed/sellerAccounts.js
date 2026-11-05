@@ -28,6 +28,14 @@ function makeUser({ sellerId, name, email, phone, roleKey, roleName, storeName, 
     storeName: storeName ?? null,
     permissions: permissionsForRole(roleKey),
     mustChangePassword: mustChange,
+    twoFactorEnrolled: true,
+    twoFactorSecret: `ARISESELLER${email.replace(/[^A-Z0-9]/gi, '').toUpperCase()}`,
+    backupCodes: [
+      { code: 'SELL-1001', usedAt: null },
+      { code: 'SELL-1002', usedAt: null },
+      { code: 'SELL-1003', usedAt: null },
+      { code: 'SELL-1004', usedAt: null },
+    ],
     notifyEmail: true,
     notifyInPanel: true,
     lastLoginAt: new Date(mockNow() - 3600_000).toISOString(),
@@ -133,6 +141,35 @@ export function seedSellerAccounts() {
     storeName: 'Nova Essentials',
     status: 'ACTIVE',
   });
+
+  // Shared, privacy-safe buyer conversations and platform notices used by
+  // Customer Experience and Support. Customer identity is never copied into
+  // the seller projection; only the masked label is retained here.
+  for (const seller of [primary, second].filter(Boolean)) {
+    const item = db.orderItems.find((row) => row.sellerId === seller.id && row.status === 'DELIVERED');
+    if (!item) continue;
+    const conversation = insert('customerConversations', {
+      id: id('CONV', 6), sellerId: seller.id, customerId: db.orders.find((row) => row.id === item.orderId)?.customerId,
+      customerMaskedName: 'Buyer ••••', orderId: item.orderId, orderItemId: item.id, productId: item.productId,
+      productTitle: item.name, status: 'OPEN', policy: 'TRANSACTION_ONLY', lastMessageAt: mockNowIso(), version: 1,
+    });
+    insert('customerMessages', { id: id('CMSG', 7), conversationId: conversation.id, authorType: 'CUSTOMER', authorName: 'Buyer', body: 'Could you confirm what is included in the box?', attachments: [], moderationStatus: 'VISIBLE', createdAt: mockNowIso(), version: 1 });
+
+    const offers = db.offers.filter((row) => row.sellerId === seller.id).slice(0, 12);
+    offers.forEach((offer, offerIndex) => {
+      const variant = db.variants.find((row) => row.id === offer.variantId);
+      for (let daysAgo = 1; daysAgo <= 45; daysAgo += 1) {
+        const impressions = 80 + ((offerIndex + 3) * (daysAgo + 11)) % 420;
+        const productViews = Math.round(impressions * (0.22 + (offerIndex % 4) * 0.03));
+        const addsToCart = Math.round(productViews * 0.24);
+        const checkouts = Math.round(addsToCart * 0.62);
+        insert('customerFunnelEvents', { id: id('FNL', 8), sellerId: seller.id, productId: offer.productId ?? variant?.productId, offerId: offer.id, sku: offer.sku, date: new Date(mockNow() - daysAgo * 86400_000).toISOString().slice(0, 10), impressions, productViews, addsToCart, checkouts, source: ['SEARCH', 'CATEGORY', 'ADS'][offerIndex % 3], version: 1 });
+      }
+    });
+    const recommendationTypes = ['RESTOCK', 'IMPROVE_CONTENT', 'CHANGE_PRICE', 'JOIN_PROMOTION', 'FIX_SLA', 'ANSWER_QUESTION'];
+    recommendationTypes.forEach((type, index) => insert('sellerRecommendations', { id: id('REC', 6), sellerId: seller.id, type, title: type.replaceAll('_', ' ').toLowerCase().replace(/^./, (c) => c.toUpperCase()), rationale: `Generated from ${type === 'RESTOCK' ? 'stock velocity and days of cover' : type === 'FIX_SLA' ? 'dispatch SLA events' : type === 'ANSWER_QUESTION' ? 'unanswered customer questions' : 'shared marketplace performance facts'}.`, provenance: type === 'RESTOCK' ? 'INVENTORY_VELOCITY_V1' : type === 'ANSWER_QUESTION' ? 'CUSTOMER_QA_V1' : 'SELLER_GROWTH_V1', targetType: index < 3 ? 'LISTING' : type === 'ANSWER_QUESTION' ? 'QUESTION' : 'SELLER', targetId: index < 3 ? offers[index]?.id : seller.id, actionPath: index < 3 ? `/listings/${offers[index]?.id}` : type === 'JOIN_PROMOTION' ? '/promotions' : type === 'ANSWER_QUESTION' ? '/customer-experience/questions' : '/orders/processing', estimatedImpact: index % 2 ? '+3–7% conversion' : 'Reduce lost sales', status: 'OPEN', snoozedUntil: null, outcome: null, createdAt: mockNowIso(), updatedAt: mockNowIso(), version: 1 }));
+  }
+  insert('supportIncidents', { id: 'INC-SELLER-PANEL', title: 'Seller services operational', body: 'No active incidents are affecting orders, payouts or support.', status: 'OPERATIONAL', severity: 'info', startedAt: mockNowIso(), resolvedAt: mockNowIso(), version: 1 });
 
   return db.sellerUsers;
 }

@@ -133,7 +133,8 @@ export function createClaim(seller, body) {
   const amount = Math.round(Number(body?.amountClaimed) * 100);
   if (!amount || amount <= 0) return { error: 'Enter the amount you are claiming.' };
   if (!String(body?.orderId ?? '').trim()) return { error: 'Enter the order ID this claim is about.' };
-  if (!String(body?.evidence ?? '').trim()) return { error: 'Describe the evidence you have.' };
+  const evidenceMediaIds = Array.isArray(body?.evidenceMediaIds) ? body.evidenceMediaIds : [];
+  if (!String(body?.evidence ?? '').trim() && !evidenceMediaIds.length) return { error: 'Attach evidence or describe what it proves.' };
 
   const claim = insert('sellerClaims', {
     id: id('CLM', 6),
@@ -142,11 +143,16 @@ export function createClaim(seller, body) {
     type: type[0],
     typeLabel: type[1],
     orderId: body.orderId,
+    returnId: body.returnId ?? null,
+    disputeId: body.disputeId ?? null,
     amountClaimedPaise: amount,
     amountApprovedPaise: null,
     status: 'SUBMITTED',
     submittedAt: mockNowIso(),
-    evidence: [body.evidence],
+    evidence: String(body.evidence ?? '').trim() ? [body.evidence.trim()] : [],
+    evidenceMediaIds,
+    linkedEntities: [{ type: 'ORDER', id: body.orderId }, body.returnId && { type: 'RETURN', id: body.returnId }, body.disputeId && { type: 'RETURN_DISPUTE', id: body.disputeId }].filter(Boolean),
+    timeline: [{ type: 'SUBMITTED', at: mockNowIso(), actorName: seller.storeName, note: 'Claim submitted', evidenceMediaIds }],
     decisionReason: null,
     version: 1,
   });

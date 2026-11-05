@@ -47,7 +47,9 @@ export default defineConfig({
   server: { port: 5173, open: false },
   build: {
     outDir: 'dist',
-    sourcemap: true,
+    // Production source maps expose internal routes and mock/demo strings.
+    // Keep them available only for explicit non-production diagnostics.
+    sourcemap: process.env.VITE_ENABLE_SOURCEMAPS === 'true',
     rollupOptions: {
       // Two independent apps, one project: admin (index.html, served at root)
       // and seller (seller.html, served under /seller) each get their own

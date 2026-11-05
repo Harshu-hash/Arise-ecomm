@@ -1,5 +1,6 @@
-import { Divider, Flex, Typography } from 'antd';
+import { Alert, Divider, Flex, Timeline, Typography } from 'antd';
 import MoneyText from '@ui/components/MoneyText';
+import DateText from '@ui/components/DateText';
 
 /**
  * The deduction waterfall for one settlement line — the "explains every
@@ -39,6 +40,8 @@ export default function SettlementBreakdown({ line }) {
           Fees exceeded the sale on this item; the shortfall is carried forward against your next payout.
         </Typography.Paragraph>
       )}
+      {line.status === 'ON_HOLD' && <Alert style={{ marginTop: 12 }} type="warning" showIcon message={line.holdReason ?? 'Settlement on hold'} description={line.requiredAction} />}
+      {line.holdTimeline?.length > 0 && <><Divider orientation="left">Hold timeline</Divider><Timeline items={line.holdTimeline.map((event) => ({ children: <><Typography.Text strong>{event.label}</Typography.Text><div><DateText value={event.at} withTime /></div></> }))} /></>}
     </div>
   );
 }

@@ -2,6 +2,7 @@ import {
   CheckOutlined,
   CloseOutlined,
   FilePdfOutlined,
+  DownloadOutlined,
   RotateRightOutlined,
   ZoomInOutlined,
   ZoomOutOutlined,
@@ -48,6 +49,11 @@ export default function DocumentViewer({ document: doc, onDecide, deciding, read
         </Space>
 
         <Space size={2}>
+          {doc.downloadUrl && (
+            <Tooltip title="Download">
+              <Button size="small" type="text" icon={<DownloadOutlined />} href={doc.downloadUrl} target="_blank" rel="noopener noreferrer" aria-label={`Download ${doc.fileName}`} />
+            </Tooltip>
+          )}
           <Tooltip title="Zoom out">
             <Button size="small" type="text" icon={<ZoomOutOutlined />} onClick={() => setZoom((z) => Math.max(0.5, z - 0.25))} />
           </Tooltip>
@@ -72,7 +78,13 @@ export default function DocumentViewer({ document: doc, onDecide, deciding, read
           placeItems: 'center',
         }}
       >
-        {/* Mock documents have no real file, so the frame stands in for one. */}
+        {doc.previewUrl && !isPdf ? (
+          <img
+            src={doc.previewUrl}
+            alt={doc.label ?? doc.fileName}
+            style={{ maxWidth: '100%', maxHeight: '100%', transform: `scale(${zoom}) rotate(${rotation}deg)`, transition: 'transform 0.15s' }}
+          />
+        ) : (
         <div
           style={{
             transform: `scale(${zoom}) rotate(${rotation}deg)`,
@@ -92,6 +104,7 @@ export default function DocumentViewer({ document: doc, onDecide, deciding, read
             {new Date(doc.uploadedAt).toLocaleDateString('en-IN')}
           </Typography.Text>
         </div>
+        )}
 
         <div
           aria-hidden

@@ -1,0 +1,38 @@
+{
+  "name": "arise-commerce-backend",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Arise multi-vendor commerce modular monolith",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "node --watch src/app/server.js",
+    "start": "node src/app/server.js",
+    "start:worker": "node src/processes/worker.js",
+    "start:outbox": "node src/processes/outbox.js",
+    "start:scheduler": "node src/processes/scheduler.js",
+    "check:boundaries": "node scripts/check-module-boundaries.mjs",
+    "test": "node --test",
+    "verify": "npm run check:boundaries && npm test"
+  },
+  "dependencies": {
+    "bullmq": "^5.61.0",
+    "compression": "^1.8.1",
+    "cors": "^2.8.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
+    "helmet": "^8.1.0",
+    "ioredis": "^5.8.2",
+    "mongoose": "^8.19.2",
+    "pino": "^10.1.0",
+    "pino-http": "^11.0.0",
+    "socket.io": "^4.8.1",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "pino-pretty": "^13.1.2"
+  }
+}

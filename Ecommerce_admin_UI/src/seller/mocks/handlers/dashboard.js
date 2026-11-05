@@ -1,5 +1,5 @@
 import { http as mswHttp } from 'msw';
-import { findById } from '@mocks/db/store';
+import { filter, findById } from '@mocks/db/store';
 import { scheduleSave } from '@mocks/persistence';
 import { ok, unauthorized } from '@mocks/engine/respond';
 import { resolveCaller, sellerFor } from '@seller/mocks/engine/sellerAuth';
@@ -21,6 +21,7 @@ export const sellerDashboardHandlers = [
 
     const ordersToProcess = Math.round((seller?.orders30d ?? 0) * 0.04);
     const returnsPending = Math.round((seller?.orders30d ?? 0) * ((seller?.returnPct ?? 0) / 100) * 0.3);
+    const documentWarnings = filter('kycDocuments', (document) => document.sellerId === user.sellerId && document.expiresAt && new Date(document.expiresAt).getTime() <= Date.now() + 30 * 86400_000).map((document) => ({ id: document.id, label: document.label, expiresAt: document.expiresAt, expired: new Date(document.expiresAt).getTime() <= Date.now() }));
 
     return ok({
       store: { name: seller?.storeName ?? user.storeName, tier: seller?.tier ?? 'BRONZE', rating: seller?.rating ?? null },
@@ -38,6 +39,7 @@ export const sellerDashboardHandlers = [
         lateDispatchPct: seller?.lateDispatchPct ?? 0,
         returnPct: seller?.returnPct ?? 0,
       },
+      documentWarnings,
       tips: [
         { id: 'tip-ads', title: 'Boost visibility with Sponsored Products', cta: 'Create a campaign', link: '/ads/new' },
         { id: 'tip-stock', title: 'Keep best-sellers in stock to avoid lost sales', cta: 'Review inventory', link: '/inventory' },

@@ -540,4 +540,31 @@ export const warehouseHandlers = [
     scheduleSave();
     return ok(findById('removalOrders', row.id));
   }),
+
+  mswHttp.post(`${BASE}/removal-orders/:id/dispatch`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'warehouse.removal.approve');
+    if (g.response) return g.response;
+    const row = findById('removalOrders', params.id);
+    if (!row) return notFound('That removal order no longer exists.');
+    if (!['APPROVED', 'PICKING'].includes(row.status)) return illegalTransition(row.status, 'dispatch');
+    const inventory = findById('inventory', row.inventoryId);
+    if (!inventory || inventory.sellable < row.qty) return conflict('There is not enough sellable stock to dispatch this removal.', 'REMOVAL_STOCK_CHANGED');
+    update('inventory', inventory.id, { sellable: inventory.sellable - row.qty });
+    writeLedger({ inventory: findById('inventory', inventory.id), type: 'REMOVAL', qty: -row.qty, reference: row.id, note: 'Removal dispatched' });
+    const body = await request.json().catch(() => ({}));
+    update('removalOrders', row.id, { status: 'SHIPPED', awb: body.awb ?? row.awb ?? `RMV${Date.now()}`, dispatchedAt: mockNowIso() });
+    scheduleSave();
+    return ok(findById('removalOrders', row.id));
+  }),
+
+  mswHttp.post(`${BASE}/removal-orders/:id/deliver`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'warehouse.removal.approve');
+    if (g.response) return g.response;
+    const row = findById('removalOrders', params.id);
+    if (!row) return notFound('That removal order no longer exists.');
+    if (row.status !== 'SHIPPED') return illegalTransition(row.status, 'deliver');
+    update('removalOrders', row.id, { status: row.type === 'DISPOSE' ? 'DISPOSED' : 'DELIVERED_TO_SELLER', deliveredAt: mockNowIso() });
+    scheduleSave();
+    return ok(findById('removalOrders', row.id));
+  }),
 ];

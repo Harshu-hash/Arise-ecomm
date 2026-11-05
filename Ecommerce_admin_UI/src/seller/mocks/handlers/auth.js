@@ -24,6 +24,65 @@ import {
 import { permissionsForRole } from '@seller/rbac/permissions';
 
 export const SELLER_BASE = '/api/seller/v1';
+const CHALLENGE_TTL_MS = 10 * 60 * 1000;
+const MAX_CODE_ATTEMPTS = 5;
+
+function makeCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function makeBackupCodes() {
+  return Array.from({ length: 8 }, () => ({
+    code: `${Math.random().toString(36).slice(2, 5)}-${Math.random().toString(36).slice(2, 6)}`.toUpperCase(),
+    usedAt: null,
+  }));
+}
+
+function ensureTwoFactorMaterial(user) {
+  if (user.twoFactorSecret && user.backupCodes?.length) return user;
+  return update('sellerUsers', user.id, {
+    twoFactorSecret: user.twoFactorSecret ?? `ARISESELLER${user.id.replace(/[^A-Z0-9]/gi, '')}`,
+    backupCodes: user.backupCodes?.length ? user.backupCodes : makeBackupCodes(),
+  });
+}
+
+function createChallenge(user, stage) {
+  return insert('authChallenges', {
+    id: id('SCHL', 6),
+    userId: user.id,
+    audience: 'SELLER',
+    stage,
+    code: makeCode(),
+    expiresAt: new Date(mockNow() + CHALLENGE_TTL_MS).toISOString(),
+    attempts: 0,
+    consumedAt: null,
+  });
+}
+
+function liveChallenge(challengeId) {
+  const challenge = findById('authChallenges', challengeId);
+  if (!challenge || challenge.audience !== 'SELLER' || challenge.consumedAt) return null;
+  return new Date(challenge.expiresAt).getTime() > mockNow() ? challenge : null;
+}
+
+function challengePayload(rawUser, forcedStage) {
+  const user = ensureTwoFactorMaterial(rawUser);
+  const stage = forcedStage ?? (user.twoFactorEnrolled ? 'verify_2fa' : 'enrol_2fa');
+  const challenge = createChallenge(user, stage);
+  scheduleSave();
+  return {
+    stage,
+    challengeId: challenge.id,
+    maskedEmail: user.email.replace(/^(.{2}).*(@.*)$/, '$1•••••$2'),
+    ...(stage === 'enrol_2fa'
+      ? {
+          secret: user.twoFactorSecret,
+          otpauthUrl: `otpauth://totp/Arise%20Seller:${encodeURIComponent(user.email)}?secret=${user.twoFactorSecret}&issuer=Arise%20Seller`,
+        }
+      : {}),
+    devHint: { code: challenge.code },
+  };
+}
 
 function passwordPolicyErrors(password) {
   const errors = [];
@@ -33,11 +92,11 @@ function passwordPolicyErrors(password) {
   return errors;
 }
 
-function issue(user) {
+function issue(user, extra = {}) {
   const session = createSession(user);
   update('sellerUsers', user.id, { lastLoginAt: mockNowIso() });
   scheduleSave();
-  return ok(sessionPayload(findById('sellerUsers', user.id), session));
+  return ok({ ...sessionPayload(findById('sellerUsers', user.id), session), ...extra });
 }
 
 export const sellerAuthHandlers = [
@@ -65,9 +124,54 @@ export const sellerAuthHandlers = [
         details: { code: 'SUSPENDED' },
       });
     }
+    if (user.status === 'INVITED' || user.status === 'DEACTIVATED') return generic();
     if (user.password !== body?.password) return generic();
 
+    return ok(challengePayload(user));
+  }),
+
+  /* ------------------------------------------------------------ 2FA verify */
+  mswHttp.post(`${SELLER_BASE}/auth/2fa/verify`, async ({ request }) => {
+    const injected = await simulateNetwork('/auth/2fa/verify');
+    if (injected) return injected;
+    const body = await request.json();
+    const challenge = liveChallenge(body?.challengeId);
+    if (!challenge) return unauthorized('This sign-in attempt expired. Please sign in again.');
+    const user = findById('sellerUsers', challenge.userId);
+    if (!user || !user.twoFactorEnrolled) return unauthorized('This sign-in attempt expired. Please sign in again.');
+
+    const code = String(body?.code ?? '').trim();
+    const backup = (user.backupCodes ?? []).find((item) => !item.usedAt && item.code === code.toUpperCase());
+    if (code !== challenge.code && !backup) {
+      const attempts = challenge.attempts + 1;
+      update('authChallenges', challenge.id, { attempts, ...(attempts >= MAX_CODE_ATTEMPTS ? { consumedAt: mockNowIso() } : {}) });
+      scheduleSave();
+      if (attempts >= MAX_CODE_ATTEMPTS) return unauthorized('Too many incorrect codes. Please sign in again.');
+      return validationFailed({ code: 'That code is not correct.' }, 'That code is not correct.');
+    }
+
+    if (backup) backup.usedAt = mockNowIso();
+    update('authChallenges', challenge.id, { consumedAt: mockNowIso() });
     return issue(user);
+  }),
+
+  /* ------------------------------------------------------------- 2FA enrol */
+  mswHttp.post(`${SELLER_BASE}/auth/2fa/enrol`, async ({ request }) => {
+    const injected = await simulateNetwork('/auth/2fa/enrol');
+    if (injected) return injected;
+    const body = await request.json();
+    const challenge = liveChallenge(body?.challengeId);
+    if (!challenge || challenge.stage !== 'enrol_2fa') return unauthorized('This sign-in attempt expired. Please sign in again.');
+    const user = findById('sellerUsers', challenge.userId);
+    if (!user) return unauthorized('This sign-in attempt expired. Please sign in again.');
+    if (String(body?.code ?? '').trim() !== challenge.code) {
+      return validationFailed({ code: 'That code is not correct.' }, 'That code is not correct.');
+    }
+    const updated = update('sellerUsers', user.id, { twoFactorEnrolled: true });
+    update('authChallenges', challenge.id, { consumedAt: mockNowIso() });
+    return issue(updated, {
+      backupCodes: (updated.backupCodes ?? []).filter((item) => !item.usedAt).map((item) => item.code),
+    });
   }),
 
   /* -------------------------------------------------------------- register */
@@ -148,14 +252,16 @@ export const sellerAuthHandlers = [
       storeName,
       permissions: permissionsForRole('owner'),
       mustChangePassword: false,
+      twoFactorEnrolled: false,
+      twoFactorSecret: `ARISESELLER${sellerId.replace(/[^A-Z0-9]/gi, '')}`,
+      backupCodes: makeBackupCodes(),
       lastLoginAt: mockNowIso(),
       createdAt: mockNowIso(),
       version: 1,
     });
 
-    const session = createSession(user);
     scheduleSave();
-    return created(sessionPayload(user, session));
+    return created(challengePayload(user, 'enrol_2fa'));
   }),
 
   /* --------------------------------------------------------------- refresh */
@@ -231,9 +337,8 @@ export const sellerAuthHandlers = [
       status: 'ACTIVE',
       inviteToken: null,
     });
-    const fresh = findById('sellerUsers', user.id);
-    const session = createSession(fresh);
+    const fresh = ensureTwoFactorMaterial(findById('sellerUsers', user.id));
     scheduleSave();
-    return ok(sessionPayload(fresh, session));
+    return ok(challengePayload(fresh, 'enrol_2fa'));
   }),
 ];

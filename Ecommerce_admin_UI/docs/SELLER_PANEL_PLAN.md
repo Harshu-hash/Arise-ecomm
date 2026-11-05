@@ -10,6 +10,24 @@
 
 ## Implementation status
 
+### Backend-readiness hardening — complete (2026-11-04)
+
+The seller UI is now ready to be connected to production APIs. The post-S8 audit
+removed the unused placeholder-route fallback, added mandatory login and invite
+enrolment 2FA journeys (verification, recovery codes, and mock API contracts), and
+implemented seller-scoped scheduled email reports instead of the former "coming
+soon" notice. Supporting catalogue, campaign, promotion, warehouse/SKU, finance,
+and performance queries now expose loading and retryable error states rather than
+silently treating transport failures as empty data. All 32 seller route assertions
+and 47 seller domain/integration assertions pass (79/79 total), lint is clean, and
+the live-mode production build succeeds.
+
+This means **UI-complete and backend-contract-ready**, not production-backend
+complete. The production service must still implement and publish the seller/admin
+OpenAPI contracts, durable identity/session security, persistence, workers, email,
+object storage, and third-party payment/logistics/KYC integrations. See
+`SELLER_BACKEND_READINESS_AUDIT.md` for the exact hand-off boundary.
+
 - **Phase 0 — module split:** ✅ done. `src/shared/{core,ui,theme,mocks}` + `src/admin/*`
   + `src/seller/*`; aliases `@core @ui @theme @mocks @admin @seller`.
 - **Phase S1 — seller foundation & shell:** ✅ done (2026-10-24). Admin stays at site

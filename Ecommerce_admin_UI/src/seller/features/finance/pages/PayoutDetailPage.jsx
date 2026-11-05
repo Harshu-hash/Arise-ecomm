@@ -1,4 +1,4 @@
-import { Alert, Card, Col, Drawer, Flex, Row, Space, Table, Typography } from 'antd';
+import { Alert, Button, Card, Col, Drawer, Flex, Row, Space, Table, Timeline, Typography } from 'antd';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -10,6 +10,7 @@ import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
 import SettlementBreakdown from '../components/SettlementBreakdown';
 import { financeApi, financeKeys } from '../api/finance.api';
+import FinanceDocumentButton from '../components/FinanceDocumentButton';
 
 export default function PayoutDetailPage() {
   const { id } = useParams();
@@ -37,7 +38,7 @@ export default function PayoutDetailPage() {
         tags={<StatusTag domain="sellerPayout" code={data.status} />}
       />
 
-      {data.status === 'FAILED' && <Alert type="error" showIcon message="This payout failed" description={data.failureReason} />}
+      {data.status === 'FAILED' && <Alert type="error" showIcon message={`Transfer failed · ${data.bankTransfer?.utrStatus ?? 'UTR not issued'}`} description={<Space direction="vertical"><span>{data.bankTransfer?.failureReason ?? data.failureReason}</span><Button size="small" onClick={() => navigate(data.bankTransfer?.correctionAction?.to ?? '/settings/bank')}>{data.bankTransfer?.correctionAction?.label ?? 'Correct bank details'}</Button></Space>} />}
       {data.carriedForward && <Alert type="warning" showIcon message="Carried forward" description="Fees and adjustments exceeded sales this period; the shortfall is set against your next payout." />}
 
       <Row gutter={16}>
@@ -82,6 +83,11 @@ export default function PayoutDetailPage() {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>Tap a row to see every deduction.</Typography.Text>
           </Card>
         </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col xs={24} lg={12}><Card title="Transfer timeline" size="small"><Timeline items={(data.bankTransfer?.timeline ?? []).map((event) => ({ children: <><Typography.Text strong>{event.label}</Typography.Text><div><DateText value={event.at} withTime /></div></> }))} /></Card></Col>
+        <Col xs={24} lg={12}><Card title="Official documents" size="small"><Space wrap><FinanceDocumentButton kind="PAYOUT_ADVICE" entityType="PAYOUT" entityId={data.id} label="Payout advice" /><FinanceDocumentButton kind="SETTLEMENT_STATEMENT" entityType="PAYOUT" entityId={data.id} label="Settlement statement" /></Space></Card></Col>
       </Row>
 
       <Drawer title={line?.productTitle} open={Boolean(line)} onClose={() => setLine(null)} width={420}>

@@ -1,9 +1,11 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Flex, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd';
+import { Alert, App, Button, Card, Collapse, Flex, Form, Input, Modal, Select, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
+import DocumentUpload from '@ui/components/DocumentUpload';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
 import useListQuery from '@ui/hooks/useListQuery';
@@ -18,6 +20,8 @@ export default function SupportPage() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [helpTerm, setHelpTerm] = useState('');
+  const [attachments, setAttachments] = useState([]);
   const state = useUrlTableState({ defaultSort: '-createdAt' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
@@ -25,14 +29,19 @@ export default function SupportPage() {
     url: '/support/tickets',
     params: state.queryParams,
   });
+  const helpQuery = useQuery({ queryKey: supportKeys.help(helpTerm), queryFn: () => supportApi.help(helpTerm) });
+  const contextQuery = useQuery({ queryKey: supportKeys.contextOptions, queryFn: supportApi.contextOptions });
+  const incidentQuery = useQuery({ queryKey: supportKeys.incidents, queryFn: supportApi.incidents });
 
   const submit = async (values) => {
     setSaving(true);
     try {
-      const ticket = await supportApi.create(values);
+      const context = values.context ? JSON.parse(values.context) : {};
+      const ticket = await supportApi.create({ ...values, context: undefined, ...context, attachments: attachments.map((item) => item.mediaId) });
       message.success('Ticket raised.');
       setOpen(false);
       form.resetFields();
+      setAttachments([]);
       navigate(`/support/${ticket.id}`);
     } catch (e) {
       message.error(e?.message ?? 'Could not raise the ticket.');
@@ -59,6 +68,13 @@ export default function SupportPage() {
         subtitle="Raise a ticket with the Arise seller support team."
         actions={<Button type="primary" icon={<PlusOutlined />} onClick={() => setOpen(true)}>Raise a ticket</Button>}
       />
+
+      {(incidentQuery.data ?? []).map((incident) => <Alert key={incident.id} type={incident.status === 'OPERATIONAL' ? 'success' : incident.severity} showIcon message={incident.title} description={incident.body} />)}
+
+      <Card title="Search seller help" size="small">
+        <Input.Search allowClear placeholder="Search published help articles" value={helpTerm} onChange={(e) => setHelpTerm(e.target.value)} />
+        <Collapse style={{ marginTop: 12 }} items={(helpQuery.data ?? []).slice(0, 8).map((article) => ({ key: article.id, label: article.question, children: <><Typography.Paragraph>{article.answer}</Typography.Paragraph><Tag>{article.category}</Tag></> }))} />
+      </Card>
 
       <DataTable
         tableId="seller-tickets"
@@ -90,9 +106,10 @@ export default function SupportPage() {
           <Form.Item name="subject" label="What's this about?" rules={[{ required: true, message: 'Choose a subject.' }]}>
             <Select options={SUBJECTS.map((s) => ({ value: s, label: s }))} placeholder="Select a category" />
           </Form.Item>
-          <Form.Item name="orderId" label="Order ID (if related)">
-            <Input placeholder="e.g. ORD-80123" />
+          <Form.Item name="context" label="Link a record">
+            <Select showSearch allowClear optionFilterProp="label" placeholder="Order, listing, payout or return" options={(contextQuery.data ?? []).map((item) => ({ value: JSON.stringify({ contextType: item.type, contextId: item.id }), label: item.label }))} />
           </Form.Item>
+          <Form.Item label="Attachments"><DocumentUpload value={attachments} onChange={setAttachments} maxCount={5} label="Ticket attachments" /></Form.Item>
           <Form.Item name="text" label="Describe the issue" rules={[{ required: true, message: 'Describe the issue.' }]}>
             <Input.TextArea rows={4} />
           </Form.Item>

@@ -452,6 +452,28 @@ export const payoutHandlers = [
     return created(adjustment);
   }),
 
+  /* ------------------------------------------- seller deduction disputes */
+  mswHttp.post(`${BASE}/finance-disputes/:id/resolve`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'finance.recon.resolve');
+    if (g.response) return g.response;
+    const dispute = findById('financeDisputes', params.id);
+    if (!dispute) return notFound('That finance dispute no longer exists.');
+    if (['RESOLVED', 'REJECTED'].includes(dispute.status)) return conflict('This dispute has already been resolved.', 'ALREADY_RESOLVED');
+    const body = await request.json();
+    if (!['APPROVE', 'REJECT'].includes(body.decision)) return validationFailed({ decision: 'Approve or reject the dispute.' });
+    if (!String(body.reason ?? '').trim()) return validationFailed({ reason: 'Explain the resolution to the seller.' });
+    let adjustment = null;
+    if (body.decision === 'APPROVE') {
+      const line = findById('settlementLines', dispute.settlementLineId);
+      const seller = findById('sellers', dispute.sellerId);
+      adjustment = insert('payoutAdjustments', { id: id('ADJ', 5), sellerId: dispute.sellerId, sellerName: seller?.storeName ?? line?.sellerName, type: 'DEDUCTION_DISPUTE_REVERSAL', amountPaise: dispute.disputedPaise, note: `Approved deduction dispute ${dispute.id}`, referenceType: 'FINANCE_DISPUTE', referenceId: dispute.id, orderId: dispute.orderId, status: 'APPROVED', batchId: null, raisedByName: g.user.name, raisedAt: mockNowIso(), approvedByName: g.user.name, version: 1 });
+    }
+    update('financeDisputes', dispute.id, { status: body.decision === 'APPROVE' ? 'RESOLVED' : 'REJECTED', approvalStatus: body.decision === 'APPROVE' ? 'APPROVED' : 'NOT_REQUIRED', resolution: body.reason.trim(), resolvedAt: mockNowIso(), resolvedByName: g.user.name, payoutAdjustmentId: adjustment?.id ?? null, timeline: [...(dispute.timeline ?? []), { status: body.decision === 'APPROVE' ? 'RESOLVED' : 'REJECTED', at: mockNowIso(), actorName: g.user.name, note: body.reason.trim() }] });
+    writeAudit({ actor: g.user, action: 'finance.recon.resolve', entityType: 'financeDispute', entityId: dispute.id, entityLabel: dispute.id, reason: body.reason, metadata: { decision: body.decision, adjustmentId: adjustment?.id } });
+    scheduleSave();
+    return ok(findById('financeDisputes', dispute.id));
+  }),
+
   /* ------------------------------------------------------------ hold flag */
   mswHttp.post(`${BASE}/sellers/:sellerId/payout-hold`, async ({ request, params }) => {
     const g = await guard(request, new URL(request.url), 'finance.payout.hold');

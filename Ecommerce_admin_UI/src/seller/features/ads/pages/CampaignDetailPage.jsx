@@ -23,6 +23,8 @@ export default function CampaignDetailPage() {
   const [dailyBudget, setDailyBudget] = useState(0);
 
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: adsKeys.detail(id), queryFn: () => adsApi.detail(id) });
+  const reportQuery = useQuery({ queryKey: adsKeys.report(id), queryFn: () => adsApi.report(id) });
+  const billingQuery = useQuery({ queryKey: adsKeys.billing, queryFn: adsApi.billing });
   const invalidate = () => { queryClient.invalidateQueries({ queryKey: adsKeys.detail(id) }); queryClient.invalidateQueries({ queryKey: ['seller', 'ads', 'campaigns'] }); };
 
   const submitMut = useMutation({ mutationFn: () => adsApi.submit(id), onSuccess: () => { message.success('Submitted for review.'); invalidate(); }, onError: (e) => message.error(e?.message) });
@@ -102,6 +104,11 @@ export default function CampaignDetailPage() {
               ]}
             />
           </Card>
+
+          <Card title="Product performance" size="small" style={{ marginTop: 16 }}>
+            <Typography.Paragraph type="secondary">{reportQuery.data?.attributionDefinition}</Typography.Paragraph>
+            <Table rowKey="id" size="small" pagination={false} loading={reportQuery.isLoading} dataSource={reportQuery.data?.productRows ?? []} columns={[{ title: 'Product', dataIndex: 'title' }, { title: 'Clicks', dataIndex: 'clicks', align: 'right' }, { title: 'Orders', dataIndex: 'orders', align: 'right' }, { title: 'Spend', dataIndex: 'spendPaise', render: (value) => <MoneyText paise={value} /> }, { title: 'Attributed revenue', dataIndex: 'attributedRevenuePaise', render: (value) => <MoneyText paise={value} /> }]} />
+          </Card>
         </Col>
 
         <Col xs={24} lg={10}>
@@ -128,6 +135,12 @@ export default function CampaignDetailPage() {
               <Space wrap>{data.group.keywords.map((k, i) => <Tag key={i}>{k.term} ({k.matchType})</Tag>)}</Space>
             </Card>
           )}
+
+          {data.group?.negativeKeywords?.length > 0 && <Card title="Negative keywords" size="small" style={{ marginTop: 16 }}><Space wrap>{data.group.negativeKeywords.map((keyword) => <Tag key={keyword} color="red">{keyword}</Tag>)}</Space></Card>}
+          <Card title="Billing reconciliation" size="small" style={{ marginTop: 16 }}>
+            <List size="small" dataSource={[["Billed spend", <MoneyText key="billed" paise={billingQuery.data?.billedSpendPaise} />], ["Spend ledger", <MoneyText key="ledger" paise={billingQuery.data?.ledgerSpendPaise} />], ["Variance", <MoneyText key="variance" paise={billingQuery.data?.variancePaise} />]]} renderItem={([label, value]) => <List.Item><Typography.Text type="secondary">{label}</Typography.Text>{value}</List.Item>} />
+            {billingQuery.data?.reconciled && <Tag color="green">Reconciled</Tag>}
+          </Card>
         </Col>
       </Row>
 

@@ -1,6 +1,7 @@
 import { db, filter, findById, id, insert, update } from '@mocks/db/store';
 import { mockNow, mockNowIso } from '@mocks/engine/settings';
 import { createRefund } from '@mocks/engine/orderState';
+import { appendReturnEvent, createReplacementFulfilment, returnProjection } from '@mocks/engine/returnWorkflow';
 
 /**
  * Seller-side returns, inventory and FBA inbound over the shared collections
@@ -38,6 +39,7 @@ export function returnRow(r) {
     stage: returnStage(r.status),
     actions: sellerReturnActions({ ...r, fulfillmentType: item?.fulfillmentType ?? 'SELLER' }),
     ageHours: Math.floor((mockNow() - new Date(r.requestedAt).getTime()) / 3600_000),
+    ...returnProjection(r),
   };
 }
 
@@ -63,18 +65,29 @@ export function decideReturn(r, action, body, actor) {
   if (action === 'approve') {
     const courier = reverseCourier();
     patch = { status: 'PICKUP_SCHEDULED', approvedAt: mockNowIso(), approvedByName: actor?.name, pickupAwb: `AWB${String(mockNow()).slice(-10)}`, reverseCourierName: courier?.name ?? 'Arise Reverse' };
+    appendReturnEvent(r, { type: 'RETURN_APPROVED', actorType: 'SELLER', actorName: actor?.name, reason: body?.reason, evidenceMediaIds: body?.evidenceMediaIds });
   } else if (action === 'reject') {
     if (!String(body?.reason ?? '').trim()) return { error: 'A reason is required to reject a return.' };
-    patch = { status: 'RETURN_REJECTED', decisionReason: body.reason, decidedByName: actor?.name };
+    patch = { status: 'RETURN_REJECTED', decisionReasonCode: body.reasonCode ?? 'OTHER', decisionReason: body.reason, decisionEvidenceMediaIds: body.evidenceMediaIds ?? [], decidedAt: mockNowIso(), decidedByName: actor?.name };
+    appendReturnEvent(r, { type: 'RETURN_REJECTED', actorType: 'SELLER', actorName: actor?.name, reason: body.reason, evidenceMediaIds: body.evidenceMediaIds ?? [], metadata: { reasonCode: body.reasonCode ?? 'OTHER' } });
   } else if (action === 'receive') {
     patch = { status: 'RECEIVED', receivedAt: mockNowIso() };
+    appendReturnEvent(r, { type: 'RECEIVED', actorType: 'SELLER', actorName: actor?.name });
   } else if (action === 'qc') {
     const passed = body?.result === 'PASS';
-    patch = { status: passed ? 'QC_PASSED' : 'QC_FAILED', qcResult: body?.result ?? 'FAIL', qcNotes: body?.notes ?? null, qcAt: mockNowIso(), qcByName: actor?.name };
+    if (!passed && (!String(body?.reasonCode ?? '').trim() || !String(body?.notes ?? '').trim() || !(body?.evidenceMediaIds?.length))) return { error: 'Failed QC requires a reason code, notes and evidence.' };
+    patch = { status: passed ? 'QC_PASSED' : 'QC_FAILED', qcResult: body?.result ?? 'FAIL', qcReasonCode: body?.reasonCode ?? null, qcNotes: body?.notes ?? null, qcEvidenceMediaIds: body?.evidenceMediaIds ?? [], qcAt: mockNowIso(), qcByName: actor?.name };
+    appendReturnEvent(r, { type: passed ? 'QC_PASSED' : 'QC_FAILED', actorType: 'SELLER', actorName: actor?.name, reason: body?.notes, evidenceMediaIds: body?.evidenceMediaIds ?? [], metadata: { reasonCode: body?.reasonCode ?? null } });
     if (passed && order) {
+      if (r.type === 'REPLACEMENT') {
+        update('returns', r.id, patch);
+        const replacement = createReplacementFulfilment(findById('returns', r.id), { name: actor?.name, type: 'SELLER' });
+        return { return: returnRow(findById('returns', r.id)), replacement };
+      }
       refund = createRefund({ order, items: [item].filter(Boolean), type: 'RETURN', amountPaise: r.amountPaise, actor, reason: r.reason });
       patch.refundId = refund.id;
       patch.status = 'CLOSED';
+      appendReturnEvent(r, { type: 'REFUND_CREATED', actorType: 'SYSTEM', actorName: 'Refund service', metadata: { refundId: refund.id } });
     }
   }
   update('returns', r.id, patch);
@@ -92,11 +105,61 @@ export function inventoryRow(inv) {
     daysOfCover,
     lowStock: available < (inv.lowStockThreshold ?? 20),
     aged: inv.oldestUnitDays > 180,
+    fulfillmentType: inv.fulfillmentType ?? 'ARISE',
+    blocked: inv.blocked ?? 0,
+    quarantined: inv.quarantined ?? 0,
+    damaged: inv.damaged ?? 0,
   };
 }
 
 export function sellerInventory(sellerId) {
+  ensureSelfShipInventory(sellerId);
   return filter('inventory', (i) => i.sellerId === sellerId).map(inventoryRow);
+}
+
+export function ensureSelfShipInventory(sellerId) {
+  const primary = filter('pickupAddresses', (row) => row.sellerId === sellerId && row.status !== 'INACTIVE').find((row) => row.isPrimary)
+    ?? filter('pickupAddresses', (row) => row.sellerId === sellerId && row.status !== 'INACTIVE')[0];
+  if (!primary) return [];
+  const created = [];
+  for (const offer of filter('offers', (row) => row.sellerId === sellerId && row.fulfillmentType !== 'ARISE' && row.status !== 'DELETED')) {
+    const existing = db.inventory.find((row) => row.offerId === offer.id && row.fulfillmentType === 'SELLER');
+    if (existing) continue;
+    const variant = findById('variants', offer.variantId);
+    const product = variant ? findById('products', variant.productId) : null;
+    created.push(insert('inventory', {
+      id: id('INV', 7), offerId: offer.id, variantId: offer.variantId,
+      sku: variant?.sku ?? offer.id, productTitle: product?.title ?? 'Seller listing', variantLabel: variant?.label ?? null,
+      sellerId, sellerName: offer.sellerName, warehouseId: primary.id, warehouseCode: primary.label,
+      fulfillmentType: 'SELLER', sellable: Number(offer.stock) || 0, reserved: 0, damaged: 0, blocked: 0, quarantined: 0,
+      dailyVelocity: 1, lowStockThreshold: 10, oldestUnitDays: 0, version: 1,
+    }));
+  }
+  return created;
+}
+
+export function writeSellerLedger(inventory, type, qty, reference, note) {
+  return insert('inventoryLedger', {
+    id: id('ILG', 8), inventoryId: inventory.id, variantId: inventory.variantId,
+    warehouseId: inventory.warehouseId, type, qty, balanceAfter: inventory.sellable,
+    reference: reference ?? null, note: note ?? null, at: mockNowIso(),
+  });
+}
+
+export function changeSellerStock(inventory, body) {
+  const requested = Number(body?.sellable);
+  if (!Number.isInteger(requested) || requested < 0) return { error: 'Stock must be a whole number of zero or more.', code: 'STOCK_INVALID' };
+  if (requested < inventory.reserved) return { error: `Stock cannot be below ${inventory.reserved} reserved units.`, code: 'RESERVED_STOCK' };
+  if (body?.version != null && Number(body.version) !== inventory.version) return { error: 'This stock row changed. Refresh and retry.', code: 'VERSION_CONFLICT', current: inventoryRow(inventory) };
+  const before = inventory.sellable;
+  update('inventory', inventory.id, { sellable: requested });
+  const current = findById('inventory', inventory.id);
+  if (current.offerId) {
+    const offer = findById('offers', current.offerId);
+    if (offer) update('offers', offer.id, { stock: requested, status: requested > current.reserved ? (offer.status === 'OUT_OF_STOCK' ? 'LIVE' : offer.status) : 'OUT_OF_STOCK' });
+  }
+  writeSellerLedger(current, 'ADJUSTMENT', requested - before, body?.reference, body?.note ?? 'Seller stock update');
+  return { inventory: inventoryRow(current) };
 }
 
 /* ----------------------------------------------------------------- inbound */
@@ -137,6 +200,10 @@ export function createInbound(seller, body) {
     invoiceNo: body?.invoiceNo ?? null,
     ewayBillNo: body?.ewayBillNo ?? null,
     boxCount: Number(body?.boxCount) || lines.length,
+    packagingType: body?.packagingType === 'PALLET' ? 'PALLET' : 'CARTON',
+    cartons: Array.isArray(body?.cartons) ? body.cartons : [],
+    palletCount: Number(body?.palletCount) || 0,
+    requestedAppointmentAt: body?.requestedAppointmentAt ?? null,
     receivedAt: null,
     receivedByName: null,
     hasDiscrepancy: false,

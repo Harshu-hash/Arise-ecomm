@@ -92,6 +92,20 @@ export const reviewHandlers = [
     return ok(findById('reviews', review.id));
   }),
 
+  mswHttp.post(`${BASE}/reviews/:reviewId/reply/moderate`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'reviews.review.moderate');
+    if (g.response) return g.response;
+    const review = findById('reviews', params.reviewId);
+    if (!review) return notFound('That review no longer exists.');
+    if (!review.sellerReply || review.sellerReply.status !== 'PENDING') return conflict('There is no pending seller reply.', 'NO_PENDING_REPLY');
+    const body = await request.json();
+    if (!['PUBLISHED', 'REJECTED'].includes(body.status)) return validationFailed({ status: 'Publish or reject the reply.' });
+    if (body.status === 'REJECTED' && !String(body.reason ?? '').trim()) return validationFailed({ reason: 'Explain why the reply was rejected.' });
+    update('reviews', review.id, { sellerReply: { ...review.sellerReply, status: body.status, moderatedAt: mockNowIso(), moderationReason: body.reason ?? null } });
+    writeAudit({ actor: g.user, action: 'review.seller_reply_moderate', entityType: 'review', entityId: review.id, entityLabel: review.productTitle, reason: body.reason, metadata: { status: body.status } });
+    scheduleSave(); return ok(findById('reviews', review.id));
+  }),
+
   /** Bulk: publish every clean pending review on the current page's filter, or reject a selected set. */
   mswHttp.post(`${BASE}/reviews/bulk`, async ({ request }) => {
     const g = await guard(request, new URL(request.url), 'reviews.review.moderate');
@@ -122,8 +136,9 @@ export const reviewHandlers = [
     const query = parseListQuery(url, { defaultSort: '-askedAt' });
     const rows = db.questions.map((q) => ({
       ...q,
-      answerCount: filter('answers', (a) => a.questionId === q.id).length,
-      unansweredDays: filter('answers', (a) => a.questionId === q.id).length
+      answerCount: filter('answers', (a) => a.questionId === q.id && a.status === 'PUBLISHED').length,
+      pendingSellerAnswer: filter('answers', (a) => a.questionId === q.id && a.authorType === 'SELLER' && a.status === 'PENDING')[0] ?? null,
+      unansweredDays: filter('answers', (a) => a.questionId === q.id && a.status === 'PUBLISHED').length
         ? null : Math.floor((Date.now() - new Date(q.askedAt).getTime()) / 86400_000),
     }));
     const result = listResult(rows, query, {

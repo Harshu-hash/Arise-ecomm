@@ -12,10 +12,15 @@ const STATUS_TAG = { GOOD: ['green', 'Good'], WARNING: ['gold', 'Watch'], BAD: [
 
 export default function AccountHealthPage() {
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: performanceKeys.health, queryFn: performanceApi.health });
-  const { data: trend = [] } = useQuery({ queryKey: performanceKeys.trend, queryFn: performanceApi.trend });
-  const { data: ratings } = useQuery({ queryKey: performanceKeys.ratings, queryFn: performanceApi.ratings });
+  const trendQuery = useQuery({ queryKey: performanceKeys.trend, queryFn: performanceApi.trend });
+  const ratingsQuery = useQuery({ queryKey: performanceKeys.ratings, queryFn: performanceApi.ratings });
+  const trend = trendQuery.data ?? [];
+  const ratings = ratingsQuery.data;
 
   if (isError) return <ErrorState error={error} onRetry={refetch} title="Could not load account health" />;
+  if (trendQuery.isError || ratingsQuery.isError) {
+    return <ErrorState error={trendQuery.error ?? ratingsQuery.error} onRetry={() => Promise.all([refetch(), trendQuery.refetch(), ratingsQuery.refetch()])} title="Could not load complete account health" />;
+  }
   const d = data ?? {};
 
   return (

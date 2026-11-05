@@ -5,6 +5,7 @@ import {
   CustomerServiceOutlined,
   DashboardOutlined,
   InboxOutlined,
+  MessageOutlined,
   RiseOutlined,
   SettingOutlined,
   ShoppingOutlined,
@@ -22,5 +23,6 @@ export const NAV_ICONS = {
   star: <StarOutlined />,
   barChart: <BarChartOutlined />,
   customerService: <CustomerServiceOutlined />,
+  message: <MessageOutlined />,
   setting: <SettingOutlined />,
 };

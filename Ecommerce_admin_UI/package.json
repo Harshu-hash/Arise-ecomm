@@ -14,6 +14,8 @@
     "lint:fix": "eslint . --ext .js,.jsx --fix",
     "format": "prettier --write \"src/**/*.{js,jsx,css,md}\"",
     "test": "vitest run",
+    "test:seller-contract": "vitest run src/seller/test/sellerOpenApiCoverage.test.js src/seller/test/httpContract.test.js src/shared/core/config/env.test.js src/shared/core/auth/useBootstrapSession.test.js",
+    "verify:seller": "npm run lint && npm run test:seller-contract && vitest run src/seller --maxWorkers=1 --minWorkers=1 --testTimeout=20000 && npm run build",
     "test:watch": "vitest",
     "msw:init": "msw init public --save"
   },

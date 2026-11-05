@@ -1,4 +1,5 @@
 import { http as mswHttp } from 'msw';
+import { DOCUMENT_SECTION, applicationFor, ensureSections, markSection } from '@mocks/engine/sellerOnboarding';
 import { db, filter, findById, id, insert, update } from '../db/store';
 import { createApproval } from '../engine/approvals';
 import { diffOf, writeAudit } from '../engine/audit';
@@ -65,6 +66,7 @@ function reviewBundle(seller) {
     addresses: filter('pickupAddresses', (a) => a.sellerId === seller.id),
     bank: filter('bankAccounts', (b) => b.sellerId === seller.id)[0] ?? null,
     brandRequests: filter('brandRequests', (r) => r.sellerId === seller.id),
+    changeRequests: filter('sellerChangeRequests', (r) => r.sellerId === seller.id).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
     categories: (seller.requestedCategories ?? []).map((cid) => {
       const c = findById('categories', cid);
       return c ? { id: c.id, name: c.name, gated: c.gated } : null;
@@ -275,7 +277,28 @@ export const sellerHandlers = [
     update('kycDocuments', doc.id, {
       status: approve ? 'APPROVED' : 'REJECTED',
       rejectionReason: approve ? null : body.reason,
+      // Document version tracks the uploaded artifact, not review decisions.
+      version: doc.version,
     });
+    const application = applicationFor(seller.id);
+    if (application) {
+      const sectionKey = doc.sectionKey ?? DOCUMENT_SECTION[doc.type];
+      if (sectionKey) {
+        if (approve) {
+          const sectionDocuments = filter('kycDocuments', (item) => item.sellerId === seller.id && (item.sectionKey ?? DOCUMENT_SECTION[item.type]) === sectionKey);
+          const sectionReady = sectionDocuments.length > 0 && sectionDocuments.every((item) => item.id === doc.id || item.status === 'APPROVED');
+          if (sectionReady) markSection(application, sectionKey, 'UNDER_REVIEW', { adminReason: null, correctiveAction: null });
+        } else {
+          markSection(application, sectionKey, 'CLARIFICATION_REQUIRED', {
+            adminReason: body.reason,
+            correctiveAction: `Replace ${doc.label} with a clear, current document and resubmit this section.`,
+            decidedAt: mockNowIso(),
+          });
+          update('sellerOnboarding', application.id, { status: 'CLARIFICATION_REQUIRED', updatedAt: mockNowIso() });
+          update('sellers', seller.id, { status: 'NEEDS_INFO', infoRequested: [body.reason] });
+        }
+      }
+    }
     writeAudit({
       actor: g.user,
       action: approve ? 'sellers.kyc.approve_document' : 'sellers.kyc.reject_document',
@@ -286,6 +309,23 @@ export const sellerHandlers = [
     });
     scheduleSave();
     return ok(findById('kycDocuments', doc.id), { blockers: approvalBlockers(seller) });
+  }),
+
+  mswHttp.post(`${BASE}/sellers/:id/change-requests/:requestId/decide`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'sellers.seller.edit');
+    if (g.response) return g.response;
+    const seller = findById('sellers', params.id);
+    const changeRequest = findById('sellerChangeRequests', params.requestId);
+    if (!seller || !changeRequest || changeRequest.sellerId !== seller.id) return notFound('That change request no longer exists.');
+    if (changeRequest.status !== 'UNDER_REVIEW') return conflict('This change request was already decided.', 'ALREADY_DECIDED');
+    const body = await request.json();
+    const approve = Boolean(body?.approve);
+    if (!approve && !String(body?.reason ?? '').trim()) return validationFailed({ reason: 'Give the seller a reason.' });
+    update('sellerChangeRequests', changeRequest.id, { status: approve ? 'APPROVED' : 'REJECTED', decidedAt: mockNowIso(), decidedBy: g.user.id, decisionReason: approve ? null : body.reason });
+    if (approve && changeRequest.field === 'legalName') update('sellers', seller.id, { legalName: changeRequest.proposedValue });
+    writeAudit({ actor: g.user, action: approve ? 'sellers.change_request.approve' : 'sellers.change_request.reject', entityType: 'seller', entityId: seller.id, entityLabel: seller.storeName, reason: body?.reason });
+    scheduleSave();
+    return ok(findById('sellerChangeRequests', changeRequest.id));
   }),
 
   /** Application decisions: approve, request info, reject. */
@@ -322,6 +362,11 @@ export const sellerHandlers = [
         commissionPlan: body.commissionPlan ?? 'STANDARD',
         tier: body.tier ?? 'BRONZE',
       });
+      const application = applicationFor(seller.id);
+      if (application) {
+        update('sellerOnboarding', application.id, { status: 'APPROVED', approvedAt: mockNowIso(), updatedAt: mockNowIso() });
+        for (const section of ensureSections(application)) markSection(application, section.key, 'APPROVED', { decidedAt: mockNowIso(), adminReason: null, correctiveAction: null });
+      }
       writeAudit({
         actor: g.user,
         action: 'sellers.application.approve',
@@ -340,6 +385,13 @@ export const sellerHandlers = [
         return validationFailed({ reason: 'Give a reason the applicant can act on.' });
       }
       update('sellers', seller.id, { status: 'REJECTED', rejectionReason: body.reason });
+      const application = applicationFor(seller.id);
+      if (application) {
+        update('sellerOnboarding', application.id, { status: 'REJECTED', rejectionReason: body.reason, updatedAt: mockNowIso() });
+        for (const section of ensureSections(application)) {
+          if (section.state !== 'APPROVED') markSection(application, section.key, 'REJECTED', { adminReason: body.reason, correctiveAction: 'Contact seller support before reapplying.' });
+        }
+      }
       writeAudit({
         actor: g.user,
         action: 'sellers.application.reject',
@@ -359,6 +411,12 @@ export const sellerHandlers = [
       return validationFailed({ items: 'Pick at least one thing the seller needs to fix.' });
     }
     update('sellers', seller.id, { status: 'NEEDS_INFO', infoRequested: body.items });
+    const application = applicationFor(seller.id);
+    if (application) {
+      update('sellerOnboarding', application.id, { status: 'CLARIFICATION_REQUIRED', updatedAt: mockNowIso() });
+      const section = ensureSections(application).find((item) => item.state !== 'APPROVED');
+      if (section) markSection(application, section.key, 'CLARIFICATION_REQUIRED', { adminReason: body.items.join(' '), correctiveAction: body.items.join(' ') });
+    }
     writeAudit({
       actor: g.user,
       action: 'sellers.application.request_info',

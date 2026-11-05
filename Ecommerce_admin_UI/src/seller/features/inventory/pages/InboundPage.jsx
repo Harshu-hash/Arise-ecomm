@@ -1,5 +1,5 @@
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons';
-import { App, Button, Card, Checkbox, Flex, Form, Input, InputNumber, Modal, Select, Space, Typography } from 'antd';
+import { Alert, App, Button, Card, Checkbox, Flex, Form, Input, InputNumber, Modal, Select, Space, Typography } from 'antd';
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
@@ -34,8 +34,11 @@ export default function InboundPage() {
     url: '/inbound',
     params: state.queryParams,
   });
-  const { data: warehouses = [] } = useQuery({ queryKey: inventoryKeys.warehouses, queryFn: inventoryApi.warehouses });
-  const { data: listings = [] } = useQuery({ queryKey: ['seller', 'inbound', 'sku-source'], queryFn: inventoryApi.myListings, enabled: open });
+  const warehousesQuery = useQuery({ queryKey: inventoryKeys.warehouses, queryFn: inventoryApi.warehouses });
+  const listingsQuery = useQuery({ queryKey: ['seller', 'inbound', 'sku-source'], queryFn: inventoryApi.myListings, enabled: open });
+  const warehouses = warehousesQuery.data ?? [];
+  const listings = listingsQuery.data ?? [];
+  const sourceError = warehousesQuery.error ?? listingsQuery.error;
 
   const skuOptions = Array.from(new Map(listings.map((l) => [l.variantId, l])).values())
     .map((l) => ({ value: l.variantId, label: `${l.productTitle}${l.sku ? ` (${l.sku})` : ''}` }));
@@ -47,6 +50,9 @@ export default function InboundPage() {
         warehouseId: values.warehouseId,
         invoiceNo: values.invoiceNo,
         boxCount: values.boxCount,
+        palletCount: values.palletCount,
+        packagingType: values.packagingType,
+        requestedAppointmentAt: values.requestedAppointmentAt,
         lines: (values.lines ?? []).map((l) => ({ variantId: l.variantId, qty: l.qty })),
       });
       if (values.submitNow) await inventoryApi.submitInbound(created.id);
@@ -86,10 +92,31 @@ export default function InboundPage() {
         />
       </Card>
 
-      <Modal title="Create an inbound consignment" open={open} onCancel={() => setOpen(false)} onOk={() => form.submit()} okText="Create" confirmLoading={saving} width={640}>
-        <Form form={form} layout="vertical" onFinish={submit} initialValues={{ submitNow: true, lines: [{}] }}>
+      <Modal
+        title="Create an inbound consignment"
+        open={open}
+        onCancel={() => setOpen(false)}
+        onOk={() => form.submit()}
+        okText="Create"
+        confirmLoading={saving}
+        okButtonProps={{ disabled: Boolean(sourceError) }}
+        width={640}
+      >
+        {sourceError && (
+          <Alert
+            type="error"
+            showIcon
+            message="Inbound setup data could not be loaded"
+            description={sourceError.message}
+            action={<Button size="small" onClick={() => Promise.all([warehousesQuery.refetch(), listingsQuery.refetch()])}>Retry</Button>}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        <Form form={form} layout="vertical" onFinish={submit} initialValues={{ submitNow: true, packagingType: 'CARTON', lines: [{}] }}>
           <Form.Item name="warehouseId" label="Destination warehouse" rules={[{ required: true, message: 'Pick a warehouse.' }]}>
             <Select
+              loading={warehousesQuery.isLoading || warehousesQuery.isFetching}
+              disabled={warehousesQuery.isError}
               placeholder="Choose an Arise fulfilment centre"
               options={warehouses.map((w) => ({ value: w.id, label: `${w.name} — ${w.city}`, disabled: w.inboundPaused }))}
             />
@@ -102,7 +129,7 @@ export default function InboundPage() {
                 {fields.map((field) => (
                   <Space key={field.key} align="baseline" style={{ display: 'flex', marginBottom: 8 }}>
                     <Form.Item {...field} name={[field.name, 'variantId']} rules={[{ required: true, message: 'Pick a SKU' }]} style={{ marginBottom: 0, minWidth: 320 }}>
-                      <Select showSearch optionFilterProp="label" placeholder="Select a product" options={skuOptions} style={{ width: 320 }} />
+                      <Select showSearch optionFilterProp="label" placeholder="Select a product" options={skuOptions} loading={listingsQuery.isLoading || listingsQuery.isFetching} disabled={listingsQuery.isError} style={{ width: 320 }} />
                     </Form.Item>
                     <Form.Item {...field} name={[field.name, 'qty']} rules={[{ required: true, message: 'Qty' }]} style={{ marginBottom: 0 }}>
                       <InputNumber min={1} placeholder="Qty" />
@@ -122,6 +149,11 @@ export default function InboundPage() {
             <Form.Item name="boxCount" label="Boxes" style={{ width: 120 }}>
               <InputNumber min={1} style={{ width: '100%' }} />
             </Form.Item>
+          </Space>
+          <Space size={16} style={{ display: 'flex' }}>
+            <Form.Item name="packagingType" label="Load type" style={{ width: 180 }}><Select options={[{ value: 'CARTON', label: 'Cartons' }, { value: 'PALLET', label: 'Pallets' }]} /></Form.Item>
+            <Form.Item name="palletCount" label="Pallets" style={{ width: 120 }}><InputNumber min={0} /></Form.Item>
+            <Form.Item name="requestedAppointmentAt" label="Requested appointment" style={{ flex: 1 }}><Input type="datetime-local" /></Form.Item>
           </Space>
           <Form.Item name="submitNow" valuePropName="checked" style={{ marginBottom: 0 }}>
             <Checkbox>Submit to the warehouse now (otherwise saved as a draft)</Checkbox>

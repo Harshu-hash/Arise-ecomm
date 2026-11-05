@@ -1,4 +1,17 @@
-import { Alert, Col, Flex, Input, InputNumber, Row, Select, Space, Table, Tag, Typography } from 'antd';
+/* eslint-disable max-lines */
+import {
+  Alert,
+  Col,
+  Flex,
+  Input,
+  InputNumber,
+  Row,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+} from 'antd';
 import { useMemo } from 'react';
 import ImageUpload from '@ui/components/ImageUpload/ImageUpload';
 
@@ -20,6 +33,9 @@ function defaultRow(combo, index, skuPrefix) {
     attributes,
     label: combo.map((c) => c.value).join(' · '),
     sku: `${skuPrefix}-${index + 1}`,
+    sellerSku: `${skuPrefix}-${index + 1}`,
+    barcode: '',
+    taxCode: '',
     mrpPaise: null,
     sellingPricePaise: null,
     stock: 0,
@@ -54,8 +70,15 @@ export default function VariantMatrix({ variantAttrs, value = [], onChange, skuP
       return;
     }
     const combos = cartesian(lists);
-    const existing = new Map((value ?? []).map((r) => [r.key ?? comboKey(Object.entries(r.attributes).map(([code, v]) => ({ code, value: v }))), r]));
-    const nextRows = combos.map((combo, i) => existing.get(comboKey(combo)) ?? defaultRow(combo, i, skuPrefix));
+    const existing = new Map(
+      (value ?? []).map((r) => [
+        r.key ?? comboKey(Object.entries(r.attributes).map(([code, v]) => ({ code, value: v }))),
+        r,
+      ]),
+    );
+    const nextRows = combos.map(
+      (combo, i) => existing.get(comboKey(combo)) ?? defaultRow(combo, i, skuPrefix),
+    );
     onChange?.(nextRows);
   };
 
@@ -79,7 +102,9 @@ export default function VariantMatrix({ variantAttrs, value = [], onChange, skuP
       <Row gutter={12}>
         {variantAttrs.map((attr) => (
           <Col xs={24} sm={12} key={attr.id}>
-            <Typography.Text strong style={{ fontSize: 12 }}>{attr.name}</Typography.Text>
+            <Typography.Text strong style={{ fontSize: 12 }}>
+              {attr.name}
+            </Typography.Text>
             <Select
               mode="multiple"
               style={{ width: '100%', marginTop: 4 }}
@@ -101,46 +126,160 @@ export default function VariantMatrix({ variantAttrs, value = [], onChange, skuP
           scroll={{ x: 'max-content' }}
           columns={[
             {
-              title: 'Variant', dataIndex: 'label', fixed: 'left', width: 140,
+              title: 'Variant',
+              dataIndex: 'label',
+              fixed: 'left',
+              width: 140,
               render: (label) => <Tag style={{ marginInlineEnd: 0 }}>{label}</Tag>,
             },
             {
-              title: 'SKU', dataIndex: 'sku', width: 150,
-              render: (v, row) => <Input size="small" value={v} onChange={(e) => updateRow(row.key, { sku: e.target.value })} />,
-            },
-            {
-              title: 'MRP (₹)', dataIndex: 'mrpPaise', width: 110,
+              title: 'SKU',
+              dataIndex: 'sku',
+              width: 150,
               render: (v, row) => (
-                <InputNumber size="small" style={{ width: '100%' }} min={1} value={v ? v / 100 : null} onChange={(n) => updateRow(row.key, { mrpPaise: n ? Math.round(n * 100) : null })} />
+                <Input
+                  size="small"
+                  value={v}
+                  onChange={(e) => updateRow(row.key, { sku: e.target.value })}
+                />
               ),
             },
             {
-              title: 'Price (₹)', dataIndex: 'sellingPricePaise', width: 110,
+              title: 'Seller SKU',
+              dataIndex: 'sellerSku',
+              width: 150,
               render: (v, row) => (
-                <InputNumber size="small" style={{ width: '100%' }} min={1} value={v ? v / 100 : null} onChange={(n) => updateRow(row.key, { sellingPricePaise: n ? Math.round(n * 100) : null })} />
+                <Input
+                  size="small"
+                  value={v}
+                  onChange={(e) => updateRow(row.key, { sellerSku: e.target.value })}
+                />
               ),
             },
             {
-              title: 'Stock', dataIndex: 'stock', width: 90,
-              render: (v, row) => <InputNumber size="small" style={{ width: '100%' }} min={0} value={v} onChange={(n) => updateRow(row.key, { stock: n ?? 0 })} />,
+              title: 'Barcode / EAN',
+              dataIndex: 'barcode',
+              width: 150,
+              render: (v, row) => (
+                <Input
+                  size="small"
+                  value={v}
+                  onChange={(e) => updateRow(row.key, { barcode: e.target.value })}
+                />
+              ),
             },
             {
-              title: 'Weight (g)', dataIndex: 'weightG', width: 100,
-              render: (v, row) => <InputNumber size="small" style={{ width: '100%' }} min={1} value={v} onChange={(n) => updateRow(row.key, { weightG: n ?? 500 })} />,
+              title: 'Tax code',
+              dataIndex: 'taxCode',
+              width: 120,
+              render: (v, row) => (
+                <Input
+                  size="small"
+                  value={v}
+                  onChange={(e) => updateRow(row.key, { taxCode: e.target.value })}
+                />
+              ),
             },
             {
-              title: 'Dimensions L×W×H (cm)', dataIndex: 'dimsCm', width: 200,
+              title: 'MRP (₹)',
+              dataIndex: 'mrpPaise',
+              width: 110,
+              render: (v, row) => (
+                <InputNumber
+                  size="small"
+                  style={{ width: '100%' }}
+                  min={1}
+                  value={v ? v / 100 : null}
+                  onChange={(n) => updateRow(row.key, { mrpPaise: n ? Math.round(n * 100) : null })}
+                />
+              ),
+            },
+            {
+              title: 'Price (₹)',
+              dataIndex: 'sellingPricePaise',
+              width: 110,
+              render: (v, row) => (
+                <InputNumber
+                  size="small"
+                  style={{ width: '100%' }}
+                  min={1}
+                  value={v ? v / 100 : null}
+                  onChange={(n) =>
+                    updateRow(row.key, { sellingPricePaise: n ? Math.round(n * 100) : null })
+                  }
+                />
+              ),
+            },
+            {
+              title: 'Stock',
+              dataIndex: 'stock',
+              width: 90,
+              render: (v, row) => (
+                <InputNumber
+                  size="small"
+                  style={{ width: '100%' }}
+                  min={0}
+                  value={v}
+                  onChange={(n) => updateRow(row.key, { stock: n ?? 0 })}
+                />
+              ),
+            },
+            {
+              title: 'Weight (g)',
+              dataIndex: 'weightG',
+              width: 100,
+              render: (v, row) => (
+                <InputNumber
+                  size="small"
+                  style={{ width: '100%' }}
+                  min={1}
+                  value={v}
+                  onChange={(n) => updateRow(row.key, { weightG: n ?? 500 })}
+                />
+              ),
+            },
+            {
+              title: 'Dimensions L×W×H (cm)',
+              dataIndex: 'dimsCm',
+              width: 200,
               render: (v, row) => (
                 <Space size={4}>
-                  <InputNumber size="small" style={{ width: 56 }} min={1} value={v.l} onChange={(n) => updateRow(row.key, { dimsCm: { ...v, l: n ?? v.l } })} />
-                  <InputNumber size="small" style={{ width: 56 }} min={1} value={v.w} onChange={(n) => updateRow(row.key, { dimsCm: { ...v, w: n ?? v.w } })} />
-                  <InputNumber size="small" style={{ width: 56 }} min={1} value={v.h} onChange={(n) => updateRow(row.key, { dimsCm: { ...v, h: n ?? v.h } })} />
+                  <InputNumber
+                    size="small"
+                    style={{ width: 56 }}
+                    min={1}
+                    value={v.l}
+                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, l: n ?? v.l } })}
+                  />
+                  <InputNumber
+                    size="small"
+                    style={{ width: 56 }}
+                    min={1}
+                    value={v.w}
+                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, w: n ?? v.w } })}
+                  />
+                  <InputNumber
+                    size="small"
+                    style={{ width: 56 }}
+                    min={1}
+                    value={v.h}
+                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, h: n ?? v.h } })}
+                  />
                 </Space>
               ),
             },
             {
-              title: 'Images', dataIndex: 'images', width: 240,
-              render: (v, row) => <ImageUpload value={v} onChange={(images) => updateRow(row.key, { images })} maxCount={4} label={row.label} />,
+              title: 'Images',
+              dataIndex: 'images',
+              width: 240,
+              render: (v, row) => (
+                <ImageUpload
+                  value={v}
+                  onChange={(images) => updateRow(row.key, { images })}
+                  maxCount={4}
+                  label={row.label}
+                />
+              ),
             },
           ]}
         />

@@ -1,4 +1,4 @@
-import { filter, find, findById, id, insert, update } from '@mocks/db/store';
+import { db, filter, find, findById, id, insert, update } from '@mocks/db/store';
 import { mockNowIso } from '@mocks/engine/settings';
 import { permissionsForRole, SELLER_ROLE_TEMPLATES } from '@seller/rbac/permissions';
 
@@ -11,13 +11,17 @@ import { permissionsForRole, SELLER_ROLE_TEMPLATES } from '@seller/rbac/permissi
 
 export function profileFor(sellerId) {
   const seller = findById('sellers', sellerId);
-  const documents = filter('kycDocuments', (d) => d.sellerId === sellerId);
-  return { seller, documents };
+  const documents = filter('kycDocuments', (d) => d.sellerId === sellerId).map((document) => ({
+    ...document,
+    expiryState: !document.expiresAt ? null : new Date(document.expiresAt) <= new Date() ? 'EXPIRED' : new Date(document.expiresAt).getTime() - Date.now() < 30 * 86400_000 ? 'EXPIRING_SOON' : 'CURRENT',
+  }));
+  const changeRequests = filter('sellerChangeRequests', (request) => request.sellerId === sellerId).sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  return { seller, documents, changeRequests };
 }
 
 export function updateProfile(seller, body) {
   const patch = {};
-  for (const key of ['storeName', 'legalName']) {
+  for (const key of ['storeName', 'logoMediaId', 'logoUrl']) {
     if (body?.[key]) patch[key] = body[key];
   }
   update('sellers', seller.id, patch);
@@ -41,6 +45,7 @@ export function addPickupAddress(seller, body) {
     if (!String(body?.[key] ?? '').trim()) return { error: `Fill in ${key}.` };
   }
   const makePrimary = Boolean(body?.isPrimary) || pickupAddressesFor(seller.id).length === 0;
+  const pincode = find('pincodes', (row) => row.pincode === String(body.pincode));
   if (makePrimary) {
     for (const p of pickupAddressesFor(seller.id)) update('pickupAddresses', p.id, { isPrimary: false });
   }
@@ -57,10 +62,37 @@ export function addPickupAddress(seller, body) {
     contactPhone: body.contactPhone,
     isPrimary: makePrimary,
     geoVerified: false,
-    serviceableCouriers: [],
+    serviceableCouriers: pincode?.courierIds ?? [],
+    status: 'ACTIVE',
+    pickupCapable: body.pickupCapable !== false,
+    operatingHours: body.operatingHours ?? { mon: '09:00-18:00', tue: '09:00-18:00', wed: '09:00-18:00', thu: '09:00-18:00', fri: '09:00-18:00', sat: '09:00-14:00', sun: 'CLOSED' },
+    holidays: body.holidays ?? [],
+    serviceability: { pincode: body.pincode, checkedAt: mockNowIso(), serviceable: Boolean(pincode?.serviceable ?? pincode) },
     version: 1,
   });
   return { address: row };
+}
+
+export function warehouseDependencies(sellerId, warehouseId) {
+  const inventory = filter('inventory', (row) => row.sellerId === sellerId && row.warehouseId === warehouseId && (row.sellable > 0 || row.reserved > 0));
+  const activeOrders = filter('shipments', (row) => row.sellerId === sellerId && row.pickupAddressId === warehouseId && !['DELIVERED', 'CANCELLED', 'RTO_DELIVERED'].includes(row.status));
+  return { inventory, activeOrders, blocked: inventory.length > 0 || activeOrders.length > 0 };
+}
+
+export function updateWarehouse(seller, warehouse, body) {
+  const editable = ['label', 'line1', 'line2', 'city', 'state', 'pincode', 'contactName', 'contactPhone', 'pickupCapable', 'operatingHours', 'holidays'];
+  const patch = {};
+  for (const key of editable) if (body?.[key] !== undefined) patch[key] = body[key];
+  if (body?.pincode !== undefined) {
+    const pincode = find('pincodes', (row) => row.pincode === String(body.pincode));
+    patch.serviceableCouriers = pincode?.courierIds ?? [];
+    patch.serviceability = { pincode: body.pincode, checkedAt: mockNowIso(), serviceable: Boolean(pincode?.serviceable ?? pincode) };
+  }
+  if (body?.isPrimary) {
+    for (const row of pickupAddressesFor(seller.id)) update('pickupAddresses', row.id, { isPrimary: row.id === warehouse.id });
+  }
+  update('pickupAddresses', warehouse.id, patch);
+  return findById('pickupAddresses', warehouse.id);
 }
 
 export function bankAccountFor(sellerId) {
@@ -100,7 +132,7 @@ export function inviteUser(seller, body) {
   const email = String(body?.email ?? '').trim().toLowerCase();
   if (!email || !email.includes('@')) return { error: 'Enter a valid email.' };
   if (find('sellerUsers', (u) => u.email.toLowerCase() === email)) return { error: 'This email is already on your team (or another account).' };
-  const role = SELLER_ROLE_TEMPLATES.find((r) => r.key === body?.roleKey);
+  const role = SELLER_ROLE_TEMPLATES.find((r) => r.key === body?.roleKey) ?? db.sellerRoles.find((r) => r.id === body?.roleKey && r.sellerId === seller.id);
   if (!role || role.key === 'owner') return { error: 'Choose a role to invite them as.' };
 
   const user = insert('sellerUsers', {
@@ -112,11 +144,14 @@ export function inviteUser(seller, body) {
     password: null,
     avatarColor: '#4F46E5',
     status: 'INVITED',
-    roleKey: role.key,
+    roleKey: role.id ?? role.key,
     roleName: role.name,
     storeName: seller.storeName,
-    permissions: permissionsForRole(role.key),
+    permissions: role.permissions ?? permissionsForRole(role.key),
     mustChangePassword: false,
+    twoFactorEnrolled: false,
+    twoFactorSecret: `ARISESELLER${email.replace(/[^A-Z0-9]/gi, '').toUpperCase()}`,
+    backupCodes: [],
     notifyEmail: true,
     notifyInPanel: true,
     lastLoginAt: null,

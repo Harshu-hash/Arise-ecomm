@@ -17,6 +17,8 @@ export default function MobileCardList({
   total,
   onPageChange,
 }) {
+  const accessibleRowName = (row) => `Open ${row.name ?? row.title ?? row[rowKey]}`;
+
   if (loading) {
     return (
       <Space direction="vertical" size={8} style={{ width: '100%' }}>
@@ -38,7 +40,16 @@ export default function MobileCardList({
           key={row[rowKey]}
           size="small"
           hoverable={Boolean(onRowClick)}
+          role={onRowClick ? 'button' : undefined}
+          tabIndex={onRowClick ? 0 : undefined}
+          aria-label={onRowClick ? accessibleRowName(row) : undefined}
           onClick={onRowClick ? () => onRowClick(row) : undefined}
+          onKeyDown={onRowClick ? (event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault();
+              onRowClick(row);
+            }
+          } : undefined}
           styles={{ body: { padding: 12 } }}
         >
           {render(row)}

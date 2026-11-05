@@ -266,7 +266,18 @@ export const sellerOpsHandlers = [
       decisionReason: decision === 'APPROVED' ? null : body.reason,
       decidedAt: mockNowIso(),
       decidedByName: g.user.name,
+      timeline: [...(row.timeline ?? []), { type: decision, at: mockNowIso(), actorName: g.user.name, note: body.reason ?? 'Claim approved', evidenceMediaIds: body.evidenceMediaIds ?? [] }],
     });
+    if (approved) {
+      const adjustment = insert('payoutAdjustments', {
+        id: id('ADJ', 5), sellerId: row.sellerId, sellerName: row.sellerName,
+        type: 'SELLER_CLAIM_REIMBURSEMENT', amountPaise: approved,
+        note: `Reimbursement for claim ${row.id}`, referenceType: 'SELLER_CLAIM', referenceId: row.id,
+        orderId: row.orderId, returnId: row.returnId ?? null, status: 'APPLIED', batchId: null,
+        raisedByName: g.user.name, raisedAt: mockNowIso(), approvedByName: g.user.name, version: 1,
+      });
+      update('sellerClaims', row.id, { payoutAdjustmentId: adjustment.id });
+    }
     writeAudit({
       actor: g.user,
       action: 'sellers.claim.decide',

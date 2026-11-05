@@ -4,6 +4,8 @@ import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { rupeesToPaise } from '@core/utils/money';
 import PageHeader from '@ui/components/PageHeader';
+import ErrorState from '@ui/components/ErrorState';
+import FullPageSpinner from '@ui/components/FullPageSpinner';
 import { adsApi } from '../api/ads.api';
 
 export default function CreateCampaignPage() {
@@ -11,7 +13,8 @@ export default function CreateCampaignPage() {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
-  const { data: listings = [] } = useQuery({ queryKey: ['seller', 'ads', 'listings-source'], queryFn: adsApi.myLiveListings });
+  const listingsQuery = useQuery({ queryKey: ['seller', 'ads', 'listings-source'], queryFn: adsApi.myLiveListings });
+  const listings = listingsQuery.data ?? [];
 
   const submit = async (values) => {
     setSaving(true);
@@ -33,6 +36,9 @@ export default function CreateCampaignPage() {
       setSaving(false);
     }
   };
+
+  if (listingsQuery.isLoading) return <FullPageSpinner label="Loading eligible listings…" />;
+  if (listingsQuery.isError) return <ErrorState error={listingsQuery.error} onRetry={listingsQuery.refetch} title="Could not load eligible listings" />;
 
   return (
     <Flex vertical gap={16}>

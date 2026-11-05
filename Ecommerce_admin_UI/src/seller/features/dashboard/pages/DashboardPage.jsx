@@ -1,5 +1,5 @@
 import { ArrowRightOutlined, BulbOutlined } from '@ant-design/icons';
-import { Card, Col, Flex, List, Progress, Row, Space, Tag, Typography } from 'antd';
+import { Alert, Card, Col, Flex, List, Progress, Row, Space, Tag, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@core/api/axiosInstance';
@@ -34,6 +34,14 @@ export default function DashboardPage() {
         subtitle="Here's how your store is doing."
         tags={data?.store?.tier && <Tag color="purple">{data.store.tier}</Tag>}
       />
+
+      {data?.documentWarnings?.length > 0 && <Alert
+        type={data.documentWarnings.some((document) => document.expired) ? 'error' : 'warning'}
+        showIcon
+        message={data.documentWarnings.some((document) => document.expired) ? 'A verification document has expired' : 'A verification document expires soon'}
+        description={`${data.documentWarnings.map((document) => document.label).join(', ')}. Renew it to keep the account compliant.`}
+        action={<Typography.Link onClick={() => navigate('/settings/profile')}>Renew now</Typography.Link>}
+      />}
 
       <Row gutter={[12, 12]}>
         <Col xs={12} md={8} lg={6}>

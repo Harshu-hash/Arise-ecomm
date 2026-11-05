@@ -6,16 +6,16 @@ import { db, find, findById } from '@mocks/db/store';
 import { seedAll } from '@mocks/seed';
 import { sellerHandlers } from '@seller/mocks/handlers';
 import { seedSellerAccounts } from '@seller/mocks/seed/sellerAccounts';
+import { signInSeller } from '@seller/test/signInSeller';
 import { sellerAuthApi } from '../auth/api/auth.api';
+import { sellerReportsApi } from '../reports/api/reports.api';
 import { settingsApi } from '../settings/api/settings.api';
 import { supportApi } from './api/support.api';
 
 const server = setupServer(...sellerHandlers);
 
 async function signIn(email = 'owner@arise.test') {
-  const payload = await sellerAuthApi.login({ email, password: 'Arise@123456' });
-  useSessionStore.getState().setAuthenticated(payload);
-  return payload.user;
+  return signInSeller(email);
 }
 
 describe('seller support, settings & the final hand-offs', () => {
@@ -66,6 +66,22 @@ describe('seller support, settings & the final hand-offs', () => {
     await expect(supportApi.detail(foreignTicket.id)).rejects.toMatchObject({ status: 404 });
   });
 
+  it('requires a newly registered owner to enrol 2FA before issuing a session', async () => {
+    const challenge = await sellerAuthApi.register({
+      storeName: 'Secure Store',
+      name: 'Secure Owner',
+      email: 'secure-owner@arise.test',
+      phone: '9999999999',
+      password: 'Arise@123456',
+    });
+    expect(challenge.stage).toBe('enrol_2fa');
+    expect(challenge.accessToken).toBeUndefined();
+
+    const session = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code: challenge.devHint.code });
+    expect(session.user.email).toBe('secure-owner@arise.test');
+    expect(session.backupCodes).toHaveLength(8);
+  });
+
   it('inviting a sub-user creates an INVITED account usable via accept-invite', async () => {
     const invited = await settingsApi.inviteUser({ name: 'New Hire', email: 'newhire@arise.test', roleKey: 'order_manager' });
     expect(invited.status).toBe('INVITED');
@@ -74,7 +90,9 @@ describe('seller support, settings & the final hand-offs', () => {
     const info = await sellerAuthApi.getInvite(invited.inviteToken);
     expect(info.roleName).toBe('Order Manager');
 
-    const accepted = await sellerAuthApi.acceptInvite({ token: invited.inviteToken, name: 'New Hire', password: 'Arise@123456' });
+    const challenge = await sellerAuthApi.acceptInvite({ token: invited.inviteToken, name: 'New Hire', password: 'Arise@123456' });
+    expect(challenge.stage).toBe('enrol_2fa');
+    const accepted = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code: challenge.devHint.code });
     expect(accepted.user.roleKey).toBe('order_manager');
     expect(accepted.user.sellerId).toBe(sellerId);
   });
@@ -110,5 +128,23 @@ describe('seller support, settings & the final hand-offs', () => {
     if (primaryBefore) {
       expect(after.addresses.find((a) => a.id === primaryBefore.id).isPrimary).toBe(true);
     }
+  });
+
+  it('creates, pauses and deletes a seller-scoped report schedule', async () => {
+    const created = await sellerReportsApi.createSchedule({
+      reportKey: 'transactions',
+      frequency: 'WEEKLY',
+      format: 'CSV',
+      recipients: ['finance@example.test'],
+    });
+    expect(created.sellerId).toBe(sellerId);
+    expect(created.enabled).toBe(true);
+
+    const paused = await sellerReportsApi.updateSchedule(created.id, { enabled: false });
+    expect(paused.enabled).toBe(false);
+    expect(await sellerReportsApi.schedules()).toHaveLength(1);
+
+    await sellerReportsApi.deleteSchedule(created.id);
+    expect(await sellerReportsApi.schedules()).toHaveLength(0);
   });
 });

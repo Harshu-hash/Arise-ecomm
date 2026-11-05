@@ -10,6 +10,8 @@ export const sellersApi = {
   addNote: (id, text) => api.post(`/sellers/${id}/notes`, { text }),
   decideDocument: (id, docId, payload) =>
     api.post(`/sellers/${id}/documents/${docId}/decide`, payload),
+  decideChangeRequest: (id, requestId, payload) =>
+    api.post(`/sellers/${id}/change-requests/${requestId}/decide`, payload),
   decideApplication: (id, decision, payload) =>
     api.post(`/sellers/${id}/application/${decision}`, payload ?? {}),
   lifecycle: (id, action, payload) => api.post(`/sellers/${id}/lifecycle/${action}`, payload ?? {}),

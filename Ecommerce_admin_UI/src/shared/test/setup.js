@@ -22,3 +22,8 @@ if (!window.matchMedia) {
     dispatchEvent: () => false,
   });
 }
+
+// Ant Design asks for pseudo-element styles while measuring scrollbars.
+// JSDOM does not implement that overload and otherwise floods CI with noise.
+const nativeGetComputedStyle = window.getComputedStyle.bind(window);
+window.getComputedStyle = (element) => nativeGetComputedStyle(element);

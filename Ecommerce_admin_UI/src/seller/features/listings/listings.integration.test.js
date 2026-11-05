@@ -6,7 +6,7 @@ import { db } from '@mocks/db/store';
 import { seedAll } from '@mocks/seed';
 import { sellerHandlers } from '@seller/mocks/handlers';
 import { seedSellerAccounts } from '@seller/mocks/seed/sellerAccounts';
-import { sellerAuthApi } from '../auth/api/auth.api';
+import { signInSeller } from '@seller/test/signInSeller';
 import { listingsApi } from './api/listings.api';
 
 /**
@@ -17,9 +17,7 @@ import { listingsApi } from './api/listings.api';
 const server = setupServer(...sellerHandlers);
 
 async function signInAsOwner() {
-  const payload = await sellerAuthApi.login({ email: 'owner@arise.test', password: 'Arise@123456' });
-  useSessionStore.getState().setAuthenticated(payload);
-  return payload.user;
+  return signInSeller();
 }
 
 describe('seller listings API (golden loop)', () => {
@@ -45,7 +43,9 @@ describe('seller listings API (golden loop)', () => {
     const res = await listingsApi_list();
     expect(res.data.length).toBeGreaterThan(0);
     // Every row belongs to one of the seller's own offers.
-    const ownOfferIds = new Set(db.offers.filter((o) => o.sellerId === user.sellerId).map((o) => o.id));
+    const ownOfferIds = new Set(
+      db.offers.filter((o) => o.sellerId === user.sellerId).map((o) => o.id),
+    );
     expect(res.data.every((row) => ownOfferIds.has(row.id))).toBe(true);
   });
 
@@ -61,7 +61,6 @@ describe('seller listings API (golden loop)', () => {
       sellingPricePaise: 49900,
       stock: 25,
       highlights: ['Soft cotton'],
-      images: ['https://example.com/a.jpg'],
     });
 
     expect(created.status).toBe('QC_PENDING');
@@ -78,7 +77,13 @@ describe('seller listings API (golden loop)', () => {
     await signInAsOwner();
     const leaf = db.categories.find((c) => c.level === 3);
     await expect(
-      listingsApi.create({ title: 'Bad Price', categoryId: leaf.id, mrpPaise: 10000, sellingPricePaise: 20000, stock: 1 }),
+      listingsApi.create({
+        title: 'Bad Price',
+        categoryId: leaf.id,
+        mrpPaise: 10000,
+        sellingPricePaise: 20000,
+        stock: 1,
+      }),
     ).rejects.toMatchObject({ code: 'VALIDATION_FAILED' });
   });
 
@@ -99,13 +104,33 @@ describe('seller listings API (golden loop)', () => {
       categoryId: leaf.id,
       returnPolicy: { windowDays: 10, type: 'RETURN' },
       variants: [
-        { attributes: { colour: 'Red', size: 'M' }, sku: 'NVM-RED-M', mrpPaise: 99900, sellingPricePaise: 49900, stock: 10 },
-        { attributes: { colour: 'Red', size: 'L' }, sku: 'NVM-RED-L', mrpPaise: 99900, sellingPricePaise: 54900, stock: 5 },
-        { attributes: { colour: 'Blue', size: 'M' }, sku: 'NVM-BLUE-M', mrpPaise: 109900, sellingPricePaise: 59900, stock: 0 },
+        {
+          attributes: { colour: 'Red', size: 'M' },
+          sku: 'NVM-RED-M',
+          mrpPaise: 99900,
+          sellingPricePaise: 49900,
+          stock: 10,
+        },
+        {
+          attributes: { colour: 'Red', size: 'L' },
+          sku: 'NVM-RED-L',
+          mrpPaise: 99900,
+          sellingPricePaise: 54900,
+          stock: 5,
+        },
+        {
+          attributes: { colour: 'Blue', size: 'M' },
+          sku: 'NVM-BLUE-M',
+          mrpPaise: 109900,
+          sellingPricePaise: 59900,
+          stock: 0,
+        },
       ],
     });
 
-    const offers = db.offers.filter((o) => o.productId === created.productId && o.sellerId === user.sellerId);
+    const offers = db.offers.filter(
+      (o) => o.productId === created.productId && o.sellerId === user.sellerId,
+    );
     expect(offers).toHaveLength(3);
     const bySku = Object.fromEntries(
       offers.map((o) => [db.variants.find((v) => v.id === o.variantId).sku, o]),
@@ -132,7 +157,9 @@ describe('seller listings API (golden loop)', () => {
     expect(created.status).toBe('DRAFT');
     expect(created.productStatus).toBe('DRAFT');
 
-    const offer = db.offers.find((o) => o.productId === created.productId && o.sellerId === user.sellerId);
+    const offer = db.offers.find(
+      (o) => o.productId === created.productId && o.sellerId === user.sellerId,
+    );
     offer.mrpPaise = 10000;
     offer.sellingPricePaise = 9000;
     offer.stock = 3;

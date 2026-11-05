@@ -5,12 +5,18 @@ import { sellerDashboardHandlers } from './dashboard';
 import { sellerCatalogHandlers } from './catalog';
 import { sellerListingHandlers } from './listings';
 import { sellerOrderHandlers } from './orders';
+import { sellerLogisticsHandlers } from './logistics';
 import { sellerFulfilmentHandlers } from './fulfilment';
 import { sellerFinanceHandlers } from './finance';
 import { sellerGrowthHandlers } from './growth';
 import { sellerPerformanceHandlers } from './performance';
 import { sellerSupportHandlers } from './support';
 import { sellerSettingsHandlers } from './settings';
+import { sellerReportHandlers } from './reports';
+import { sellerFoundationHandlers } from './foundation';
+import { sellerCustomerExperienceHandlers } from './customerExperience';
+import { sellerAnalyticsHandlers } from './analytics';
+import { sellerSecurityHandlers } from './security';
 
 /**
  * All seller-panel request handlers, served at `/api/seller/v1`. They read and
@@ -20,16 +26,22 @@ import { sellerSettingsHandlers } from './settings';
  */
 export const sellerHandlers = [
   ...sellerAuthHandlers,
+  ...sellerFoundationHandlers,
   ...sellerMeHandlers,
   ...sellerOnboardingHandlers,
   ...sellerDashboardHandlers,
   ...sellerCatalogHandlers,
   ...sellerListingHandlers,
+  ...sellerLogisticsHandlers,
   ...sellerOrderHandlers,
   ...sellerFulfilmentHandlers,
   ...sellerFinanceHandlers,
   ...sellerGrowthHandlers,
   ...sellerPerformanceHandlers,
+  ...sellerCustomerExperienceHandlers,
+  ...sellerAnalyticsHandlers,
+  ...sellerSecurityHandlers,
   ...sellerSupportHandlers,
   ...sellerSettingsHandlers,
+  ...sellerReportHandlers,
 ];

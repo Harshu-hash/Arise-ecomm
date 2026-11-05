@@ -1,5 +1,5 @@
-import { App, Drawer, Layout, Modal } from 'antd';
-import { Suspense, useCallback, useState } from 'react';
+import { Alert, App, Drawer, Layout, Modal } from 'antd';
+import { Suspense, useCallback, useEffect, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { LAYOUT } from '@theme/tokens';
 import { queryClient } from '@core/api/queryClient';
@@ -20,6 +20,7 @@ export default function SellerLayout() {
   const { isMobile, isDesktop } = useBreakpoint();
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine !== false);
   const navigate = useNavigate();
   const { message } = App.useApp();
   const setAnonymous = useSessionStore((s) => s.setAnonymous);
@@ -44,6 +45,13 @@ export default function SellerLayout() {
   });
 
   const railCollapsed = isDesktop ? collapsed : true;
+
+  useEffect(() => {
+    const connected = () => { setOnline(true); queryClient.invalidateQueries(); message.success('Back online. Refreshing current data.'); };
+    const disconnected = () => setOnline(false);
+    window.addEventListener('online', connected); window.addEventListener('offline', disconnected);
+    return () => { window.removeEventListener('online', connected); window.removeEventListener('offline', disconnected); };
+  }, [message]);
 
   return (
     <Layout style={{ minHeight: '100%' }}>
@@ -81,6 +89,8 @@ export default function SellerLayout() {
           onToggleSidebar={() => (isMobile ? setDrawerOpen(true) : setCollapsed((c) => !c))}
           onSignOut={() => signOut()}
         />
+
+        {!online && <Alert role="status" banner type="warning" showIcon message="You’re offline. Read-only data may be stale; commands will remain available to retry after reconnecting." />}
 
         <Layout.Content
           style={{

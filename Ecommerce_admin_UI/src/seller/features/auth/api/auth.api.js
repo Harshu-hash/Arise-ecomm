@@ -3,6 +3,8 @@ import { api } from '@core/api/axiosInstance';
 /** Seller auth endpoints. All resolve to the unwrapped `data` payload. */
 export const sellerAuthApi = {
   login: (payload) => api.post('/auth/login', payload).then((r) => r.data),
+  verify2fa: (payload) => api.post('/auth/2fa/verify', payload).then((r) => r.data),
+  enrol2fa: (payload) => api.post('/auth/2fa/enrol', payload).then((r) => r.data),
   register: (payload) => api.post('/auth/register', payload).then((r) => r.data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }).then((r) => r.data),
   resetPassword: (payload) => api.post('/auth/reset-password', payload).then((r) => r.data),

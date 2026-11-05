@@ -1,7 +1,7 @@
 import { ArrowLeftOutlined } from '@ant-design/icons';
 import {
   Alert, App, Button, Card, Checkbox, Col, Descriptions, Flex, Form, Image,
-  Radio, Row, Space, Tag, Typography,
+  Radio, Row, Select, Space, Tag, Typography,
 } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
@@ -15,6 +15,7 @@ import FullPageSpinner from '@ui/components/FullPageSpinner';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import DocumentUpload from '@ui/components/DocumentUpload';
 import { orderKeys, ordersApi } from '../api/orders.api';
 
 const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E";
@@ -26,6 +27,7 @@ const ACTION_LABEL = {
   MARK_RECEIVED: ['mark-received', 'Mark received'],
   RECORD_QC: ['qc', 'Record QC'],
   CONVERT_TO_REFUND: ['convert-to-refund', 'Convert to refund'],
+  OVERRIDE_REJECTION: ['override-rejection', 'Override seller rejection'],
 };
 
 export default function ReturnDetailPage() {
@@ -35,6 +37,8 @@ export default function ReturnDetailPage() {
   const [modal, setModal] = useState(null);
   const [qcResult, setQcResult] = useState('PASS');
   const [checked, setChecked] = useState([]);
+  const [qcReasonCode, setQcReasonCode] = useState('USED_OR_DAMAGED');
+  const [qcEvidence, setQcEvidence] = useState([]);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: orderKeys.returnDetail(id),
@@ -150,7 +154,7 @@ export default function ReturnDetailPage() {
                 {row.comments ?? <Typography.Text type="secondary">Nothing added</Typography.Text>}
               </Descriptions.Item>
               <Descriptions.Item label="Photos">
-                {row.images?.length ? `${row.images.length} supplied` : 'None'}
+                {row.customerEvidence?.length ? `${row.customerEvidence.length} moderated attachments` : 'None'}
               </Descriptions.Item>
               <Descriptions.Item label="Pickup AWB">
                 {row.pickupAwb ? <Typography.Text className="mono">{row.pickupAwb}</Typography.Text> : '—'}
@@ -162,6 +166,7 @@ export default function ReturnDetailPage() {
                 <DateText value={item?.returnWindowEndsAt} variant="date" />
               </Descriptions.Item>
             </Descriptions>
+            {row.customerEvidence?.length > 0 && <><Typography.Title level={5} style={{ marginTop: 16 }}>Customer evidence</Typography.Title><Image.PreviewGroup><Space wrap>{row.customerEvidence.map((evidence) => <Image key={evidence.id} src={evidence.url} alt={evidence.fileName} width={88} height={88} style={{ objectFit: 'cover', borderRadius: 6 }} fallback={BLANK} />)}</Space></Image.PreviewGroup></>}
           </Card>
         </Col>
 
@@ -199,7 +204,7 @@ export default function ReturnDetailPage() {
                 ? 'The replacement is cancelled and the customer gets their money back instead.'
                 : undefined
         }
-        reasonRequired={['REJECT', 'CONVERT_TO_REFUND'].includes(modal)}
+        reasonRequired={['REJECT', 'CONVERT_TO_REFUND', 'OVERRIDE_REJECTION'].includes(modal)}
         reasonLabel={modal === 'REJECT' ? 'Why are you rejecting this?' : 'Reason'}
         showNote={false}
         confirmLabel={modal ? ACTION_LABEL[modal][1] : ''}
@@ -211,7 +216,7 @@ export default function ReturnDetailPage() {
         onConfirm={(values) =>
           act.mutate({
             action: 'qc',
-            payload: { result: qcResult, notes: values.reason, checklist: checked },
+            payload: { result: qcResult, reasonCode: qcResult === 'FAIL' ? qcReasonCode : null, notes: values.reason, checklist: checked, evidenceMediaIds: qcEvidence.map((item) => item.mediaId) },
           })
         }
         loading={act.isPending}
@@ -243,6 +248,7 @@ export default function ReturnDetailPage() {
                 options={(qcChecklist ?? []).map((c) => ({ label: c, value: c }))}
               />
             </Form.Item>
+            {qcResult === 'FAIL' && <><Form.Item label="Failure reason" required><Select value={qcReasonCode} onChange={setQcReasonCode} options={[{ value: 'USED_OR_DAMAGED', label: 'Used or damaged' }, { value: 'MISSING_ACCESSORIES', label: 'Missing accessories' }, { value: 'WRONG_ITEM', label: 'Wrong item returned' }, { value: 'SERIAL_MISMATCH', label: 'Serial mismatch' }]} /></Form.Item><Form.Item label="QC evidence" required><DocumentUpload value={qcEvidence} onChange={setQcEvidence} maxCount={5} label="QC evidence" /></Form.Item></>}
           </>
         }
       />

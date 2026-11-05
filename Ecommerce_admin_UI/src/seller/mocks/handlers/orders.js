@@ -1,10 +1,17 @@
 import { http as mswHttp } from 'msw';
-import { findById } from '@mocks/db/store';
+import { db, filter, findById } from '@mocks/db/store';
 import { scheduleSave } from '@mocks/persistence';
 import { parseListQuery, listResult } from '@mocks/engine/list';
 import { badRequest, conflict, notFound, ok, okList, unauthorized } from '@mocks/engine/respond';
 import { resolveCaller } from '@seller/mocks/engine/sellerAuth';
-import { advanceShipment, cancelShipment, orderTimeline, sellerOrders, shipmentRow, stageFor } from '@seller/mocks/engine/sellerOrders';
+import {
+  advanceShipment,
+  cancelShipment,
+  orderTimeline,
+  sellerOrders,
+  shipmentRow,
+  stageFor,
+} from '@seller/mocks/engine/sellerOrders';
 import { SELLER_BASE } from './auth';
 
 function ctx(request) {
@@ -82,6 +89,14 @@ export const sellerOrderHandlers = [
       address: order?.address ?? null,
       priceDetails: order?.priceDetails ?? null,
       timeline: orderTimeline(shipment.id),
+      documents: filter('fulfilmentDocuments', (doc) => doc.shipmentId === shipment.id).map(
+        (doc) => ({ ...doc, downloadUrl: `/logistics/documents/${doc.id}/download` }),
+      ),
+      manifest: shipment.manifestId ? findById('manifests', shipment.manifestId) : null,
+      exceptions: db.orderExceptions.filter((exception) => exception.orderId === shipment.orderId),
+      courierOptions: db.couriers
+        .filter((courier) => courier.status === 'ACTIVE' && courier.type !== 'REVERSE')
+        .map((courier) => ({ id: courier.id, name: courier.name, onTimePct: courier.onTimePct })),
     });
   }),
 
@@ -110,8 +125,35 @@ export const sellerOrderHandlers = [
     if (c.response) return c.response;
     const body = await request.json();
     const action = body?.action;
-    const ids = Array.isArray(body?.ids) ? body.ids : [];
-    if (!['confirm', 'pack', 'manifest', 'dispatch'].includes(action)) return badRequest('Unknown bulk action.', 'BAD_ACTION');
+    const selection = body?.selection ?? { mode: 'SELECTED', ids: body?.ids ?? [] };
+    let ids = Array.isArray(selection.ids) ? selection.ids : [];
+    if (selection.mode === 'FILTERED') {
+      const filters = selection.filters ?? {};
+      let matching = sellerOrders(c.user.sellerId);
+      if (filters.tab && filters.tab !== 'all')
+        matching = matching.filter((row) => row.stage === filters.tab);
+      if (filters.status) {
+        const statuses = String(filters.status).split(',');
+        matching = matching.filter((row) => statuses.includes(row.status));
+      }
+      if (filters.fulfillmentType)
+        matching = matching.filter((row) => row.fulfillmentType === filters.fulfillmentType);
+      if (String(filters.slaBreached) === 'true')
+        matching = matching.filter((row) => row.slaBreached);
+      if (filters.q) {
+        const term = String(filters.q).toLowerCase();
+        matching = matching.filter((row) =>
+          [row.orderId, row.id, row.awb, row.customerName].some((value) =>
+            String(value ?? '')
+              .toLowerCase()
+              .includes(term),
+          ),
+        );
+      }
+      ids = matching.map((row) => row.id);
+    }
+    if (!['confirm', 'pack', 'manifest', 'dispatch'].includes(action))
+      return badRequest('Unknown bulk action.', 'BAD_ACTION');
 
     let done = 0;
     const failures = [];

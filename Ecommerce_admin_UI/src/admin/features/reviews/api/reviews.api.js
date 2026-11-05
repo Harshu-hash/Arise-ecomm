@@ -7,6 +7,7 @@ export const reviewsApi = {
   rejectReview: (id, reason) => api.post(`/reviews/${id}/reject`, { reason }),
   hideMedia: (id) => api.post(`/reviews/${id}/hide-media`, {}),
   flagIncentivised: (id) => api.post(`/reviews/${id}/flag-incentivised`, {}),
+  moderateSellerReply: (id, status, reason) => api.post(`/reviews/${id}/reply/moderate`, { status, reason }),
   bulkReviews: (payload) => api.post('/reviews/bulk', payload),
 
   questions: (params) => api.get('/questions', params),

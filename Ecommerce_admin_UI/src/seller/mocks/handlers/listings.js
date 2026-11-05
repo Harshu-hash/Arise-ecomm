@@ -1,12 +1,26 @@
+/* eslint-disable max-lines */
 import { http as mswHttp } from 'msw';
-import { db, filter, findById, id, insert, update } from '@mocks/db/store';
-import { mockNowIso } from '@mocks/engine/settings';
+import { csvCell } from '@core/utils/csvSafety';
+import { db, filter, find, findById, id, insert, remove, update } from '@mocks/db/store';
+import { diffOf } from '@mocks/engine/audit';
+import { mockNow, mockNowIso } from '@mocks/engine/settings';
 import { scheduleSave } from '@mocks/persistence';
 import { parseListQuery, listResult } from '@mocks/engine/list';
-import { badRequest, conflict, created, notFound, okList, ok, unauthorized, validationFailed } from '@mocks/engine/respond';
+import {
+  badRequest,
+  conflict,
+  created,
+  notFound,
+  okList,
+  ok,
+  unauthorized,
+  validationFailed,
+} from '@mocks/engine/respond';
 import { resolveCaller, sellerFor } from '@seller/mocks/engine/sellerAuth';
 import {
   listingRow,
+  listingQuality,
+  customerProductProjection,
   openSubmissionFor,
   recomputeBuyBox,
   sellerListings,
@@ -35,6 +49,251 @@ function categoryMeta(categoryId) {
   return { categoryPath: `${c.rootName} › ${c.name}`, hsnCode: c.hsnCode, gstRate: c.gstRate };
 }
 
+function durableMedia(items = [], allowedUrls = []) {
+  return items.filter(Boolean).map((item) => {
+    if (typeof item === 'string') {
+      if (/^(blob:|data:)/i.test(item) || !allowedUrls.includes(item))
+        throw new Error('LOCAL_MEDIA_URL');
+      return item; // Existing canonical URLs can remain while a seller edits other fields.
+    }
+    const mediaId = item.mediaId ?? item.id;
+    if (!mediaId || /^(blob:|data:)/i.test(item.previewUrl ?? ''))
+      throw new Error('LOCAL_MEDIA_URL');
+    return {
+      mediaId,
+      previewUrl: item.previewUrl,
+      fileName: item.fileName,
+      mimeType: item.mimeType,
+      width: item.width,
+      height: item.height,
+      crop: item.crop ?? null,
+    };
+  });
+}
+
+function findOwnOfferByReference(sellerId, row) {
+  if (row.listingId)
+    return find('offers', (offer) => offer.id === row.listingId && offer.sellerId === sellerId);
+  if (row.sellerSku || row.sku)
+    return find(
+      'offers',
+      (offer) =>
+        offer.sellerId === sellerId &&
+        (offer.sellerSku === row.sellerSku ||
+          findById('variants', offer.variantId)?.sku === row.sku),
+    );
+  return null;
+}
+
+function preflightRow(operation, row, sellerId, index) {
+  const errors = [];
+  const warnings = [];
+  let offer = null;
+  if (['UPDATE_PRICE', 'UPDATE_STOCK', 'UPDATE_CONTENT'].includes(operation)) {
+    offer = findOwnOfferByReference(sellerId, row);
+    if (!offer) errors.push('No seller offer matches listingId or SKU.');
+  }
+  if (operation === 'UPDATE_PRICE' && offer) {
+    const price = Math.round(Number(row.price ?? row.sellingPriceRupees) * 100);
+    if (!(price > 0)) errors.push('Price must be positive.');
+    if (price > offer.mrpPaise) errors.push('Price cannot exceed MRP.');
+    const rivalPrices = filter(
+      'offers',
+      (item) =>
+        item.variantId === offer.variantId && item.id !== offer.id && item.status === 'LIVE',
+    ).map((item) => item.sellingPricePaise);
+    if (rivalPrices.length && price > Math.min(...rivalPrices))
+      warnings.push('Price is above the current buy-box competitor.');
+  }
+  if (operation === 'UPDATE_STOCK' && !(Number(row.stock) >= 0))
+    errors.push('Stock must be zero or greater.');
+  if (operation === 'CREATE_PRODUCTS') {
+    if (!String(row.title ?? '').trim()) errors.push('Title is required.');
+    if (
+      !db.categories.some(
+        (category) => category.id === row.categoryId || category.name === row.category,
+      )
+    )
+      errors.push('Category is unknown.');
+    const mrp = Number(row.mrp);
+    const price = Number(row.price);
+    if (!(mrp > 0)) errors.push('MRP must be positive.');
+    if (!(price > 0)) errors.push('Price must be positive.');
+    if (price > mrp) errors.push('Price cannot exceed MRP.');
+  }
+  if (operation === 'ATTACH_OFFERS') {
+    const product = findById('products', row.productId);
+    const variant = findById('variants', row.variantId);
+    if (!product || product.status !== 'LIVE') errors.push('Product is not customer-visible.');
+    if (!variant || variant.productId !== row.productId)
+      errors.push('Variant does not belong to product.');
+    if (
+      variant &&
+      find(
+        'offers',
+        (item) =>
+          item.variantId === variant.id && item.sellerId === sellerId && item.status !== 'DELETED',
+      )
+    )
+      errors.push('Offer already exists.');
+    const mrp = Number(row.mrp);
+    const price = Number(row.price);
+    if (!(mrp > 0)) errors.push('MRP must be positive.');
+    if (!(price > 0)) errors.push('Price must be positive.');
+    if (price > mrp) errors.push('Price cannot exceed MRP.');
+  }
+  if (
+    ![
+      'CREATE_PRODUCTS',
+      'ATTACH_OFFERS',
+      'UPDATE_PRICE',
+      'UPDATE_STOCK',
+      'UPDATE_CONTENT',
+    ].includes(operation)
+  )
+    errors.push('Unsupported operation.');
+  return {
+    line: index + 1,
+    row,
+    offerId: offer?.id ?? null,
+    valid: errors.length === 0,
+    errors,
+    warnings,
+  };
+}
+
+function executeBulkRow(operation, result, ctx) {
+  if (!result.valid) return { ...result, success: false };
+  const row = result.row;
+  if (operation === 'UPDATE_PRICE') {
+    const offer = findById('offers', result.offerId);
+    update('offers', offer.id, {
+      sellingPricePaise: Math.round(Number(row.price ?? row.sellingPriceRupees) * 100),
+      updatedAt: mockNowIso(),
+    });
+    recomputeBuyBox(offer.variantId);
+    return { ...result, success: true };
+  }
+  if (operation === 'UPDATE_STOCK') {
+    const offer = findById('offers', result.offerId);
+    const stock = Math.floor(Number(row.stock));
+    update('offers', offer.id, {
+      stock,
+      status:
+        stock > 0 && offer.status === 'OUT_OF_STOCK'
+          ? 'LIVE'
+          : stock === 0 && offer.status === 'LIVE'
+            ? 'OUT_OF_STOCK'
+            : offer.status,
+      updatedAt: mockNowIso(),
+    });
+    recomputeBuyBox(offer.variantId);
+    return { ...result, success: true };
+  }
+  if (operation === 'UPDATE_CONTENT') {
+    const offer = findById('offers', result.offerId);
+    const product = findById('products', offer.productId);
+    const payload = {
+      ...(row.title ? { title: row.title } : {}),
+      ...(row.description ? { description: row.description } : {}),
+      updatedAt: mockNowIso(),
+    };
+    const revision = insert('productRevisions', {
+      id: id('REV', 6),
+      productId: product.id,
+      version: product.version + 1,
+      payload,
+      changes: diffOf(product, { ...product, ...payload }),
+      createdBySellerId: ctx.user.sellerId,
+      createdAt: mockNowIso(),
+      status: 'PENDING',
+    });
+    const submission = submitForQc(product, ctx.seller, 'REVISION');
+    update('listingSubmissions', submission.id, { revisionId: revision.id });
+    return { ...result, success: true };
+  }
+  if (operation === 'ATTACH_OFFERS') {
+    const variant = findById('variants', row.variantId);
+    const product = findById('products', row.productId);
+    const offer = insert('offers', {
+      id: id('OFR', 7),
+      productId: product.id,
+      variantId: variant.id,
+      sellerId: ctx.user.sellerId,
+      sellerName: ctx.seller.storeName,
+      sellerSku: row.sellerSku,
+      sellingPricePaise: Math.round(Number(row.price) * 100),
+      mrpPaise: Math.round(Number(row.mrp) * 100),
+      stock: Math.max(0, Number(row.stock) || 0),
+      fulfillmentType: 'SELLER',
+      dispatchSlaHours: 48,
+      status: Number(row.stock) > 0 ? 'LIVE' : 'OUT_OF_STOCK',
+      buyBoxWinner: false,
+      ariseAssured: false,
+      createdAt: mockNowIso(),
+      updatedAt: mockNowIso(),
+      version: 1,
+    });
+    recomputeBuyBox(variant.id);
+    return { ...result, offerId: offer.id, success: true };
+  }
+  const category = db.categories.find(
+    (item) => item.id === row.categoryId || item.name === row.category,
+  );
+  const product = insert('products', {
+    id: id('FSN', 6),
+    title: row.title,
+    brandName: row.brand ?? null,
+    categoryId: category.id,
+    categoryPath: `${category.rootName} › ${category.name}`,
+    status: 'QC_PENDING',
+    description: row.description ?? '',
+    highlights: [],
+    attributes: {},
+    hsnCode: category.hsnCode,
+    gstRate: category.gstRate,
+    countryOfOrigin: 'India',
+    variantDefiningAttrs: [],
+    images: [],
+    createdAt: mockNowIso(),
+    updatedAt: mockNowIso(),
+    createdBySellerId: ctx.user.sellerId,
+    version: 1,
+  });
+  const variant = insert('variants', {
+    id: id('VAR', 6),
+    productId: product.id,
+    sku: row.sku ?? `BULK-${product.id}`,
+    ean: row.barcode ?? null,
+    attributes: {},
+    label: 'Default',
+    images: [],
+    weightG: Number(row.weightG) || 500,
+    dimsCm: { l: 20, w: 15, h: 5 },
+    status: 'ACTIVE',
+    version: 1,
+  });
+  insert('offers', {
+    id: id('OFR', 7),
+    productId: product.id,
+    variantId: variant.id,
+    sellerId: ctx.user.sellerId,
+    sellerName: ctx.seller.storeName,
+    sellerSku: row.sku,
+    sellingPricePaise: Math.round(Number(row.price) * 100),
+    mrpPaise: Math.round(Number(row.mrp) * 100),
+    stock: Number(row.stock) || 0,
+    fulfillmentType: 'SELLER',
+    dispatchSlaHours: 48,
+    status: 'QC_PENDING',
+    buyBoxWinner: false,
+    ariseAssured: false,
+    version: 1,
+  });
+  submitForQc(product, ctx.seller, 'NEW');
+  return { ...result, productId: product.id, success: true };
+}
+
 export const sellerListingHandlers = [
   /* --------------------------------------------------------- my listings */
   mswHttp.get(`${SELLER_BASE}/listings`, async ({ request }) => {
@@ -60,6 +319,215 @@ export const sellerListingHandlers = [
     });
   }),
 
+  mswHttp.post(`${SELLER_BASE}/listings/fee-preview`, async ({ request }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const body = await request.json();
+    const pricePaise = Number(body.pricePaise);
+    const category = findById('categories', body.categoryId);
+    if (!(pricePaise > 0) || !category)
+      return badRequest('Choose a category and valid selling price.', 'PREVIEW_INVALID');
+    const rules = filter('commissionRules', (rule) => rule.rootName === category.rootName);
+    const commissionRule =
+      rules.find(
+        (rule) =>
+          pricePaise >= rule.minPaise && (rule.maxPaise == null || pricePaise <= rule.maxPaise),
+      ) ?? rules[0];
+    const commissionPct = commissionRule?.commissionPct ?? 12;
+    const commissionPaise = Math.round((pricePaise * commissionPct) / 100);
+    const feeConfig = findById('feeConfig', 'fees');
+    const closingFeePaise =
+      feeConfig?.closingFeeSlabs?.find(
+        (band) => band.uptoPaise == null || pricePaise <= band.uptoPaise,
+      )?.feePaise ?? 0;
+    const shippingPaise = Number(body.shippingPaise ?? 4000);
+    const gstOnFeesPaise = Math.round((commissionPaise + closingFeePaise + shippingPaise) * 0.18);
+    const netPaise =
+      pricePaise - commissionPaise - closingFeePaise - shippingPaise - gstOnFeesPaise;
+    const costPaise = Number(body.costPaise ?? 0);
+    const marginPaise = netPaise - costPaise;
+    const rivalPrices = body.variantId
+      ? filter(
+          'offers',
+          (offer) => offer.variantId === body.variantId && offer.status === 'LIVE',
+        ).map((offer) => offer.sellingPricePaise)
+      : [];
+    return ok({
+      pricePaise,
+      commissionPct,
+      commissionPaise,
+      closingFeePaise,
+      shippingPaise,
+      gstOnFeesPaise,
+      netPaise,
+      costPaise,
+      marginPaise,
+      lossMaking: costPaise > 0 && marginPaise < 0,
+      buyBoxCompetitive: !rivalPrices.length || pricePaise <= Math.min(...rivalPrices),
+      lowestCompetingPricePaise: rivalPrices.length ? Math.min(...rivalPrices) : null,
+    });
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/listings/bulk-jobs/template`, ({ request }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const url = new URL(request.url);
+    const operation = url.searchParams.get('operation') ?? 'UPDATE_PRICE';
+    const base = {
+      CREATE_PRODUCTS: [
+        'title',
+        'categoryId',
+        'brand',
+        'sku',
+        'barcode',
+        'mrp',
+        'price',
+        'stock',
+        'description',
+      ],
+      ATTACH_OFFERS: ['productId', 'variantId', 'sellerSku', 'mrp', 'price', 'stock'],
+      UPDATE_PRICE: ['listingId', 'sellerSku', 'price'],
+      UPDATE_STOCK: ['listingId', 'sellerSku', 'stock'],
+      UPDATE_CONTENT: ['listingId', 'sellerSku', 'title', 'description'],
+    };
+    return ok({
+      operation,
+      columns: base[operation] ?? [],
+      categoryId: url.searchParams.get('categoryId'),
+      sample: [],
+    });
+  }),
+  mswHttp.post(`${SELLER_BASE}/listings/bulk-jobs/preflight`, async ({ request }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const body = await request.json();
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!rows.length) return badRequest('Add at least one row.', 'EMPTY');
+    const results = rows.map((row, index) =>
+      preflightRow(body.operation, row, ctx.user.sellerId, index),
+    );
+    return ok({
+      operation: body.operation,
+      totalRows: rows.length,
+      validRows: results.filter((row) => row.valid).length,
+      invalidRows: results.filter((row) => !row.valid).length,
+      warningRows: results.filter((row) => row.warnings.length).length,
+      rows: results,
+    });
+  }),
+  mswHttp.get(`${SELLER_BASE}/listings/bulk-jobs`, ({ request }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    return ok(
+      filter(
+        'jobs',
+        (job) => job.type === 'SELLER_CATALOG_BULK' && job.sellerId === ctx.user.sellerId,
+      ).sort((a, b) => b.createdAt.localeCompare(a.createdAt)),
+    );
+  }),
+  mswHttp.get(`${SELLER_BASE}/listings/bulk-jobs/:jobId`, ({ request, params }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const job = findById('jobs', params.jobId);
+    if (!job || job.type !== 'SELLER_CATALOG_BULK' || job.sellerId !== ctx.user.sellerId)
+      return notFound('That bulk job does not exist.');
+    return ok(job);
+  }),
+  mswHttp.get(`${SELLER_BASE}/listings/bulk-jobs/:jobId/errors`, ({ request, params }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const job = findById('jobs', params.jobId);
+    if (!job || job.type !== 'SELLER_CATALOG_BULK' || job.sellerId !== ctx.user.sellerId)
+      return notFound('That bulk job does not exist.');
+    const failed = (job.metadata?.rowResults ?? []).filter((row) => !row.success);
+    const csv = [
+      'line,errors,row',
+      ...failed.map(
+        (row) =>
+          `${row.line},${csvCell(row.errors.join(' | '))},${csvCell(JSON.stringify(row.row))}`,
+      ),
+    ].join('\n');
+    return new Response(csv, {
+      headers: {
+        'Content-Type': 'text/csv',
+        'Content-Disposition': `attachment; filename="${job.id}-errors.csv"`,
+      },
+    });
+  }),
+  mswHttp.post(`${SELLER_BASE}/listings/bulk-jobs`, async ({ request }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const body = await request.json();
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    const preflight = rows.map((row, index) =>
+      preflightRow(body.operation, row, ctx.user.sellerId, index),
+    );
+    const results = preflight.map((result) => executeBulkRow(body.operation, result, ctx));
+    const failRows = results.filter((result) => !result.success).length;
+    const jobId = id('JOB', 6);
+    const job = insert('jobs', {
+      id: jobId,
+      type: 'SELLER_CATALOG_BULK',
+      sellerId: ctx.user.sellerId,
+      label: `${String(body.operation ?? '').replace(/_/g, ' ')} · ${rows.length} rows`,
+      status: failRows ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
+      progressPct: 100,
+      createdAt: mockNowIso(),
+      completedAt: mockNowIso(),
+      totalRows: rows.length,
+      processedRows: rows.length,
+      failRows,
+      resultUrl: failRows ? `/api/seller/v1/listings/bulk-jobs/${jobId}/errors` : null,
+      metadata: { operation: body.operation, rowResults: results },
+      expiresAt: new Date(mockNow() + 7 * 86400_000).toISOString(),
+    });
+    scheduleSave();
+    return created(job);
+  }),
+  mswHttp.post(`${SELLER_BASE}/listings/bulk-jobs/:jobId/retry`, async ({ request, params }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const original = findById('jobs', params.jobId);
+    if (
+      !original ||
+      original.type !== 'SELLER_CATALOG_BULK' ||
+      original.sellerId !== ctx.user.sellerId
+    )
+      return notFound('That bulk job does not exist.');
+    const body = await request.json().catch(() => ({}));
+    const failed = (original.metadata?.rowResults ?? []).filter((row) => !row.success);
+    const rows = body.rows?.length ? body.rows : failed.map((row) => row.row);
+    if (!rows.length)
+      return badRequest('This job has no failed rows to retry.', 'NOTHING_TO_RETRY');
+    const preflight = rows.map((row, index) =>
+      preflightRow(original.metadata.operation, row, ctx.user.sellerId, index),
+    );
+    const results = preflight.map((result) =>
+      executeBulkRow(original.metadata.operation, result, ctx),
+    );
+    const failRows = results.filter((result) => !result.success).length;
+    const jobId = id('JOB', 6);
+    const job = insert('jobs', {
+      id: jobId,
+      type: 'SELLER_CATALOG_BULK',
+      sellerId: ctx.user.sellerId,
+      parentJobId: original.id,
+      label: `Retry · ${original.label}`,
+      status: failRows ? 'COMPLETED_WITH_ERRORS' : 'COMPLETED',
+      progressPct: 100,
+      createdAt: mockNowIso(),
+      completedAt: mockNowIso(),
+      totalRows: rows.length,
+      processedRows: rows.length,
+      failRows,
+      resultUrl: failRows ? `/api/seller/v1/listings/bulk-jobs/${jobId}/errors` : null,
+      metadata: { operation: original.metadata.operation, rowResults: results },
+      expiresAt: new Date(mockNow() + 7 * 86400_000).toISOString(),
+    });
+    scheduleSave();
+    return created(job);
+  }),
+
   /* ------------------------------------------------------- listing detail */
   mswHttp.get(`${SELLER_BASE}/listings/:id`, async ({ request, params }) => {
     const ctx = sellerContext(request);
@@ -74,8 +542,17 @@ export const sellerListingHandlers = [
       ...listingRow(offer),
       product,
       variant,
-      submission: submission ? { ...submission, ageHours: submissionAge(submission.submittedAt) } : null,
-      competingOffers: filter('offers', (o) => o.variantId === offer.variantId && o.id !== offer.id).length,
+      submission: submission
+        ? { ...submission, ageHours: submissionAge(submission.submittedAt) }
+        : null,
+      competingOffers: filter('offers', (o) => o.variantId === offer.variantId && o.id !== offer.id)
+        .length,
+      quality: listingQuality(product),
+      preview: customerProductProjection(product.id),
+      revisions: filter('productRevisions', (revision) => revision.productId === product.id).sort(
+        (a, b) => b.createdAt.localeCompare(a.createdAt),
+      ),
+      variants: filter('variants', (item) => item.productId === product.id),
     });
   }),
 
@@ -90,7 +567,9 @@ export const sellerListingHandlers = [
     if (!body?.title) fieldErrors.title = 'Enter a product title.';
     if (!body?.categoryId) fieldErrors.categoryId = 'Pick a category.';
 
-    const variantSpecs = body.variants?.length ? body.variants : [{ label: 'Default', attributes: {} }];
+    const variantSpecs = body.variants?.length
+      ? body.variants
+      : [{ label: 'Default', attributes: {} }];
     const effectiveMrp = (v) => Number(v.mrpPaise ?? body?.mrpPaise);
     const effectivePrice = (v) => Number(v.sellingPricePaise ?? body?.sellingPricePaise);
     if (!isDraft) {
@@ -100,7 +579,8 @@ export const sellerListingHandlers = [
         const label = variantSpecs.length > 1 ? ` (variant ${vi + 1})` : '';
         if (!mrp || mrp <= 0) fieldErrors.mrpPaise = `Enter the MRP${label}.`;
         if (!price || price <= 0) fieldErrors.sellingPricePaise = `Enter a selling price${label}.`;
-        if (price && mrp && price > mrp) fieldErrors.sellingPricePaise = `Selling price cannot exceed MRP${label}.`;
+        if (price && mrp && price > mrp)
+          fieldErrors.sellingPricePaise = `Selling price cannot exceed MRP${label}.`;
       });
     }
     if (Object.keys(fieldErrors).length) return validationFailed(fieldErrors);
@@ -109,6 +589,17 @@ export const sellerListingHandlers = [
     if (!cat) return badRequest('That category no longer exists.', 'BAD_CATEGORY');
     const brand = body.brandId ? findById('brands', body.brandId) : null;
 
+    let productImages;
+    let videos;
+    let complianceDocuments;
+    try {
+      productImages = durableMedia(body.images);
+      videos = durableMedia(body.videos);
+      complianceDocuments = durableMedia(body.complianceDocuments);
+      variantSpecs.forEach((spec) => durableMedia(spec.images));
+    } catch {
+      return badRequest('Upload media before saving the listing.', 'MEDIA_NOT_DURABLE');
+    }
     const product = insert('products', {
       id: id('FSN', 6),
       title: body.title,
@@ -126,7 +617,9 @@ export const sellerListingHandlers = [
       sizeChartId: body.sizeChartId ?? null,
       returnPolicy: body.returnPolicy ?? { windowDays: cat.returnWindowDays ?? 7, type: 'RETURN' },
       variantDefiningAttrs: body.variants?.length ? ['colour', 'size'] : [],
-      images: Array.isArray(body.images) ? body.images.filter(Boolean) : [],
+      images: productImages,
+      videos,
+      complianceDocuments,
       rating: null,
       ratingCount: 0,
       reviewCount: 0,
@@ -138,14 +631,17 @@ export const sellerListingHandlers = [
 
     let firstOfferId = null;
     variantSpecs.forEach((vspec, vi) => {
+      const variantImages = durableMedia(vspec.images);
       const variant = insert('variants', {
         id: id('VAR', 6),
         productId: product.id,
-        sku: vspec.sku || `${(brand?.name ?? 'SKU').toUpperCase().slice(0, 4)}-${product.id}-${vi + 1}`,
-        ean: null,
+        sku:
+          vspec.sku ||
+          `${(brand?.name ?? 'SKU').toUpperCase().slice(0, 4)}-${product.id}-${vi + 1}`,
+        ean: vspec.ean ?? vspec.barcode ?? null,
         attributes: vspec.attributes ?? {},
         label: vspec.label ?? `Variant ${vi + 1}`,
-        images: Array.isArray(vspec.images) ? vspec.images.filter(Boolean) : [],
+        images: variantImages,
         weightG: Number(vspec.weightG ?? body.weightG) || 500,
         dimsCm: vspec.dimsCm ?? body.dimsCm ?? { l: 20, w: 15, h: 5 },
         status: 'ACTIVE',
@@ -156,9 +652,12 @@ export const sellerListingHandlers = [
         productId: product.id,
         variantId: variant.id,
         sellerId: ctx.user.sellerId,
+        sellerSku: vspec.sellerSku ?? vspec.sku ?? null,
         sellerName: ctx.seller?.storeName ?? '—',
         sellingPricePaise: effectivePrice(vspec) || 0,
         mrpPaise: effectiveMrp(vspec) || 0,
+        compareAtPaise: Number(vspec.compareAtPaise ?? effectiveMrp(vspec)) || 0,
+        taxCode: vspec.taxCode ?? body.taxCode ?? cat.hsnCode,
         stock: Number(vspec.stock ?? body.stock) || 0,
         fulfillmentType: body.fulfillmentType === 'ARISE' ? 'ARISE' : 'SELLER',
         dispatchSlaHours: 48,
@@ -168,6 +667,17 @@ export const sellerListingHandlers = [
         version: 1,
       });
       if (!firstOfferId) firstOfferId = offer.id;
+    });
+
+    insert('productRevisions', {
+      id: id('REV', 6),
+      productId: product.id,
+      version: 1,
+      payload: { ...product },
+      changes: [],
+      createdBySellerId: ctx.user.sellerId,
+      createdAt: mockNowIso(),
+      status: isDraft ? 'DRAFT' : 'PENDING',
     });
 
     if (!isDraft) submitForQc(product, ctx.seller, 'NEW');
@@ -185,22 +695,61 @@ export const sellerListingHandlers = [
     const body = await request.json();
 
     const patch = { updatedAt: mockNowIso() };
-    for (const key of ['title', 'description', 'highlights', 'attributes', 'images', 'countryOfOrigin', 'returnPolicy', 'sizeChartId']) {
+    for (const key of [
+      'title',
+      'description',
+      'highlights',
+      'attributes',
+      'countryOfOrigin',
+      'returnPolicy',
+      'sizeChartId',
+    ]) {
       if (body?.[key] !== undefined) patch[key] = body[key];
     }
-    update('products', product.id, patch);
+    if (body?.images !== undefined) {
+      try {
+        patch.images = durableMedia(body.images, product.images ?? []);
+      } catch {
+        return badRequest('Upload images before saving the listing.', 'MEDIA_NOT_DURABLE');
+      }
+    }
+    // Customer-visible content stays untouched until QC approves its revision.
+    if (product.status === 'LIVE') {
+      const open = openSubmissionFor(product.id);
+      const prior = open?.revisionId ? findById('productRevisions', open.revisionId) : null;
+      const payload = { ...(prior?.payload ?? {}), ...patch };
+      const revision = insert('productRevisions', {
+        id: id('REV', 6),
+        productId: product.id,
+        version: Number(product.version ?? 1) + 1,
+        payload,
+        changes: diffOf(product, { ...product, ...payload }),
+        createdBySellerId: ctx.user.sellerId,
+        createdAt: mockNowIso(),
+        status: 'PENDING',
+        supersedesRevisionId: prior?.id ?? null,
+      });
+      if (prior) update('productRevisions', prior.id, { status: 'SUPERSEDED' });
+      const submission = submitForQc(product, ctx.seller, 'REVISION');
+      update('listingSubmissions', submission.id, { revisionId: revision.id });
+      scheduleSave();
+      return ok({ ...listingRow(offer), pendingRevision: true });
+    }
 
-    // A content change on a live listing is logged as a revision for QC, while
-    // the listing stays live; anything not yet live simply re-enters the queue.
+    update('products', product.id, patch);
     const fresh = findById('products', product.id);
-    if (fresh.status === 'LIVE') submitForQc(fresh, ctx.seller, 'REVISION');
-    else if (fresh.status === 'DRAFT' && body?.submitForQc) {
+    if (fresh.status === 'DRAFT' && body?.submitForQc) {
       update('products', product.id, { status: 'QC_PENDING' });
-      for (const o of filter('offers', (x) => x.productId === product.id)) update('offers', o.id, { status: 'QC_PENDING' });
+      for (const o of filter('offers', (x) => x.productId === product.id))
+        update('offers', o.id, { status: 'QC_PENDING' });
       submitForQc(findById('products', product.id), ctx.seller, 'NEW');
     } else if (['QC_PENDING', 'NEEDS_CHANGES', 'INACTIVE'].includes(fresh.status)) {
       update('products', product.id, { status: 'QC_PENDING' });
-      submitForQc(findById('products', product.id), ctx.seller, fresh.status === 'NEEDS_CHANGES' ? 'RESUBMISSION' : 'NEW');
+      submitForQc(
+        findById('products', product.id),
+        ctx.seller,
+        fresh.status === 'NEEDS_CHANGES' ? 'RESUBMISSION' : 'NEW',
+      );
     }
     scheduleSave();
     return ok(listingRow(findById('offers', offer.id)));
@@ -214,9 +763,27 @@ export const sellerListingHandlers = [
     if (!offer) return notFound('That listing does not exist on your account.');
     const body = await request.json();
     const price = Number(body?.sellingPricePaise);
-    if (!price || price <= 0) return validationFailed({ sellingPricePaise: 'Enter a valid price.' });
-    if (price > offer.mrpPaise) return validationFailed({ sellingPricePaise: 'Price cannot exceed MRP.' });
-    update('offers', offer.id, { sellingPricePaise: price });
+    if (!price || price <= 0)
+      return validationFailed({ sellingPricePaise: 'Enter a valid price.' });
+    const mrpPaise = body?.mrpPaise === undefined ? offer.mrpPaise : Number(body.mrpPaise);
+    if (!(mrpPaise > 0)) return validationFailed({ mrpPaise: 'Enter a valid MRP.' });
+    if (price > mrpPaise)
+      return validationFailed({ sellingPricePaise: 'Price cannot exceed MRP.' });
+    const scheduledAt = body?.scheduledAt ? new Date(body.scheduledAt) : null;
+    if (scheduledAt && Number.isNaN(scheduledAt.getTime()))
+      return validationFailed({ scheduledAt: 'Choose a valid schedule time.' });
+    update('offers', offer.id, {
+      ...(scheduledAt && scheduledAt.getTime() > mockNow()
+        ? {
+            scheduledPrice: {
+              sellingPricePaise: price,
+              mrpPaise,
+              effectiveAt: scheduledAt.toISOString(),
+            },
+          }
+        : { sellingPricePaise: price, mrpPaise, scheduledPrice: null }),
+      updatedAt: mockNowIso(),
+    });
     recomputeBuyBox(offer.variantId);
     scheduleSave();
     return ok(listingRow(findById('offers', offer.id)));
@@ -231,25 +798,128 @@ export const sellerListingHandlers = [
     const stock = Math.max(0, Math.floor(Number(body?.stock)));
     if (Number.isNaN(stock)) return validationFailed({ stock: 'Enter a stock quantity.' });
     const product = findById('products', offer.productId);
-    const nextStatus = product?.status === 'LIVE' ? (stock > 0 ? 'LIVE' : 'OUT_OF_STOCK') : offer.status;
+    const nextStatus =
+      product?.status === 'LIVE' ? (stock > 0 ? 'LIVE' : 'OUT_OF_STOCK') : offer.status;
     update('offers', offer.id, { stock, status: nextStatus });
     recomputeBuyBox(offer.variantId);
     scheduleSave();
     return ok(listingRow(findById('offers', offer.id)));
   }),
 
-  /* ------------------------------------------------------------ resubmit */
-  mswHttp.post(`${SELLER_BASE}/listings/:id/resubmit`, async ({ request, params }) => {
+  mswHttp.patch(`${SELLER_BASE}/listings/:id/variant`, async ({ request, params }) => {
     const ctx = sellerContext(request);
     if (ctx.response) return ctx.response;
     const offer = ownOffer(ctx.user, params.id);
     if (!offer) return notFound('That listing does not exist on your account.');
-    const product = findById('products', offer.productId);
-    if (product.status !== 'NEEDS_CHANGES') {
-      return conflict('Only listings that need changes can be resubmitted.', 'NOT_RESUBMITTABLE');
+    const variant = findById('variants', offer.variantId);
+    const body = await request.json();
+    let images;
+    try {
+      images =
+        body.images === undefined
+          ? variant.images
+          : durableMedia(body.images, variant.images ?? []);
+    } catch {
+      return badRequest('Upload variant media before saving.', 'MEDIA_NOT_DURABLE');
     }
-    update('products', product.id, { status: 'QC_PENDING', updatedAt: mockNowIso() });
-    submitForQc(findById('products', product.id), ctx.seller, 'RESUBMISSION');
+    update('variants', variant.id, {
+      ...(body.sku !== undefined ? { sku: body.sku } : {}),
+      ...(body.barcode !== undefined || body.ean !== undefined
+        ? { ean: body.ean ?? body.barcode }
+        : {}),
+      ...(body.weightG !== undefined ? { weightG: Number(body.weightG) } : {}),
+      ...(body.dimsCm !== undefined ? { dimsCm: body.dimsCm } : {}),
+      images,
+      version: Number(variant.version ?? 1) + 1,
+    });
+    update('offers', offer.id, {
+      ...(body.sellerSku !== undefined ? { sellerSku: body.sellerSku } : {}),
+      ...(body.taxCode !== undefined ? { taxCode: body.taxCode } : {}),
+      updatedAt: mockNowIso(),
+    });
+    scheduleSave();
+    return ok({
+      variant: findById('variants', variant.id),
+      offer: listingRow(findById('offers', offer.id)),
+    });
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/listings/:id/preview`, ({ request, params }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const offer = ownOffer(ctx.user, params.id);
+    if (!offer) return notFound('That listing does not exist on your account.');
+    return ok(customerProductProjection(offer.productId));
+  }),
+
+  mswHttp.post(`${SELLER_BASE}/listings/:id/:action`, async ({ request, params }) => {
+    const ctx = sellerContext(request);
+    if (ctx.response) return ctx.response;
+    const offer = ownOffer(ctx.user, params.id);
+    if (!offer) return notFound('That listing does not exist on your account.');
+    const action = String(params.action).toLowerCase();
+    if (action === 'resubmit') {
+      const product = findById('products', offer.productId);
+      const submission = openSubmissionFor(product.id);
+      if (
+        product.status !== 'NEEDS_CHANGES' &&
+        !(
+          product.status === 'LIVE' &&
+          submission?.type === 'REVISION' &&
+          submission.status === 'NEEDS_CHANGES'
+        )
+      )
+        return conflict('Only listings that need changes can be resubmitted.', 'NOT_RESUBMITTABLE');
+      if (product.status === 'NEEDS_CHANGES')
+        update('products', product.id, { status: 'QC_PENDING', updatedAt: mockNowIso() });
+      submitForQc(
+        findById('products', product.id),
+        ctx.seller,
+        submission?.type === 'REVISION' ? 'REVISION' : 'RESUBMISSION',
+      );
+      scheduleSave();
+      return ok(listingRow(findById('offers', offer.id)));
+    }
+    if (!['activate', 'deactivate', 'archive', 'relist', 'delete'].includes(action))
+      return notFound('Unknown listing action.');
+    const body = await request.json().catch(() => ({}));
+    if (['deactivate', 'archive', 'delete'].includes(action) && !String(body.reason ?? '').trim())
+      return validationFailed({ reason: 'Give a reason.' });
+    if (action === 'delete') {
+      const used = find(
+        'orderItems',
+        (item) => item.offerId === offer.id || item.listingId === offer.id,
+      );
+      if (used)
+        return conflict(
+          'This offer has order history and can only be archived.',
+          'HAS_ORDER_HISTORY',
+        );
+      remove('offers', offer.id);
+      recomputeBuyBox(offer.variantId);
+      scheduleSave();
+      return ok({ id: offer.id, status: 'DELETED', reason: body.reason });
+    }
+    const product = findById('products', offer.productId);
+    if (['activate', 'relist'].includes(action) && product.status !== 'LIVE')
+      return conflict(
+        'The canonical product must be live before this offer can be relisted.',
+        'PRODUCT_NOT_LIVE',
+      );
+    const status =
+      action === 'archive'
+        ? 'ARCHIVED'
+        : action === 'deactivate'
+          ? 'INACTIVE'
+          : offer.stock > 0
+            ? 'LIVE'
+            : 'OUT_OF_STOCK';
+    update('offers', offer.id, {
+      status,
+      lifecycleReason: body.reason ?? null,
+      updatedAt: mockNowIso(),
+    });
+    recomputeBuyBox(offer.variantId);
     scheduleSave();
     return ok(listingRow(findById('offers', offer.id)));
   }),
@@ -267,7 +937,11 @@ export const sellerListingHandlers = [
     const groups = new Map();
     const lineOf = new Map();
     inputRows.forEach((row, i) => {
-      const key = `${String(row.title ?? '').trim().toLowerCase()}|${String(row.category ?? '').trim().toLowerCase()}`;
+      const key = `${String(row.title ?? '')
+        .trim()
+        .toLowerCase()}|${String(row.category ?? '')
+        .trim()
+        .toLowerCase()}`;
       if (!groups.has(key)) groups.set(key, []);
       groups.get(key).push(row);
       lineOf.set(row, i + 1);
@@ -277,7 +951,10 @@ export const sellerListingHandlers = [
     for (const groupRows of groups.values()) {
       const errors = [];
       const first = groupRows[0];
-      const cat = db.categories.find((c) => c.level === 3 && c.name?.toLowerCase() === String(first.category ?? '').toLowerCase());
+      const cat = db.categories.find(
+        (c) =>
+          c.level === 3 && c.name?.toLowerCase() === String(first.category ?? '').toLowerCase(),
+      );
       if (!first.title) errors.push('Missing title');
       if (!cat) errors.push('Unknown category');
 
@@ -315,9 +992,14 @@ export const sellerListingHandlers = [
         hsnCode: cat.hsnCode,
         gstRate: cat.gstRate,
         countryOfOrigin: 'India',
-        returnPolicy: { windowDays: Number(first.returnWindowDays) || cat.returnWindowDays || 7, type: first.returnType || 'RETURN' },
-        variantDefiningAttrs: hasVariantAttrs ? ['colour', 'size'].filter((k) => groupRows.some((r) => r[k])) : [],
-        images: first.images ? String(first.images).split('|').map((s) => s.trim()).filter(Boolean) : [],
+        returnPolicy: {
+          windowDays: Number(first.returnWindowDays) || cat.returnWindowDays || 7,
+          type: first.returnType || 'RETURN',
+        },
+        variantDefiningAttrs: hasVariantAttrs
+          ? ['colour', 'size'].filter((k) => groupRows.some((r) => r[k]))
+          : [],
+        images: [],
         rating: null,
         ratingCount: 0,
         reviewCount: 0,
@@ -338,9 +1020,13 @@ export const sellerListingHandlers = [
           ean: null,
           attributes,
           label: [row.colour, row.size].filter(Boolean).join(' · ') || 'Default',
-          images: row.images ? String(row.images).split('|').map((s) => s.trim()).filter(Boolean) : [],
+          images: [],
           weightG: Number(row.weightG) || 500,
-          dimsCm: { l: Number(row.dimsL) || 20, w: Number(row.dimsW) || 15, h: Number(row.dimsH) || 5 },
+          dimsCm: {
+            l: Number(row.dimsL) || 20,
+            w: Number(row.dimsW) || 15,
+            h: Number(row.dimsH) || 5,
+          },
           status: 'ACTIVE',
           version: 1,
         });
@@ -362,7 +1048,8 @@ export const sellerListingHandlers = [
         });
       });
       submitForQc(product, ctx.seller, 'NEW');
-      for (const row of groupRows) results.push({ line: lineOf.get(row), title: row.title, ok: true });
+      for (const row of groupRows)
+        results.push({ line: lineOf.get(row), title: row.title, ok: true });
     }
     results.sort((a, b) => a.line - b.line);
 

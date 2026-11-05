@@ -22,6 +22,12 @@ export function ticketRow(t) {
     resolvedAt: t.resolvedAt,
     firstRespondedAt: t.firstRespondedAt,
     assigneeName: t.assigneeName,
+    contextType: t.contextType ?? null,
+    contextId: t.contextId ?? null,
+    firstResponseDueAt: t.firstResponseDueAt,
+    resolutionDueAt: t.resolutionDueAt,
+    escalationStatus: t.escalationStatus ?? 'NONE',
+    callbackRequestedAt: t.callbackRequestedAt ?? null,
   };
 }
 
@@ -57,6 +63,8 @@ export function createTicket(seller, body) {
     requesterType: 'SELLER',
     sellerId: seller.id,
     orderId: order?.id ?? null,
+    contextType: body.contextType ?? (order ? 'ORDER' : null),
+    contextId: body.contextId ?? order?.id ?? null,
     queueId,
     assigneeId: assignee?.id ?? null,
     assigneeName: assignee?.name ?? null,
@@ -87,15 +95,20 @@ export function createTicket(seller, body) {
 }
 
 export function ticketDetail(ticket) {
+  const terms = `${ticket.subject} ${ticket.category}`.toLowerCase().split(/\W+/).filter((word) => word.length > 3);
+  const suggestedArticles = filter('helpArticles', (article) => article.status === 'PUBLISHED' && terms.some((word) => `${article.question} ${article.answer}`.toLowerCase().includes(word))).slice(0, 3);
   return {
     ...ticketRow(ticket),
+    suggestedArticles,
     events: filter('ticketEvents', (e) => e.ticketId === ticket.id)
       .filter((e) => e.visibility !== 'INTERNAL') // sellers never see internal agent notes
+      .map((e) => ({ ...e, attachments: (e.attachments ?? []).map((item) => typeof item === 'string' ? findById('mediaResources', item) : item).filter(Boolean) }))
       .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt)),
   };
 }
 
-export function reply(ticket, seller, text) {
+export function reply(ticket, seller, body) {
+  const text = body?.text;
   if (ticket.status === 'CLOSED') return { error: 'This ticket is closed.' };
   if (!String(text ?? '').trim()) return { error: 'Write a message.' };
   const now = mockNowIso();
@@ -106,7 +119,7 @@ export function reply(ticket, seller, text) {
     authorType: 'SELLER',
     authorName: seller.storeName,
     body: text,
-    attachments: [],
+    attachments: body?.attachments ?? [],
     visibility: 'PUBLIC',
     createdAt: now,
   });

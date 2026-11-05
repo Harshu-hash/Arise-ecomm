@@ -29,6 +29,7 @@ export default function QaPage() {
     onSuccess: () => { refetch(); setAnswering(null); setAnswerText(''); message.success('Answer posted'); },
     onError: (e) => message.error(e.message),
   });
+  const moderate = useMutation({ mutationFn: ({ id, status }) => reviewsApi.moderateAnswer(id, status), onSuccess: () => { refetch(); message.success('Seller answer moderated'); }, onError: (e) => message.error(e.message) });
 
   const columns = [
     {
@@ -53,9 +54,7 @@ export default function QaPage() {
     {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
-        <Can perm="reviews.qa.answer">
-          <Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button>
-        </Can>
+        <Flex gap={6} justify="end"><Can perm="reviews.qa.moderate">{row.pendingSellerAnswer && <><Button size="small" type="primary" loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'PUBLISHED' }); }}>Publish seller answer</Button><Button size="small" danger loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'REJECTED' }); }}>Reject</Button></>}</Can><Can perm="reviews.qa.answer"><Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button></Can></Flex>
       ),
     },
   ];

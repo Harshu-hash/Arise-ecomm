@@ -8,9 +8,26 @@ const RETURN_TYPES = [
 ];
 
 /** The "Edit content" modal on a listing's detail page. */
-export default function EditListingModal({ open, onCancel, form, onFinish, loading, images, onImagesChange, sizeCharts, isLive }) {
+export default function EditListingModal({
+  open,
+  onCancel,
+  form,
+  onFinish,
+  loading,
+  images,
+  onImagesChange,
+  sizeCharts,
+  isLive,
+}) {
   return (
-    <Modal title="Edit listing content" open={open} onCancel={onCancel} onOk={() => form.submit()} okText="Save changes" confirmLoading={loading}>
+    <Modal
+      title="Edit listing content"
+      open={open}
+      onCancel={onCancel}
+      onOk={() => form.submit()}
+      okText="Save changes"
+      confirmLoading={loading}
+    >
       <Form form={form} layout="vertical" onFinish={onFinish}>
         <Form.Item name="title" label="Title" rules={[{ required: true }]}>
           <Input />
@@ -26,7 +43,11 @@ export default function EditListingModal({ open, onCancel, form, onFinish, loadi
         </Form.Item>
         {sizeCharts.length > 0 && (
           <Form.Item name="sizeChartId" label="Size chart">
-            <Select allowClear placeholder="Attach a size chart" options={sizeCharts.map((s) => ({ value: s.id, label: s.name }))} />
+            <Select
+              allowClear
+              placeholder="Attach a size chart"
+              options={sizeCharts.map((s) => ({ value: s.id, label: s.name }))}
+            />
           </Form.Item>
         )}
         <Space.Compact block>
@@ -38,7 +59,11 @@ export default function EditListingModal({ open, onCancel, form, onFinish, loadi
           </Form.Item>
         </Space.Compact>
         {isLive && (
-          <Alert type="info" showIcon message="Editing a live listing creates a revision for QC; the listing stays live meanwhile." />
+          <Alert
+            type="info"
+            showIcon
+            message="Editing a live listing creates a revision for QC; the listing stays live meanwhile."
+          />
         )}
       </Form>
     </Modal>

@@ -19,6 +19,7 @@ import {
   validationFailed,
 } from '../engine/respond';
 import { mockNow, mockNowIso } from '../engine/settings';
+import { appendReturnEvent, createReplacementFulfilment, returnProjection } from '../engine/returnWorkflow';
 import { scheduleSave } from '../persistence';
 
 const BASE = '/api/admin/v1';
@@ -41,6 +42,7 @@ function returnRow(r) {
     faultAttribution: r.faultAttribution ?? FAULT_BY_REASON[r.reason] ?? 'UNKNOWN',
     itemStatus: item?.status ?? null,
     refundStatus: r.refundId ? findById('refunds', r.refundId)?.status ?? null : null,
+    ...returnProjection(r),
   };
 }
 
@@ -56,6 +58,7 @@ function allowedReturnActions(r, permissions) {
   if (r.type === 'REPLACEMENT' && !['CLOSED', 'RETURN_REJECTED'].includes(r.status) && has('orders.return.convert')) {
     out.push('CONVERT_TO_REFUND');
   }
+  if (r.status === 'RETURN_REJECTED' && has('orders.return.approve')) out.push('OVERRIDE_REJECTION');
   return out;
 }
 
@@ -110,6 +113,20 @@ export const returnHandlers = [
     });
   }),
 
+  mswHttp.post(`${BASE}/returns/:id/override-rejection`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'orders.return.approve');
+    if (g.response) return g.response;
+    const row = findById('returns', params.id);
+    if (!row) return notFound('That return no longer exists.');
+    if (row.status !== 'RETURN_REJECTED') return illegalTransition(row.status, 'override rejection');
+    const body = await request.json();
+    if (!String(body?.reason ?? '').trim()) return validationFailed({ reason: 'Explain the override to the seller and customer.' });
+    update('returns', row.id, { status: 'RETURN_APPROVED', overrideReason: body.reason, overrideEvidenceMediaIds: body.evidenceMediaIds ?? [], overriddenAt: mockNowIso(), overriddenByName: g.user.name });
+    appendReturnEvent(row, { type: 'REJECTION_OVERRIDDEN', actorType: 'ADMIN', actorName: g.user.name, reason: body.reason, evidenceMediaIds: body.evidenceMediaIds ?? [] });
+    scheduleSave();
+    return ok(returnRow(findById('returns', row.id)));
+  }),
+
   /** One endpoint per transition keeps the state machine explicit. */
   mswHttp.post(`${BASE}/returns/:id/:action`, async ({ request, params }) => {
     const map = {
@@ -141,7 +158,7 @@ export const returnHandlers = [
       if (!['PASS', 'FAIL'].includes(body?.result)) {
         return validationFailed({ result: 'Record whether QC passed or failed.' });
       }
-      if (body.result === 'FAIL' && !String(body?.notes ?? '').trim()) {
+      if (body.result === 'FAIL' && (!String(body?.notes ?? '').trim() || !String(body?.reasonCode ?? '').trim() || !(body?.evidenceMediaIds?.length))) {
         return validationFailed({ notes: 'Say what was wrong — the seller may claim against this.' });
       }
 
@@ -149,7 +166,9 @@ export const returnHandlers = [
       update('returns', row.id, {
         status: passed ? 'QC_PASSED' : 'QC_FAILED',
         qcResult: body.result,
+        qcReasonCode: body.reasonCode ?? null,
         qcNotes: body.notes ?? null,
+        qcEvidenceMediaIds: body.evidenceMediaIds ?? [],
         qcAt: mockNowIso(),
         qcByName: g.user.name,
       });
@@ -167,7 +186,10 @@ export const returnHandlers = [
           amountPaise: row.amountPaise, actor: g.user, reason: row.reason,
         });
         update('returns', row.id, { refundId: refund.id, status: 'CLOSED' });
+        appendReturnEvent(row, { type: 'REFUND_CREATED', actorType: 'SYSTEM', actorName: 'Refund service', metadata: { refundId: refund.id } });
       }
+      if (passed && row.type === 'REPLACEMENT') createReplacementFulfilment(findById('returns', row.id), { name: g.user.name, type: 'ADMIN' });
+      appendReturnEvent(row, { type: passed ? 'QC_PASSED' : 'QC_FAILED', actorType: 'ADMIN', actorName: g.user.name, reason: body.notes, evidenceMediaIds: body.evidenceMediaIds ?? [], metadata: { reasonCode: body.reasonCode ?? null } });
 
       writeAudit({
         actor: g.user, action: 'orders.return.qc', entityType: 'return',
@@ -205,7 +227,13 @@ export const returnHandlers = [
     }
 
     const patch = { status: target };
-    if (params.action === 'reject') patch.decisionReason = body.reason;
+    if (params.action === 'reject') {
+      patch.decisionReasonCode = body.reasonCode ?? 'OTHER';
+      patch.decisionReason = body.reason;
+      patch.decisionEvidenceMediaIds = body.evidenceMediaIds ?? [];
+      patch.decidedAt = mockNowIso();
+      patch.decidedByName = g.user.name;
+    }
     if (params.action === 'approve') {
       patch.type = body.type ?? row.type;
       patch.faultAttribution = body.faultAttribution ?? FAULT_BY_REASON[row.reason] ?? 'UNKNOWN';
@@ -217,6 +245,7 @@ export const returnHandlers = [
     if (params.action === 'mark-received') patch.receivedAt = mockNowIso();
 
     update('returns', row.id, patch);
+    appendReturnEvent(row, { type: target, actorType: 'ADMIN', actorName: g.user.name, reason: body.reason, evidenceMediaIds: body.evidenceMediaIds ?? [], metadata: { reasonCode: body.reasonCode ?? null } });
     recordEvent({
       orderId: row.orderId, itemId: row.orderItemId, status: target,
       actorName: g.user.name, note: body.reason ?? null,

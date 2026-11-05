@@ -1,0 +1,2728 @@
+openapi: 3.1.0
+info:
+  title: Arise Seller API
+  version: 2.0.0-backend-ready
+  description: Complete seller client surface from S1 through S18. All timestamps are UTC, money is integer paise and all IDs are opaque.
+servers:
+  - url: /api/seller/v1
+security:
+  - bearerAuth: []
+paths:
+  /onboarding:
+    get:
+      operationId: getSellerApplication
+      x-permission: onboarding.application.view
+      responses:
+        {
+          '200': { $ref: '#/components/responses/Application' },
+          '400': { $ref: '#/components/responses/Error' },
+        }
+    patch:
+      operationId: saveSellerApplicationSection
+      x-idempotent: true
+      x-permission: onboarding.application.edit
+      requestBody:
+        {
+          required: true,
+          content: { application/json: { schema: { type: object, additionalProperties: true } } },
+        }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/Application' },
+          '400': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /onboarding/submit:
+    post:
+      operationId: submitSellerApplication
+      x-permission: onboarding.application.submit
+      x-idempotent: true
+      responses:
+        {
+          '200': { description: Submitted },
+          '400': { $ref: '#/components/responses/Error' },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /onboarding/status:
+    get:
+      operationId: getSellerApplicationStatus
+      x-permission: onboarding.application.view
+      responses:
+        {
+          '200': { $ref: '#/components/responses/Application' },
+          '404': { $ref: '#/components/responses/Error' },
+        }
+  /onboarding/sections/{sectionKey}/resubmit:
+    parameters: [{ name: sectionKey, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: resubmitSellerApplicationSection
+      x-permission: onboarding.application.resubmit
+      x-idempotent: true
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      properties:
+                        {
+                          documents:
+                            {
+                              type: object,
+                              additionalProperties: { $ref: '#/components/schemas/MediaReference' },
+                            },
+                        },
+                    },
+                },
+            },
+        }
+      responses:
+        {
+          '200': { $ref: '#/components/responses/Application' },
+          '400': { $ref: '#/components/responses/Error' },
+        }
+  /onboarding/agreement:
+    get:
+      operationId: getCurrentSellerAgreement
+      x-permission: onboarding.agreement.view
+      responses: { '200': { description: Current versioned agreement } }
+  /onboarding/agreement/accept:
+    post:
+      operationId: acceptSellerAgreement
+      x-permission: onboarding.agreement.accept
+      x-idempotent: true
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [version],
+                      properties: { version: { type: string } },
+                    },
+                },
+            },
+        }
+      responses:
+        {
+          '200': { description: Immutable acceptance receipt },
+          '409': { $ref: '#/components/responses/Error' },
+        }
+  /onboarding/pincode/{pincode}:
+    parameters:
+      [{ name: pincode, in: path, required: true, schema: { type: string, pattern: '^\\d{6}$' } }]
+    get:
+      operationId: checkPickupPincode
+      x-permission: onboarding.application.edit
+      responses:
+        {
+          '200': { description: Pickup serviceability },
+          '400': { $ref: '#/components/responses/Error' },
+        }
+  /settings/profile/change-requests:
+    post:
+      operationId: requestVerifiedIdentityChange
+      x-idempotent: true
+      x-permission: onboarding.change_request.create
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json: { schema: { $ref: '#/components/schemas/VerifiedChangeRequest' } },
+            },
+        }
+      responses:
+        { '200': { description: Change request }, '422': { $ref: '#/components/responses/Error' } }
+  /settings/profile/documents/{documentId}/renew:
+    parameters: [{ name: documentId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: renewVerifiedDocument
+      x-idempotent: true
+      x-permission: onboarding.document.replace
+      requestBody:
+        {
+          required: true,
+          content:
+            {
+              application/json:
+                {
+                  schema:
+                    {
+                      type: object,
+                      required: [mediaId],
+                      properties:
+                        {
+                          mediaId: { type: string },
+                          expiresAt: { type: [string, 'null'], format: date-time },
+                        },
+                    },
+                },
+            },
+        }
+      responses:
+        {
+          '200': { description: Pending replacement document },
+          '404': { $ref: '#/components/responses/Error' },
+        }
+  /media/uploads:
+    post:
+      operationId: createMediaUpload
+      x-idempotent: true
+      x-permission: media.upload.create
+      x-idempotent: false
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateMediaUpload' }
+      responses:
+        '201': { $ref: '#/components/responses/UploadCreated' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /media/uploads/{uploadId}/content:
+    parameters: [{ $ref: '#/components/parameters/UploadId' }]
+    put:
+      operationId: putMediaContent
+      x-permission: media.upload.create
+      x-idempotent: true
+      requestBody:
+        required: true
+        content: { application/octet-stream: { schema: { type: string, format: binary } } }
+      responses:
+        '200': { description: Uploaded }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /media/uploads/{uploadId}/complete:
+    parameters: [{ $ref: '#/components/parameters/UploadId' }]
+    post:
+      operationId: completeMediaUpload
+      x-permission: media.upload.create
+      x-idempotent: true
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties: { width: { type: integer }, height: { type: integer } }
+      responses:
+        '200': { $ref: '#/components/responses/Media' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+  /media/uploads/{uploadId}:
+    parameters: [{ $ref: '#/components/parameters/UploadId' }]
+    delete:
+      operationId: abortMediaUpload
+      x-permission: media.upload.create
+      x-idempotent: true
+      responses:
+        '200': { description: Aborted }
+        '404': { $ref: '#/components/responses/Error' }
+  /media/{mediaId}:
+    parameters: [{ $ref: '#/components/parameters/MediaId' }]
+    get:
+      operationId: getMedia
+      x-permission: media.media.view
+      responses:
+        '200': { $ref: '#/components/responses/Media' }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: updateMediaPresentation
+      x-idempotent: true
+      x-permission: media.upload.create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                crop: { $ref: '#/components/schemas/Crop' }
+      responses:
+        '200': { $ref: '#/components/responses/Media' }
+        '400': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+    delete:
+      operationId: deleteMedia
+      x-permission: media.upload.delete
+      x-idempotent: true
+      responses:
+        '200': { description: Deleted }
+        '404': { $ref: '#/components/responses/Error' }
+  /exports:
+    post:
+      operationId: createExportJob
+      x-idempotent: true
+      x-permission: exports.job.create
+      x-idempotency-required: true
+      parameters: [{ $ref: '#/components/parameters/IdempotencyKey' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateExport' }
+      responses:
+        '201': { $ref: '#/components/responses/Job' }
+        '400': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /jobs:
+    get:
+      operationId: listSellerJobs
+      x-permission: exports.job.view
+      responses:
+        '200':
+          description: Seller-scoped jobs
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties: { data: { type: array, items: { $ref: '#/components/schemas/Job' } } }
+        '403': { $ref: '#/components/responses/Error' }
+  /jobs/{jobId}:
+    parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerJob
+      x-permission: exports.job.view
+      responses:
+        '200': { $ref: '#/components/responses/Job' }
+        '404': { $ref: '#/components/responses/Error' }
+  /saved-views:
+    get:
+      operationId: listSavedViews
+      x-permission: dashboard.dashboard.view
+      parameters: [{ name: tableId, in: query, schema: { type: string } }]
+      responses: { '200': { description: Saved views } }
+    post:
+      operationId: createSavedView
+      x-permission: dashboard.dashboard.view
+      x-idempotent: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tableId, name, state]
+              properties:
+                {
+                  tableId: { type: string },
+                  name: { type: string, maxLength: 80 },
+                  state: { type: object, additionalProperties: true },
+                }
+      responses:
+        '201': { description: Saved view }
+        '422': { $ref: '#/components/responses/Error' }
+  /saved-views/{viewId}:
+    parameters: [{ name: viewId, in: path, required: true, schema: { type: string } }]
+    delete:
+      operationId: deleteSavedView
+      x-permission: dashboard.dashboard.view
+      x-idempotent: true
+      responses:
+        '200': { description: Deleted }
+        '404': { $ref: '#/components/responses/Error' }
+  /catalog/search:
+    get:
+      operationId: searchSellerCatalogue
+      x-permission: catalog.product.view
+      parameters:
+        - { name: q, in: query, schema: { type: string } }
+        - { name: categoryId, in: query, schema: { type: string } }
+        - { name: brandId, in: query, schema: { type: string } }
+      responses:
+        '200': { description: Customer-visible canonical product matches }
+  /catalog/products/{productId}:
+    parameters: [{ name: productId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellableCatalogueProduct
+      x-permission: catalog.product.view
+      responses:
+        '200': { description: Canonical product and variants }
+        '404': { $ref: '#/components/responses/Error' }
+  /catalog/products/{productId}/offers:
+    parameters: [{ name: productId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: attachSellerOffers
+      x-idempotent: true
+      x-permission: listings.offer.create
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [offers]
+              properties:
+                fulfillmentType: { type: string, enum: [SELLER, ARISE] }
+                offers:
+                  type: array
+                  minItems: 1
+                  items: { $ref: '#/components/schemas/OfferInput' }
+      responses:
+        '201': { description: Seller offers created; canonical content unchanged }
+        '409': { $ref: '#/components/responses/Error' }
+  /listings/{listingId}:
+    parameters: [{ name: listingId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerListing
+      x-permission: listings.product.view
+      responses:
+        '200': { description: Offer, canonical content, quality, revision and preview projection }
+        '404': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: proposeSellerContentUpdate
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses:
+        '200': { description: Updated pre-live content or pending live revision }
+        '400': { $ref: '#/components/responses/Error' }
+  /listings/{listingId}/variant:
+    parameters: [{ name: listingId, in: path, required: true, schema: { type: string } }]
+    patch:
+      operationId: updateSellerVariant
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses: { '200': { description: Updated variant and offer projection } }
+  /listings/{listingId}/price:
+    parameters: [{ name: listingId, in: path, required: true, schema: { type: string } }]
+    patch:
+      operationId: scheduleSellerPrice
+      x-idempotent: true
+      x-permission: listings.price.edit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [sellingPricePaise]
+              properties:
+                sellingPricePaise: { type: integer, minimum: 1 }
+                mrpPaise: { type: integer, minimum: 1 }
+                scheduledAt: { type: string, format: date-time }
+      responses:
+        '200': { description: Immediate or scheduled price }
+        '422': { $ref: '#/components/responses/Error' }
+  /listings/{listingId}/preview:
+    parameters: [{ name: listingId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: previewSellerListingAsCustomer
+      x-permission: listings.product.view
+      responses: { '200': { description: Customer-shaped product projection } }
+  /listings/{listingId}/{action}:
+    parameters:
+      - { name: listingId, in: path, required: true, schema: { type: string } }
+      - {
+          name: action,
+          in: path,
+          required: true,
+          schema: { type: string, enum: [activate, deactivate, archive, relist, delete, resubmit] },
+        }
+    post:
+      operationId: transitionSellerOffer
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        content:
+          {
+            application/json:
+              { schema: { type: object, properties: { reason: { type: string } } } },
+          }
+      responses:
+        '200': { description: Transitioned seller offer; canonical product preserved }
+        '409': { $ref: '#/components/responses/Error' }
+  /listings/fee-preview:
+    post:
+      operationId: previewSellerFees
+      x-idempotent: true
+      x-permission: listings.price.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { type: object, additionalProperties: true } } }
+      responses: { '200': { description: Commission, fees, net, margin and buy-box context } }
+  /listings/bulk-jobs/template:
+    get:
+      operationId: getSellerBulkTemplate
+      x-permission: listings.product.edit
+      parameters:
+        - {
+            name: operation,
+            in: query,
+            required: true,
+            schema: { $ref: '#/components/schemas/BulkOperation' },
+          }
+        - { name: categoryId, in: query, schema: { type: string } }
+      responses: { '200': { description: Operation-specific columns and sample } }
+  /listings/bulk-jobs/preflight:
+    post:
+      operationId: preflightSellerBulkJob
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BulkRequest' } } }
+      responses: { '200': { description: Per-row errors and warnings without writes } }
+  /listings/bulk-jobs:
+    get:
+      operationId: listSellerBulkJobs
+      x-permission: listings.product.view
+      responses: { '200': { description: Seller-owned catalogue jobs } }
+    post:
+      operationId: createSellerBulkJob
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/BulkRequest' } } }
+      responses: { '201': { description: Completed job and per-row results } }
+  /listings/bulk-jobs/{jobId}:
+    parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerBulkJob
+      x-permission: listings.product.view
+      responses:
+        '200': { description: Seller bulk job }
+        '404': { $ref: '#/components/responses/Error' }
+  /listings/bulk-jobs/{jobId}/retry:
+    parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: retrySellerBulkJobFailures
+      x-idempotent: true
+      x-permission: listings.product.edit
+      requestBody:
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    properties:
+                      {
+                        rows: { type: array, items: { type: object, additionalProperties: true } },
+                      },
+                  },
+              },
+          }
+      responses:
+        '201': { description: Child retry job }
+        '400': { $ref: '#/components/responses/Error' }
+  /orders/processing:
+    get:
+      operationId: getSellerDispatchQueue
+      x-permission: logistics.shipment.view
+      parameters:
+        - {
+            name: queue,
+            in: query,
+            schema: { type: string, enum: [ALL, ACCEPTANCE, PICK, PACK, HANDOVER, OVERDUE] },
+          }
+        - { name: fulfillmentType, in: query, schema: { type: string, enum: [SELLER, ARISE] } }
+      responses: { '200': { description: Seller-scoped dispatch work queue } }
+  /orders/{shipmentId}/packages:
+    parameters: [{ name: shipmentId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: recordSellerShipmentPackages
+      x-idempotent: true
+      x-permission: logistics.shipment.pack
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [packages]
+              properties:
+                packages:
+                  { type: array, minItems: 1, items: { $ref: '#/components/schemas/PackageInput' } }
+      responses:
+        '200': { description: Package composition and actual measurements }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{shipmentId}/split:
+    parameters: [{ name: shipmentId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: splitSellerShipment
+      x-idempotent: true
+      x-permission: logistics.shipment.pack
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [itemIds],
+                    properties: { itemIds: { type: array, minItems: 1, items: { type: string } } },
+                  },
+              },
+          }
+      responses:
+        '201': { description: Child shipment for partial fulfilment }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{shipmentId}/scan:
+    parameters: [{ name: shipmentId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: recordSellerFulfilmentScan
+      x-idempotent: true
+      x-permission: logistics.shipment.pack
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [barcode, purpose],
+                    properties:
+                      {
+                        barcode: { type: string },
+                        purpose: { type: string, enum: [PACK, HANDOVER] },
+                      },
+                  },
+              },
+          }
+      responses:
+        '201': { description: Immutable fulfilment scan }
+        '400': { $ref: '#/components/responses/Error' }
+  /orders/{shipmentId}/documents:
+    parameters: [{ name: shipmentId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: listSellerFulfilmentDocuments
+      x-permission: logistics.document.view
+      responses: { '200': { description: Versioned fulfilment documents } }
+  /orders/{shipmentId}/documents/{type}:
+    parameters:
+      - { name: shipmentId, in: path, required: true, schema: { type: string } }
+      - {
+          name: type,
+          in: path,
+          required: true,
+          schema: { type: string, enum: [TAX_INVOICE, PACKING_SLIP, SHIPPING_LABEL, MANIFEST] },
+        }
+    post:
+      operationId: generateSellerFulfilmentDocument
+      x-idempotent: true
+      x-permission: logistics.document.generate
+      responses:
+        '201': { description: Immutable server-generated document artifact }
+        '409': { $ref: '#/components/responses/Error' }
+  /logistics/documents/{documentId}/download:
+    parameters: [{ name: documentId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: downloadSellerFulfilmentDocument
+      x-permission: logistics.document.view
+      responses:
+        '200':
+          {
+            description: PDF artifact,
+            content: { application/pdf: { schema: { type: string, format: binary } } },
+          }
+        '404': { $ref: '#/components/responses/Error' }
+  /logistics/batch:
+    post:
+      operationId: executeSellerLogisticsBatch
+      x-idempotent: true
+      x-permission: logistics.shipment.handover
+      requestBody:
+        required: true
+        content:
+          { application/json: { schema: { $ref: '#/components/schemas/LogisticsBatchRequest' } } }
+      responses: { '200': { description: Per-shipment success and failure results } }
+  /logistics/shipments:
+    get:
+      operationId: listSellerShipments
+      x-permission: logistics.shipment.view
+      responses: { '200': { description: Seller-scoped shipments and courier scans } }
+  /logistics/pickups:
+    get:
+      operationId: listSellerPickups
+      x-permission: logistics.pickup.view
+      responses: { '200': { description: Seller manifests and pickup attempts } }
+  /logistics/pickups/{manifestId}/reschedule:
+    parameters: [{ name: manifestId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: rescheduleSellerPickup
+      x-idempotent: true
+      x-permission: logistics.pickup.manage
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [date],
+                    properties: { date: { type: string, format: date }, slot: { type: string } },
+                  },
+              },
+          }
+      responses:
+        '200': { description: Rescheduled pickup }
+        '409': { $ref: '#/components/responses/Error' }
+  /logistics/ndr:
+    get:
+      operationId: listSellerNdr
+      x-permission: logistics.ndr.view
+      responses: { '200': { description: Seller NDR queue with response deadlines } }
+  /logistics/ndr/{ndrId}/respond:
+    parameters: [{ name: ndrId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: respondToSellerNdr
+      x-idempotent: true
+      x-permission: logistics.ndr.respond
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [action],
+                    properties:
+                      {
+                        action: { type: string, enum: [REATTEMPT, RTO] },
+                        note: { type: string },
+                        reason: { type: string },
+                      },
+                  },
+              },
+          }
+      responses:
+        '200': { description: Seller decision shared with admin and tracking }
+        '409': { $ref: '#/components/responses/Error' }
+  /logistics/rto:
+    get:
+      operationId: listSellerRto
+      x-permission: logistics.rto.view
+      responses: { '200': { description: Seller return-to-origin tracking } }
+  /logistics/weight-disputes:
+    get:
+      operationId: listSellerWeightDisputes
+      x-permission: logistics.weight_dispute.view
+      responses: { '200': { description: Seller courier weight charges } }
+  /logistics/weight-disputes/{disputeId}/dispute:
+    parameters: [{ name: disputeId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: disputeSellerWeightCharge
+      x-idempotent: true
+      x-permission: logistics.weight_dispute.create
+      requestBody:
+        required: true
+        content:
+          {
+            application/json:
+              {
+                schema:
+                  {
+                    type: object,
+                    required: [reason, evidence],
+                    properties:
+                      {
+                        reason: { type: string },
+                        evidence:
+                          {
+                            type: array,
+                            minItems: 1,
+                            items: { $ref: '#/components/schemas/MediaReference' },
+                          },
+                      },
+                  },
+              },
+          }
+      responses:
+        '200': { description: Dispute submitted for admin resolution }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/warehouses:
+    get:
+      operationId: listSellerWarehouses
+      x-permission: settings.pickup.manage
+      responses: { '200': { description: Seller warehouses with dependency summaries } }
+    post:
+      operationId: createSellerWarehouse
+      x-idempotent: true
+      x-permission: settings.pickup.manage
+      responses: { '201': { description: Warehouse created }, '400': { $ref: '#/components/responses/Error' } }
+  /settings/warehouses/{warehouseId}:
+    parameters: [{ name: warehouseId, in: path, required: true, schema: { type: string } }]
+    patch:
+      operationId: updateSellerWarehouse
+      x-idempotent: true
+      x-permission: settings.pickup.manage
+      responses: { '200': { description: Warehouse updated }, '409': { $ref: '#/components/responses/Error' } }
+  /settings/warehouses/{warehouseId}/deactivate:
+    parameters: [{ name: warehouseId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: deactivateSellerWarehouse
+      x-idempotent: true
+      x-permission: settings.pickup.manage
+      responses: { '200': { description: Warehouse deactivated }, '409': { $ref: '#/components/responses/Error' } }
+  /inventory:
+    get:
+      operationId: listSellerInventory
+      x-permission: inventory.stock.view
+      responses: { '200': { description: Self-ship and FBA inventory projection } }
+  /inventory/{inventoryId}/ledger:
+    parameters: [{ name: inventoryId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerInventoryLedger
+      x-permission: inventory.stock.view
+      responses: { '200': { description: Inventory balance and immutable movements } }
+  /inventory/{inventoryId}/stock:
+    parameters: [{ name: inventoryId, in: path, required: true, schema: { type: string } }]
+    patch:
+      operationId: updateSellerSelfShipStock
+      x-idempotent: true
+      x-permission: inventory.stock.edit
+      responses: { '200': { description: Stock updated }, '409': { $ref: '#/components/responses/Error' } }
+  /inventory/bulk-jobs:
+    post:
+      operationId: createSellerInventoryBulkJob
+      x-idempotent: true
+      x-permission: inventory.stock.edit
+      responses: { '201': { description: Per-row bulk stock results } }
+  /inventory/bulk-jobs/{jobId}/retry:
+    parameters: [{ name: jobId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: retrySellerInventoryBulkFailures
+      x-idempotent: true
+      x-permission: inventory.stock.edit
+      responses: { '201': { description: Retry job containing failed rows only } }
+  /inventory/recommendations:
+    get:
+      operationId: listSellerReplenishmentRecommendations
+      x-permission: inventory.stock.view
+      responses: { '200': { description: Velocity and days-cover recommendations } }
+  /inventory/removals:
+    get:
+      operationId: listSellerRemovalOrders
+      x-permission: inventory.stock.view
+      responses: { '200': { description: Seller removal lifecycle } }
+  /inbound/{inboundId}:
+    parameters: [{ name: inboundId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerInboundDetail
+      x-permission: inventory.inbound.manage
+      responses: { '200': { description: Lines, documents, timeline, ledger and disputes } }
+  /inbound/{inboundId}/disputes:
+    parameters: [{ name: inboundId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: createSellerInboundDispute
+      x-idempotent: true
+      x-permission: inventory.inbound.manage
+      responses: { '201': { description: Receiving discrepancy dispute }, '409': { $ref: '#/components/responses/Error' } }
+  /returns-analytics:
+    get:
+      operationId: getSellerReturnAnalytics
+      x-permission: returns.return.view
+      responses: { '200': { description: Return counts and financial impact grouped by product, reason and fault } }
+  /returns/{returnId}:
+    parameters: [{ name: returnId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerReturnDetail
+      x-permission: returns.return.view
+      responses: { '200': { description: Moderated evidence, policy, timeline and linked outcomes } }
+  /returns/{returnId}/reject:
+    parameters: [{ name: returnId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: rejectSellerReturn
+      x-idempotent: true
+      x-permission: returns.return.decide
+      responses: { '200': { description: Structured seller decision }, '409': { $ref: '#/components/responses/Error' } }
+  /returns/{returnId}/qc:
+    parameters: [{ name: returnId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: recordSellerReturnQc
+      x-idempotent: true
+      x-permission: returns.return.qc
+      responses: { '200': { description: QC outcome and linked refund or replacement }, '409': { $ref: '#/components/responses/Error' } }
+  /returns/{returnId}/disputes:
+    parameters: [{ name: returnId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: createSellerReturnDispute
+      x-idempotent: true
+      x-permission: returns.dispute.create
+      responses: { '201': { description: Return dispute and linked claim }, '400': { $ref: '#/components/responses/Error' } }
+  /finance/adjustments:
+    get:
+      operationId: listSellerPayoutAdjustments
+      x-permission: finance.transaction.view
+      responses: { '200': { description: Seller-owned payout adjustments and claim references } }
+  /finance/reconciliation:
+    get:
+      operationId: listSellerReconciliation
+      x-permission: finance.reconciliation.view
+      responses: { '200': { description: Paginated seller order-to-bank reconciliation traces } }
+  /finance/reconciliation/{lineId}:
+    parameters: [{ name: lineId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerReconciliationLine
+      x-permission: finance.reconciliation.view
+      responses: { '200': { description: Linked return, refund, weight, adjustment, payout and UTR trace }, '404': { $ref: '#/components/responses/Error' } }
+  /finance/reconciliation/{lineId}/disputes:
+    parameters: [{ name: lineId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: createSellerFinanceDispute
+      x-permission: finance.reconciliation.dispute
+      x-idempotent: true
+      responses: { '201': { description: Evidence-backed deduction dispute }, '409': { $ref: '#/components/responses/Error' } }
+  /finance/fees:
+    get:
+      operationId: getSellerFeeSchedule
+      x-permission: finance.fee.view
+      responses: { '200': { description: Current rules, plan and effective-date history } }
+  /finance/fees/preview:
+    post:
+      operationId: previewSellerFinanceFees
+      x-idempotent: true
+      x-permission: finance.fee.view
+      responses: { '200': { description: Integer-paise settlement breakdown from shared engine }, '400': { $ref: '#/components/responses/Error' } }
+  /finance/documents:
+    get:
+      operationId: listSellerFinanceDocuments
+      x-permission: finance.invoice.view
+      responses: { '200': { description: Seller-owned backend artifacts and generation states } }
+    post:
+      operationId: generateSellerFinanceDocument
+      x-permission: finance.invoice.view
+      x-idempotent: true
+      responses: { '201': { description: Generated or failed backend artifact }, '404': { $ref: '#/components/responses/Error' } }
+  /finance/documents/{documentId}/retry:
+    parameters: [{ name: documentId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: retrySellerFinanceDocument
+      x-idempotent: true
+      x-permission: finance.invoice.view
+      responses: { '200': { description: Regenerated backend artifact }, '409': { $ref: '#/components/responses/Error' } }
+  /finance/documents/{documentId}/download:
+    parameters: [{ name: documentId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: downloadSellerFinanceDocument
+      x-permission: finance.invoice.view
+      responses: { '200': { description: Finance PDF artifact }, '409': { $ref: '#/components/responses/Error' } }
+  /customer-experience/reviews:
+    get:
+      operationId: listSellerReviews
+      x-permission: customer_experience.review.view
+      responses: { '200': { description: Seller-scoped reviews with masked buyer and report/reply state } }
+  /customer-experience/reviews/{reviewId}/reply:
+    parameters: [{ name: reviewId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: replyToSellerReview
+      x-idempotent: true
+      x-permission: customer_experience.review.reply
+      responses: { '200': { description: Reply awaiting admin moderation }, '409': { $ref: '#/components/responses/Error' } }
+  /customer-experience/reviews/{reviewId}/report:
+    parameters: [{ name: reviewId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: reportSellerReviewAbuse
+      x-idempotent: true
+      x-permission: customer_experience.review.report
+      responses: { '201': { description: Shared admin abuse report }, '409': { $ref: '#/components/responses/Error' } }
+  /customer-experience/questions:
+    get:
+      operationId: listSellerProductQuestions
+      x-permission: customer_experience.question.view
+      responses: { '200': { description: Seller product questions with response SLA and moderated answers } }
+  /customer-experience/questions/{questionId}/answers:
+    parameters: [{ name: questionId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: answerSellerProductQuestion
+      x-idempotent: true
+      x-permission: customer_experience.question.answer
+      responses: { '201': { description: Seller answer awaiting moderation }, '409': { $ref: '#/components/responses/Error' } }
+  /customer-experience/messages:
+    get:
+      operationId: listSellerBuyerConversations
+      x-permission: customer_experience.message.view
+      responses: { '200': { description: Transaction-only conversations with masked buyer identity } }
+  /customer-experience/messages/{conversationId}:
+    parameters: [{ name: conversationId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerBuyerConversation
+      x-permission: customer_experience.message.view
+      responses: { '200': { description: Seller-owned moderated conversation }, '404': { $ref: '#/components/responses/Error' } }
+    post:
+      operationId: replyToBuyerConversation
+      x-idempotent: true
+      x-permission: customer_experience.message.reply
+      responses: { '201': { description: Policy-compliant transaction message }, '400': { $ref: '#/components/responses/Error' } }
+  /support/help:
+    get:
+      operationId: searchSellerHelp
+      x-permission: support.ticket.view
+      responses: { '200': { description: Published shared-CMS help articles } }
+  /support/context-options:
+    get:
+      operationId: listSellerSupportContexts
+      x-permission: support.ticket.create
+      responses: { '200': { description: Seller-owned orders, listings, payouts and returns } }
+  /support/incidents:
+    get:
+      operationId: listSellerSupportIncidents
+      x-permission: support.ticket.view
+      responses: { '200': { description: Current seller-service status notices } }
+  /support/tickets/{ticketId}/reopen:
+    parameters: [{ name: ticketId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: reopenSellerSupportTicket
+      x-idempotent: true
+      x-permission: support.ticket.reply
+      responses: { '200': { description: Reopened shared ticket with escalation state }, '409': { $ref: '#/components/responses/Error' } }
+  /support/tickets/{ticketId}/callback:
+    parameters: [{ name: ticketId, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: requestSellerSupportCallback
+      x-idempotent: true
+      x-permission: support.ticket.reply
+      responses: { '200': { description: Callback request recorded on shared ticket }, '409': { $ref: '#/components/responses/Error' } }
+  /analytics/filters:
+    get:
+      operationId: getSellerAnalyticsFilters
+      x-permission: analytics.dashboard.view
+      responses: { '200': { description: Seller-safe analytics filter dimensions } }
+  /analytics/{view}:
+    parameters: [{ name: view, in: path, required: true, schema: { type: string, enum: [overview, products, traffic, operations, finance] } }]
+    get:
+      operationId: getSellerAnalyticsView
+      x-permission: analytics.dashboard.view
+      responses: { '200': { description: Seller-scoped metrics with period, freshness and definitions } }
+  /analytics/recommendations:
+    get:
+      operationId: listSellerRecommendations
+      x-permission: analytics.recommendation.view
+      responses: { '200': { description: Seller recommendations with provenance and impact } }
+  /analytics/recommendations/{recommendationId}/{action}:
+    parameters: [{ name: recommendationId, in: path, required: true, schema: { type: string } }, { name: action, in: path, required: true, schema: { type: string, enum: [apply, dismiss, snooze] } }]
+    post:
+      operationId: actOnSellerRecommendation
+      x-idempotent: true
+      x-permission: analytics.recommendation.apply
+      responses: { '200': { description: Audited recommendation state } }
+  /ads/billing:
+    get:
+      operationId: getSellerAdBilling
+      x-permission: ads.campaign.view
+      responses: { '200': { description: Reconciled spend ledger, wallet entries and invoices } }
+  /ads/campaigns/{campaignId}/report:
+    parameters: [{ name: campaignId, in: path, required: true, schema: { type: string } }]
+    get:
+      operationId: getSellerAdCampaignReport
+      x-permission: ads.campaign.view
+      responses: { '200': { description: Product and search-term performance with attribution definition } }
+  /ads/campaigns/{campaignId}/targeting:
+    parameters: [{ name: campaignId, in: path, required: true, schema: { type: string } }]
+    patch:
+      operationId: updateSellerAdCampaignTargeting
+      x-idempotent: true
+      x-permission: ads.campaign.manage
+      responses: { '200': { description: Updated schedule, bidding and keyword targeting } }
+  /promotions/coupons/{couponId}/{action}:
+    parameters: [{ name: couponId, in: path, required: true, schema: { type: string } }, { name: action, in: path, required: true, schema: { type: string, enum: [pause, resume, end, preview] } }]
+    post:
+      operationId: actOnSellerCoupon
+      x-idempotent: true
+      x-permission: promotions.coupon.manage
+      responses: { '200': { description: Audited lifecycle state or shared-evaluator preview } }
+  /reports/templates:
+    get:
+      operationId: listSellerReportTemplates
+      x-permission: reports.report.view
+      responses: { '200': { description: Seller-owned saved report templates } }
+    post:
+      operationId: createSellerReportTemplate
+      x-idempotent: true
+      x-permission: reports.report.view
+      responses: { '201': { description: Saved report template } }
+  /settings/security:
+    get:
+      operationId: getSellerSecurityCentre
+      x-permission: security.session.view
+      responses: { '200': { description: Two-factor, recovery, sessions and security events } }
+  /settings/security/reauth:
+    post:
+      operationId: reauthenticateSellerSensitiveAction
+      x-permission: security.session.view
+      x-idempotent: true
+      responses: { '200': { description: One-use short-lived step-up token }, '401': { $ref: '#/components/responses/Error' } }
+  /settings/security/backup-codes:
+    post:
+      operationId: regenerateSellerBackupCodes
+      x-idempotent: true
+      x-permission: security.session.revoke
+      responses: { '200': { description: Create-once recovery codes }, '403': { $ref: '#/components/responses/Error' } }
+  /settings/security/sessions/{sessionId}:
+    parameters: [{ name: sessionId, in: path, required: true, schema: { type: string } }]
+    delete:
+      operationId: revokeSellerSession
+      x-idempotent: true
+      x-permission: security.session.revoke
+      responses: { '200': { description: Session revoked }, '404': { $ref: '#/components/responses/Error' } }
+  /settings/roles:
+    get:
+      operationId: listSellerRoles
+      x-permission: security.role.view
+      responses: { '200': { description: Safe templates and seller-owned custom roles } }
+    post:
+      operationId: createSellerRole
+      x-idempotent: true
+      x-permission: security.role.manage
+      responses: { '201': { description: Least-privilege custom role }, '403': { $ref: '#/components/responses/Error' } }
+  /settings/api-keys:
+    get:
+      operationId: listSellerApiKeys
+      x-permission: security.api_key.view
+      responses: { '200': { description: Metadata and scopes without stored secrets } }
+    post:
+      operationId: createSellerApiKey
+      x-idempotent: true
+      x-permission: security.api_key.create
+      responses: { '201': { description: API key with create-once plaintext secret }, '403': { $ref: '#/components/responses/Error' } }
+  /settings/webhooks:
+    get:
+      operationId: listSellerWebhooks
+      x-permission: security.webhook.view
+      responses: { '200': { description: Seller endpoints and delivery logs without secrets } }
+    post:
+      operationId: createSellerWebhook
+      x-idempotent: true
+      x-permission: security.webhook.manage
+      responses: { '201': { description: HTTPS webhook with create-once signing secret } }
+  /settings/notification-policy:
+    get:
+      operationId: getSellerNotificationPolicy
+      x-permission: settings.notification.manage
+      responses: { '200': { description: Event-channel matrix, quiet hours and escalation contacts } }
+    patch:
+      operationId: updateSellerNotificationPolicy
+      x-idempotent: true
+      x-permission: settings.notification.manage
+      responses: { '200': { description: Updated policy with mandatory security channels enforced } }
+  /me/sessions/{id}:
+    delete:
+      operationId: deleteMeSessionsId
+      x-permission: security.session.revoke
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /reports/schedules/{id}:
+    delete:
+      operationId: deleteReportsSchedulesId
+      x-permission: reports.report.view
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: patchReportsSchedulesId
+      x-permission: reports.report.view
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /reports/templates/{id}:
+    delete:
+      operationId: deleteReportsTemplatesId
+      x-permission: reports.report.view
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/roles/{id}:
+    delete:
+      operationId: deleteSettingsRolesId
+      x-permission: security.role.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: patchSettingsRolesId
+      x-permission: security.role.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns:
+    get:
+      operationId: getAdsCampaigns
+      x-permission: ads.campaign.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postAdsCampaigns
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns/{id}:
+    get:
+      operationId: getAdsCampaignsId
+      x-permission: ads.campaign.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: patchAdsCampaignsId
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/invoices/{id}/download:
+    get:
+      operationId: getAdsInvoicesIdDownload
+      x-permission: ads.campaign.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/wallet:
+    get:
+      operationId: getAdsWallet
+      x-permission: ads.campaign.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/invite/{token}:
+    get:
+      operationId: getAuthInviteToken
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /brand-requests:
+    get:
+      operationId: getBrandRequests
+      x-permission: listings.product.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postBrandRequests
+      x-permission: listings.brand.request
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /catalog/brands:
+    get:
+      operationId: getCatalogBrands
+      x-permission: catalog.product.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /catalog/categories:
+    get:
+      operationId: getCatalogCategories
+      x-permission: catalog.product.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /catalog/categories/{id}/attributes:
+    get:
+      operationId: getCatalogCategoriesIdAttributes
+      x-permission: catalog.product.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /claims:
+    get:
+      operationId: getClaims
+      x-permission: performance.claim.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postClaims
+      x-permission: performance.claim.create
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /claims/{id}:
+    get:
+      operationId: getClaimsId
+      x-permission: performance.claim.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /dashboard/activity:
+    get:
+      operationId: getDashboardActivity
+      x-permission: dashboard.dashboard.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /dashboard/alerts:
+    get:
+      operationId: getDashboardAlerts
+      x-permission: dashboard.dashboard.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      x-permission: dashboard.dashboard.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/invoices:
+    get:
+      operationId: getFinanceInvoices
+      x-permission: finance.payout.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/payouts:
+    get:
+      operationId: getFinancePayouts
+      x-permission: finance.payout.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/payouts/{id}:
+    get:
+      operationId: getFinancePayoutsId
+      x-permission: finance.payout.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/summary:
+    get:
+      operationId: getFinanceSummary
+      x-permission: finance.payout.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/tax:
+    get:
+      operationId: getFinanceTax
+      x-permission: finance.payout.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /finance/transactions:
+    get:
+      operationId: getFinanceTransactions
+      x-permission: finance.payout.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /inbound:
+    get:
+      operationId: getInbound
+      x-permission: inventory.inbound.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postInbound
+      x-permission: inventory.inbound.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /listings:
+    get:
+      operationId: getListings
+      x-permission: listings.product.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postListings
+      x-permission: listings.product.edit
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /me:
+    get:
+      operationId: getMe
+      x-permission: security.session.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /me/sessions:
+    get:
+      operationId: getMeSessions
+      x-permission: security.session.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders:
+    get:
+      operationId: getOrders
+      x-permission: orders.order.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /penalties:
+    get:
+      operationId: getPenalties
+      x-permission: performance.penalty.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /performance/health:
+    get:
+      operationId: getPerformanceHealth
+      x-permission: performance.health.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /performance/ratings:
+    get:
+      operationId: getPerformanceRatings
+      x-permission: performance.health.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /performance/trend:
+    get:
+      operationId: getPerformanceTrend
+      x-permission: performance.health.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/coupons:
+    get:
+      operationId: getPromotionsCoupons
+      x-permission: promotions.deal.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postPromotionsCoupons
+      x-permission: promotions.deal.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/deals:
+    get:
+      operationId: getPromotionsDeals
+      x-permission: promotions.deal.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/flash-sales:
+    get:
+      operationId: getPromotionsFlashSales
+      x-permission: promotions.deal.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/nominations:
+    get:
+      operationId: getPromotionsNominations
+      x-permission: promotions.deal.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /reports/schedules:
+    get:
+      operationId: getReportsSchedules
+      x-permission: reports.report.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postReportsSchedules
+      x-permission: reports.report.view
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /returns:
+    get:
+      operationId: getReturns
+      x-permission: returns.return.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/audit:
+    get:
+      operationId: getSettingsAudit
+      x-permission: security.audit.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/bank:
+    get:
+      operationId: getSettingsBank
+      x-permission: settings.bank.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/integrations:
+    get:
+      operationId: getSettingsIntegrations
+      x-permission: dashboard.dashboard.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/profile:
+    get:
+      operationId: getSettingsProfile
+      x-permission: settings.profile.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    patch:
+      operationId: patchSettingsProfile
+      x-permission: settings.profile.edit
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/users:
+    get:
+      operationId: getSettingsUsers
+      x-permission: settings.user.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/tickets:
+    get:
+      operationId: getSupportTickets
+      x-permission: support.ticket.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postSupportTickets
+      x-permission: support.ticket.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/tickets/{id}:
+    get:
+      operationId: getSupportTicketsId
+      x-permission: support.ticket.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /warehouses:
+    get:
+      operationId: getWarehouses
+      x-permission: inventory.inbound.manage
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /listings/{id}/stock:
+    patch:
+      operationId: patchListingsIdStock
+      x-permission: listings.product.edit
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /me/preferences:
+    patch:
+      operationId: patchMePreferences
+      x-permission: security.session.revoke
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/coupons/{id}:
+    patch:
+      operationId: patchPromotionsCouponsId
+      x-permission: promotions.deal.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/notifications:
+    patch:
+      operationId: patchSettingsNotifications
+      x-permission: settings.notification.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/users/{id}:
+    patch:
+      operationId: patchSettingsUsersId
+      x-permission: settings.user.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns/{id}/end:
+    post:
+      operationId: postAdsCampaignsIdEnd
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns/{id}/pause:
+    post:
+      operationId: postAdsCampaignsIdPause
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns/{id}/resume:
+    post:
+      operationId: postAdsCampaignsIdResume
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/campaigns/{id}/submit:
+    post:
+      operationId: postAdsCampaignsIdSubmit
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /ads/wallet/recharge:
+    post:
+      operationId: postAdsWalletRecharge
+      x-permission: ads.campaign.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/2fa/enrol:
+    post:
+      operationId: postAuth2faEnrol
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/2fa/verify:
+    post:
+      operationId: postAuth2faVerify
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/forgot-password:
+    post:
+      operationId: postAuthForgotPassword
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/invite/accept:
+    post:
+      operationId: postAuthInviteAccept
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/login:
+    post:
+      operationId: postAuthLogin
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/logout:
+    post:
+      operationId: postAuthLogout
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/refresh:
+    post:
+      operationId: postAuthRefresh
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/register:
+    post:
+      operationId: postAuthRegister
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /auth/reset-password:
+    post:
+      operationId: postAuthResetPassword
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /dashboard/alerts/{id}/read:
+    post:
+      operationId: postDashboardAlertsIdRead
+      x-permission: dashboard.dashboard.view
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /inbound/{id}/cancel:
+    post:
+      operationId: postInboundIdCancel
+      x-permission: inventory.inbound.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /inbound/{id}/submit:
+    post:
+      operationId: postInboundIdSubmit
+      x-permission: inventory.inbound.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /inventory/{id}/removal:
+    post:
+      operationId: postInventoryIdRemoval
+      x-permission: inventory.stock.edit
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /listings/bulk:
+    post:
+      operationId: postListingsBulk
+      x-permission: listings.product.edit
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /me/2fa/backup-codes:
+    post:
+      operationId: postMe2faBackupCodes
+      x-permission: security.session.revoke
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /me/password:
+    post:
+      operationId: postMePassword
+      x-permission: security.session.revoke
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{id}/cancel:
+    post:
+      operationId: postOrdersIdCancel
+      x-permission: orders.order.process
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{id}/confirm:
+    post:
+      operationId: postOrdersIdConfirm
+      x-permission: orders.order.process
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{id}/dispatch:
+    post:
+      operationId: postOrdersIdDispatch
+      x-permission: orders.order.process
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{id}/manifest:
+    post:
+      operationId: postOrdersIdManifest
+      x-permission: orders.order.process
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /orders/{id}/pack:
+    post:
+      operationId: postOrdersIdPack
+      x-permission: orders.order.process
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /penalties/{id}/dispute:
+    post:
+      operationId: postPenaltiesIdDispute
+      x-permission: performance.penalty.dispute
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /promotions/flash-sales/{flashSaleId}/nominate:
+    post:
+      operationId: postPromotionsFlashSalesFlashSaleIdNominate
+      x-permission: promotions.deal.manage
+      x-idempotent: true
+      parameters:
+        - { name: flashSaleId, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /returns/{id}/approve:
+    post:
+      operationId: postReturnsIdApprove
+      x-permission: returns.return.decide
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /returns/{id}/receive:
+    post:
+      operationId: postReturnsIdReceive
+      x-permission: returns.return.decide
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/api-keys/{id}/{action}:
+    post:
+      operationId: postSettingsApiKeysIdAction
+      x-permission: security.api_key.create
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: action, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/bank/pickup-addresses:
+    post:
+      operationId: postSettingsBankPickupAddresses
+      x-permission: settings.bank.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/security/2fa/replace:
+    post:
+      operationId: postSettingsSecurity2faReplace
+      x-permission: security.session.revoke
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/security/sign-out-all:
+    post:
+      operationId: postSettingsSecuritySignOutAll
+      x-permission: security.session.revoke
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/users/{id}/{action}:
+    post:
+      operationId: postSettingsUsersIdAction
+      x-permission: settings.user.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+        - { name: action, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/users/{id}/revoke:
+    post:
+      operationId: postSettingsUsersIdRevoke
+      x-permission: settings.user.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/users/invite:
+    post:
+      operationId: postSettingsUsersInvite
+      x-permission: settings.user.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/vacation:
+    post:
+      operationId: postSettingsVacation
+      x-permission: settings.vacation.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/webhook-deliveries/{id}/retry:
+    post:
+      operationId: postSettingsWebhookDeliveriesIdRetry
+      x-permission: security.webhook.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/webhooks/{id}/rotate-secret:
+    post:
+      operationId: postSettingsWebhooksIdRotateSecret
+      x-permission: security.webhook.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/tickets/{id}/close:
+    post:
+      operationId: postSupportTicketsIdClose
+      x-permission: support.ticket.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/tickets/{id}/messages:
+    post:
+      operationId: postSupportTicketsIdMessages
+      x-permission: support.ticket.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /settings/bank/account:
+    put:
+      operationId: putSettingsBankAccount
+      x-permission: settings.bank.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    UploadId: { name: uploadId, in: path, required: true, schema: { type: string } }
+    MediaId: { name: mediaId, in: path, required: true, schema: { type: string } }
+    IdempotencyKey:
+      {
+        name: Idempotency-Key,
+        in: header,
+        required: true,
+        schema: { type: string, minLength: 8, maxLength: 200 },
+      }
+  requestBodies:
+    Command:
+      required: true
+      description: Endpoint-specific command payload. Required fields and invariants are defined by the operation inventory and executable seller journey tests.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Command' }
+  schemas:
+    Command:
+      type: object
+      description: A seller-scoped command. The authenticated principal supplies seller ownership; clients must never submit sellerId.
+      additionalProperties: true
+    PackageInput:
+      type: object
+      required: [itemIds, weightG, dimsCm]
+      properties:
+        itemIds: { type: array, minItems: 1, items: { type: string } }
+        weightG: { type: number, exclusiveMinimum: 0 }
+        dimsCm:
+          type: object
+          required: [l, w, h]
+          properties:
+            {
+              l: { type: number, exclusiveMinimum: 0 },
+              w: { type: number, exclusiveMinimum: 0 },
+              h: { type: number, exclusiveMinimum: 0 },
+            }
+    LogisticsBatchRequest:
+      type: object
+      required: [action, ids]
+      properties:
+        action: { type: string, enum: [GENERATE_DOCUMENTS, HANDOVER] }
+        documentType: { type: string, enum: [TAX_INVOICE, PACKING_SLIP, SHIPPING_LABEL, MANIFEST] }
+        ids: { type: array, minItems: 1, items: { type: string } }
+    BulkOperation:
+      type: string
+      enum: [CREATE_PRODUCTS, ATTACH_OFFERS, UPDATE_PRICE, UPDATE_STOCK, UPDATE_CONTENT]
+    BulkRequest:
+      type: object
+      required: [operation, rows]
+      properties:
+        operation: { $ref: '#/components/schemas/BulkOperation' }
+        rows: { type: array, minItems: 1, items: { type: object, additionalProperties: true } }
+    OfferInput:
+      type: object
+      required: [variantId, sellingPricePaise, mrpPaise, stock]
+      properties:
+        variantId: { type: string }
+        sellerSku: { type: string }
+        barcode: { type: string }
+        taxCode: { type: string }
+        sellingPricePaise: { type: integer, minimum: 1 }
+        mrpPaise: { type: integer, minimum: 1 }
+        stock: { type: integer, minimum: 0 }
+    MediaReference:
+      type: object
+      required: [mediaId]
+      properties:
+        { mediaId: { type: string }, fileName: { type: string }, previewUrl: { type: string } }
+    ApplicationSection:
+      type: object
+      required: [id, key, label, state]
+      properties:
+        id: { type: string }
+        key: { type: string, enum: [business, tax, signatory, bank, pickup, agreement] }
+        label: { type: string }
+        state:
+          {
+            type: string,
+            enum: [DRAFT, SUBMITTED, UNDER_REVIEW, CLARIFICATION_REQUIRED, REJECTED, APPROVED],
+          }
+        adminReason: { type: [string, 'null'] }
+        correctiveAction: { type: [string, 'null'] }
+    SellerApplication:
+      type: object
+      required: [id, sellerId, status, sections, documents]
+      properties:
+        id: { type: string }
+        sellerId: { type: string }
+        status:
+          { type: string, enum: [DRAFT, UNDER_REVIEW, CLARIFICATION_REQUIRED, REJECTED, APPROVED] }
+        sections: { type: array, items: { $ref: '#/components/schemas/ApplicationSection' } }
+        documents: { type: array, items: { type: object, additionalProperties: true } }
+        slaDueAt: { type: [string, 'null'], format: date-time }
+        agreementAcceptance: { type: [object, 'null'], additionalProperties: true }
+        events: { type: array, items: { type: object, additionalProperties: true } }
+    VerifiedChangeRequest:
+      type: object
+      required: [proposedValue, reason]
+      properties:
+        proposedValue: { type: string, minLength: 2, maxLength: 200 }
+        reason: { type: string, minLength: 2, maxLength: 2000 }
+        evidenceMediaIds: { type: array, items: { type: string } }
+    CreateMediaUpload:
+      type: object
+      required: [fileName, mimeType, sizeBytes, kind]
+      properties:
+        fileName: { type: string }
+        mimeType:
+          { type: string, enum: [image/jpeg, image/png, image/webp, application/pdf, text/csv] }
+        sizeBytes: { type: integer, minimum: 1, maximum: 20971520 }
+        kind: { type: string }
+        width: { type: [integer, 'null'] }
+        height: { type: [integer, 'null'] }
+    Crop:
+      type: object
+      required: [aspect]
+      properties: { aspect: { type: string, enum: [original, square, '4:3', '16:9'] } }
+    Media:
+      type: object
+      required: [id, fileName, mimeType, sizeBytes, status, previewUrl, downloadUrl, createdAt]
+      properties:
+        id: { type: string }
+        fileName: { type: string }
+        mimeType: { type: string }
+        sizeBytes: { type: integer }
+        width: { type: [integer, 'null'] }
+        height: { type: [integer, 'null'] }
+        status:
+          { type: string, enum: [AWAITING_UPLOAD, UPLOADED, PROCESSING, READY, FAILED, CANCELLED] }
+        previewUrl: { type: string }
+        downloadUrl: { type: string }
+        crop: { oneOf: [{ $ref: '#/components/schemas/Crop' }, { type: 'null' }] }
+        processingError: { type: [string, 'null'] }
+        createdAt: { type: string, format: date-time }
+    CreateExport:
+      type: object
+      required: [resource]
+      properties:
+        resource: { type: string }
+        label: { type: string }
+        format: { type: string, enum: [CSV, XLSX] }
+        estimatedRows: { type: integer, minimum: 0 }
+        selection:
+          type: object
+          required: [mode]
+          properties:
+            mode: { type: string, enum: [SELECTED, FILTERED] }
+            ids: { type: array, items: { type: string } }
+            filters: { type: object, additionalProperties: true }
+    Job:
+      type: object
+      required: [id, type, label, status, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        label: { type: string }
+        status:
+          { type: string, enum: [QUEUED, PROCESSING, COMPLETED, COMPLETED_WITH_ERRORS, FAILED] }
+        progressPct: { type: integer, minimum: 0, maximum: 100 }
+        resultUrl: { type: [string, 'null'] }
+        expiresAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+    Error:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            {
+              code: { type: string },
+              message: { type: string },
+              fieldErrors: { type: object, additionalProperties: true },
+              details: { type: object, additionalProperties: true },
+            }
+  responses:
+    Data:
+      description: Seller-scoped resource using the standard data envelope.
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [data]
+            properties:
+              data: { type: [object, array, 'null'] }
+    Error:
+      description: Standard error envelope
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    UploadCreated:
+      description: Upload session created
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data:
+                type: object
+                required: [uploadId, mediaId, uploadUrl, expiresAt]
+                properties:
+                  {
+                    uploadId: { type: string },
+                    mediaId: { type: string },
+                    uploadUrl: { type: string },
+                    expiresAt: { type: string, format: date-time },
+                  }
+    Media:
+      description: Media resource
+      content:
+        {
+          application/json:
+            {
+              schema:
+                { type: object, properties: { data: { $ref: '#/components/schemas/Media' } } },
+            },
+        }
+    Job:
+      description: Export job
+      content:
+        {
+          application/json:
+            {
+              schema: { type: object, properties: { data: { $ref: '#/components/schemas/Job' } } },
+            },
+        }
+    Application:
+      description: Seller application projection shared with admin review
+      content:
+        {
+          application/json:
+            {
+              schema:
+                {
+                  type: object,
+                  properties: { data: { $ref: '#/components/schemas/SellerApplication' } },
+                },
+            },
+        }

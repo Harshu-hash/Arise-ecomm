@@ -9,9 +9,37 @@ import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { orderKeys } from '../api/orders.api';
 
 const columns = [
-  { key: 'orderId', title: 'Order', dataIndex: 'orderId', render: (v, r) => <div><Typography.Text strong>{v}</Typography.Text><div><Typography.Text type="secondary" style={{ fontSize: 12 }}><DateText value={r.placedAt} /> · {r.city ?? '—'}</Typography.Text></div></div> },
-  { key: 'itemCount', title: 'Items', dataIndex: 'itemCount', width: 80, align: 'center', render: (_, r) => r.items.length },
-  { key: 'totalPaise', title: 'Value', dataIndex: 'totalPaise', align: 'right', width: 120, render: (p) => <MoneyText paise={p} /> },
+  {
+    key: 'orderId',
+    title: 'Order',
+    dataIndex: 'orderId',
+    render: (v, r) => (
+      <div>
+        <Typography.Text strong>{v}</Typography.Text>
+        <div>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            <DateText value={r.placedAt} /> · {r.city ?? '—'}
+          </Typography.Text>
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: 'itemCount',
+    title: 'Items',
+    dataIndex: 'itemCount',
+    width: 80,
+    align: 'center',
+    render: (_, r) => r.items.length,
+  },
+  {
+    key: 'totalPaise',
+    title: 'Value',
+    dataIndex: 'totalPaise',
+    align: 'right',
+    width: 120,
+    render: (p) => <MoneyText paise={p} />,
+  },
 ];
 
 export default function CancellationsPage() {
@@ -42,7 +70,10 @@ export default function CancellationsPage() {
           onRetry={refetch}
           tableState={state}
           onRowClick={(row) => navigate(`/orders/${row.id}`)}
-          emptyProps={{ title: 'No cancellations', description: 'Good news — none of your orders have been cancelled.' }}
+          emptyProps={{
+            title: 'No cancellations',
+            description: 'Good news — none of your orders have been cancelled.',
+          }}
         />
       </Card>
     </Flex>

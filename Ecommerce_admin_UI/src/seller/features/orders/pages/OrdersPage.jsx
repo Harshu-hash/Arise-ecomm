@@ -23,30 +23,42 @@ export default function OrdersPage() {
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: orderKeys.list({ ...state.queryParams, tab: state.tab }),
     url: '/orders',
-    params: { ...state.queryParams, ...(state.tab && state.tab !== 'all' ? { stage: state.tab } : {}) },
+    params: {
+      ...state.queryParams,
+      ...(state.tab && state.tab !== 'all' ? { stage: state.tab } : {}),
+    },
   });
 
   const counts = meta?.counts ?? {};
-  const invalidate = () => queryClient.invalidateQueries({ queryKey: ['seller', 'orders', 'list'] });
+  const invalidate = () =>
+    queryClient.invalidateQueries({ queryKey: ['seller', 'orders', 'list'] });
 
   const actionMut = useMutation({
     mutationFn: ({ id, action }) => ordersApi.action(id, action),
     onMutate: ({ id }) => setPendingId(id),
-    onSuccess: (_d, { action }) => { message.success(`${ACTION_LABELS[action]} done.`); invalidate(); },
+    onSuccess: (_d, { action }) => {
+      message.success(`${ACTION_LABELS[action]} done.`);
+      invalidate();
+    },
     onError: (e) => message.error(e?.message ?? 'Could not update the order.'),
     onSettled: () => setPendingId(null),
   });
 
   const bulkMut = useMutation({
-    mutationFn: ({ action, ids }) => ordersApi.bulk(action, ids),
+    mutationFn: ({ action, selection }) => ordersApi.bulk(action, selection),
     onSuccess: (res, { action }) => {
-      message.success(`${ACTION_LABELS[action]}: ${res.done} done${res.failed ? `, ${res.failed} skipped` : ''}.`);
+      message.success(
+        `${ACTION_LABELS[action]}: ${res.done} done${res.failed ? `, ${res.failed} skipped` : ''}.`,
+      );
       invalidate();
     },
     onError: (e) => message.error(e?.message ?? 'Bulk action failed.'),
   });
 
-  const columns = makeOrderColumns({ onAction: (row, action) => actionMut.mutate({ id: row.id, action }), pendingId });
+  const columns = makeOrderColumns({
+    onAction: (row, action) => actionMut.mutate({ id: row.id, action }),
+    pendingId,
+  });
 
   const TABS = [
     { key: 'NEW', label: 'New', count: counts.NEW },
@@ -68,9 +80,18 @@ export default function OrdersPage() {
 
       <FilterBar
         schema={[
-          { key: 'status', label: 'Status', kind: 'multiSelect', options: statusOptions('orderItem'), width: 220 },
           {
-            key: 'fulfillmentType', label: 'Fulfilment', kind: 'select', width: 170,
+            key: 'status',
+            label: 'Status',
+            kind: 'multiSelect',
+            options: statusOptions('orderItem'),
+            width: 220,
+          },
+          {
+            key: 'fulfillmentType',
+            label: 'Fulfilment',
+            kind: 'select',
+            width: 170,
             options: [
               { value: 'SELLER', label: 'Self-ship' },
               { value: 'ARISE', label: 'Fulfilled by Arise' },
@@ -79,6 +100,9 @@ export default function OrdersPage() {
           { key: 'slaBreached', label: 'Overdue only', kind: 'boolean' },
         ]}
         tableState={state}
+        savedViews
+        exportJob={{ resource: 'orders', label: 'Export orders' }}
+        exportPerm="exports.job.create"
         searchPlaceholder="Search order ID, AWB or customer"
       />
 
@@ -93,14 +117,41 @@ export default function OrdersPage() {
         tableState={state}
         tabs={TABS}
         onRowClick={(row) => navigate(`/orders/${row.id}`)}
-        selection={{ getCheckboxProps: (row) => ({ disabled: row.fulfillmentType === 'ARISE' || !row.nextAction }) }}
+        selection={{
+          getCheckboxProps: (row) => ({
+            disabled: row.fulfillmentType === 'ARISE' || !row.nextAction,
+          }),
+        }}
         bulkActions={[
-          { key: 'confirm', label: 'Confirm', perm: 'orders.order.process', onClick: ({ selectedKeys }) => bulkMut.mutate({ action: 'confirm', ids: selectedKeys }) },
-          { key: 'pack', label: 'Pack & invoice', perm: 'orders.order.process', onClick: ({ selectedKeys }) => bulkMut.mutate({ action: 'pack', ids: selectedKeys }) },
-          { key: 'manifest', label: 'Label & manifest', perm: 'orders.order.process', onClick: ({ selectedKeys }) => bulkMut.mutate({ action: 'manifest', ids: selectedKeys }) },
-          { key: 'dispatch', label: 'Mark dispatched', perm: 'orders.order.process', onClick: ({ selectedKeys }) => bulkMut.mutate({ action: 'dispatch', ids: selectedKeys }) },
+          {
+            key: 'confirm',
+            label: 'Confirm',
+            perm: 'orders.order.process',
+            onClick: ({ selection }) => bulkMut.mutate({ action: 'confirm', selection }),
+          },
+          {
+            key: 'pack',
+            label: 'Pack & invoice',
+            perm: 'orders.order.process',
+            onClick: ({ selection }) => bulkMut.mutate({ action: 'pack', selection }),
+          },
+          {
+            key: 'manifest',
+            label: 'Label & manifest',
+            perm: 'orders.order.process',
+            onClick: ({ selection }) => bulkMut.mutate({ action: 'manifest', selection }),
+          },
+          {
+            key: 'dispatch',
+            label: 'Mark dispatched',
+            perm: 'orders.order.process',
+            onClick: ({ selection }) => bulkMut.mutate({ action: 'dispatch', selection }),
+          },
         ]}
-        emptyProps={{ title: 'No orders here yet', description: 'New orders will show up in this tab.' }}
+        emptyProps={{
+          title: 'No orders here yet',
+          description: 'New orders will show up in this tab.',
+        }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
             <Flex justify="space-between" align="flex-start" gap={8}>

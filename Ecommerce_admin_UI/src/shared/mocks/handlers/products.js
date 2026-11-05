@@ -135,7 +135,14 @@ export const productHandlers = [
         slaBreached: (row, v) =>
           String(v) === 'true' ? new Date(row.slaDueAt).getTime() < mockNow() : true,
       },
-      sortable: ['submittedAt', 'priority', 'ageHours', 'sellerName', 'productTitle', 'failedChecks'],
+      sortable: [
+        'submittedAt',
+        'priority',
+        'ageHours',
+        'sellerName',
+        'productTitle',
+        'failedChecks',
+      ],
       facetFields: ['status', 'type', 'priority'],
     });
 
@@ -157,7 +164,10 @@ export const productHandlers = [
     if (!row) return notFound('That submission is no longer in the queue.');
     if (row.assignedToId && row.assignedToId !== g.user.id) {
       const holder = findById('adminUsers', row.assignedToId);
-      return conflict(`${holder?.name ?? 'Someone else'} is already reviewing this.`, 'ALREADY_CLAIMED');
+      return conflict(
+        `${holder?.name ?? 'Someone else'} is already reviewing this.`,
+        'ALREADY_CLAIMED',
+      );
     }
     update('listingSubmissions', row.id, { assignedToId: g.user.id });
     scheduleSave();
@@ -197,15 +207,40 @@ export const productHandlers = [
       }
 
       const before = { ...product };
-      if (product.status !== 'LIVE') update('products', product.id, { status: 'LIVE', updatedAt: mockNowIso() });
-      // Offers go live with the product, unless they have no stock.
-      for (const offer of filter('offers', (o) => o.productId === product.id)) {
-        update('offers', offer.id, { status: offer.stock > 0 ? 'LIVE' : 'OUT_OF_STOCK' });
+      const revision =
+        submission.type === 'REVISION' && submission.revisionId
+          ? findById('productRevisions', submission.revisionId)
+          : null;
+      if (submission.type === 'REVISION') {
+        if (!revision)
+          return conflict('The submitted revision no longer exists.', 'REVISION_MISSING');
+        update('products', product.id, {
+          ...revision.payload,
+          status: 'LIVE',
+          version: Number(product.version ?? 1) + 1,
+          updatedAt: mockNowIso(),
+        });
+        update('productRevisions', revision.id, {
+          status: 'APPROVED',
+          approvedAt: mockNowIso(),
+          approvedByName: g.user.name,
+        });
+      } else {
+        if (product.status !== 'LIVE')
+          update('products', product.id, { status: 'LIVE', updatedAt: mockNowIso() });
+        // A new product's offers go live with the canonical product.
+        for (const offer of filter('offers', (o) => o.productId === product.id)) {
+          update('offers', offer.id, { status: offer.stock > 0 ? 'LIVE' : 'OUT_OF_STOCK' });
+        }
       }
       for (const variant of filter('variants', (v) => v.productId === product.id)) {
         recomputeBuyBox(variant.id);
       }
-      update('listingSubmissions', submission.id, { status: 'DONE', decidedAt: mockNowIso(), decidedByName: g.user.name });
+      update('listingSubmissions', submission.id, {
+        status: 'DONE',
+        decidedAt: mockNowIso(),
+        decidedByName: g.user.name,
+      });
 
       writeAudit({
         actor: g.user,
@@ -224,7 +259,13 @@ export const productHandlers = [
       if (!body?.issues?.length) {
         return validationFailed({ issues: 'Pick what the seller needs to fix.' });
       }
-      update('products', product.id, { status: 'NEEDS_CHANGES', updatedAt: mockNowIso() });
+      const revision =
+        submission.type === 'REVISION' && submission.revisionId
+          ? findById('productRevisions', submission.revisionId)
+          : null;
+      if (revision)
+        update('productRevisions', revision.id, { status: 'NEEDS_CHANGES', issues: body.issues });
+      else update('products', product.id, { status: 'NEEDS_CHANGES', updatedAt: mockNowIso() });
       update('listingSubmissions', submission.id, {
         status: 'NEEDS_CHANGES',
         issues: body.issues,
@@ -246,7 +287,21 @@ export const productHandlers = [
 
     if (decision === 'REJECT') {
       if (!String(body?.reason ?? '').trim()) return validationFailed({ reason: 'Give a reason.' });
-      update('products', product.id, { status: 'REJECTED', rejectionReason: body.reason, updatedAt: mockNowIso() });
+      const revision =
+        submission.type === 'REVISION' && submission.revisionId
+          ? findById('productRevisions', submission.revisionId)
+          : null;
+      if (revision)
+        update('productRevisions', revision.id, {
+          status: 'REJECTED',
+          rejectionReason: body.reason,
+        });
+      else
+        update('products', product.id, {
+          status: 'REJECTED',
+          rejectionReason: body.reason,
+          updatedAt: mockNowIso(),
+        });
       update('listingSubmissions', submission.id, {
         status: 'DONE',
         decidedAt: mockNowIso(),
@@ -275,9 +330,7 @@ export const productHandlers = [
 
     const url = new URL(request.url);
     const query = parseListQuery(url, { defaultSort: '-updatedAt' });
-    const rows = db.products
-      .filter((p) => categoryInScope(p.categoryId, g.user))
-      .map(productRow);
+    const rows = db.products.filter((p) => categoryInScope(p.categoryId, g.user)).map(productRow);
 
     const { items, meta } = listResult(rows, query, {
       searchFields: ['title', 'id', 'brandName', 'productCode'],
@@ -286,7 +339,8 @@ export const productHandlers = [
         categoryId: 'categoryId',
         brandId: 'brandId',
         assured: { path: 'assured', kind: 'boolean' },
-        sellerId: (row, v) => filter('offers', (o) => o.productId === row.id).some((o) => o.sellerId === v),
+        sellerId: (row, v) =>
+          filter('offers', (o) => o.productId === row.id).some((o) => o.sellerId === v),
         stock: (row, v) => {
           if (v === 'OUT') return row.totalStock === 0;
           if (v === 'LOW') return row.totalStock > 0 && row.totalStock < 20;
@@ -296,7 +350,16 @@ export const productHandlers = [
         rating: { path: 'rating' },
         createdAt: { path: 'createdAt', kind: 'date' },
       },
-      sortable: ['title', 'status', 'createdAt', 'updatedAt', 'rating', 'contentScore', 'minPricePaise', 'totalStock'],
+      sortable: [
+        'title',
+        'status',
+        'createdAt',
+        'updatedAt',
+        'rating',
+        'contentScore',
+        'minPricePaise',
+        'totalStock',
+      ],
       facetFields: ['status'],
     });
     return okList(items, meta);
@@ -321,18 +384,22 @@ export const productHandlers = [
       priceAboveMrp: o.sellingPricePaise > o.mrpPaise,
     }));
     const category = findById('categories', product.categoryId);
-    const set = category?.attributeSetId ? findById('attributeSets', category.attributeSetId) : null;
+    const set = category?.attributeSetId
+      ? findById('attributeSets', category.attributeSetId)
+      : null;
 
     return ok(productRow(product), {
       allowedActions: allowedActionsFor(product, g.permissions),
       variants,
       offers,
       category,
-      attributes: (set?.attributeIds ?? []).map((aid) => findById('attributes', aid)).filter(Boolean),
+      attributes: (set?.attributeIds ?? [])
+        .map((aid) => findById('attributes', aid))
+        .filter(Boolean),
       sizeChart: product.sizeChartId ? findById('sizeCharts', product.sizeChartId) : null,
-      submission: db.listingSubmissions.find(
-        (s) => s.productId === product.id && s.status !== 'DONE',
-      ) ?? null,
+      submission:
+        db.listingSubmissions.find((s) => s.productId === product.id && s.status !== 'DONE') ??
+        null,
     });
   }),
 
@@ -350,8 +417,19 @@ export const productHandlers = [
     const before = { ...product };
     const patch = {};
     for (const key of [
-      'title', 'description', 'highlights', 'attributes', 'fit', 'modelInfo', 'care',
-      'manufacturer', 'countryOfOrigin', 'hsnCode', 'gstRate', 'searchKeywords', 'sizeChartId',
+      'title',
+      'description',
+      'highlights',
+      'attributes',
+      'fit',
+      'modelInfo',
+      'care',
+      'manufacturer',
+      'countryOfOrigin',
+      'hsnCode',
+      'gstRate',
+      'searchKeywords',
+      'sizeChartId',
     ]) {
       if (body[key] !== undefined) patch[key] = body[key];
     }

@@ -5,6 +5,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { sellerAuthApi } from '../api/auth.api';
+import BackupCodesStep from '../components/BackupCodesStep';
+import EnrolTwoFactorStep from '../components/EnrolTwoFactorStep';
 
 /** Create a seller account → lands straight in the onboarding wizard. */
 export default function RegisterPage() {
@@ -13,6 +15,9 @@ export default function RegisterPage() {
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [stage, setStage] = useState('register');
+  const [challenge, setChallenge] = useState(null);
+  const [backupCodes, setBackupCodes] = useState(null);
 
   const submit = async (values) => {
     setLoading(true);
@@ -25,8 +30,8 @@ export default function RegisterPage() {
         phone: values.phone,
         password: values.password,
       });
-      setAuthenticated(payload);
-      navigate('/onboarding', { replace: true });
+      setChallenge(payload);
+      setStage(payload.stage);
     } catch (e) {
       if (e instanceof ApiError && e.fieldErrors) {
         form.setFields(Object.entries(e.fieldErrors).map(([name, errors]) => ({ name, errors: [errors] })));
@@ -36,6 +41,34 @@ export default function RegisterPage() {
       setLoading(false);
     }
   };
+
+  const finish = (payload) => {
+    setAuthenticated(payload);
+    navigate('/onboarding', { replace: true });
+  };
+
+  const enrol = async ({ code }) => {
+    setLoading(true);
+    setFormError(null);
+    try {
+      const payload = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code });
+      if (payload.backupCodes?.length) {
+        setBackupCodes({ codes: payload.backupCodes, payload });
+        setStage('backup_codes');
+      } else finish(payload);
+    } catch (error) {
+      setFormError(error instanceof ApiError ? (error.fieldErrors?.code ?? error.message) : 'Could not set up two-step verification.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (stage === 'enrol_2fa') {
+    return <EnrolTwoFactorStep challenge={challenge} loading={loading} error={formError} onSubmit={enrol} />;
+  }
+  if (stage === 'backup_codes') {
+    return <BackupCodesStep codes={backupCodes.codes} onContinue={() => finish(backupCodes.payload)} />;
+  }
 
   return (
     <div>

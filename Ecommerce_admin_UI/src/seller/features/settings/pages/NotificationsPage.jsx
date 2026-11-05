@@ -1,41 +1,15 @@
-import { App, Card, Flex, Switch, Typography } from 'antd';
-import { useMutation } from '@tanstack/react-query';
-import { useSessionStore } from '@core/auth/sessionStore';
+import { App, Button, Card, Flex, Input, Select, Switch, Table, TimePicker, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import dayjs from 'dayjs';
 import PageHeader from '@ui/components/PageHeader';
-import { settingsApi } from '../api/settings.api';
+import { securityApi, securityKeys } from '@seller/features/security/api/security.api';
 
+const LABELS = { orders: 'Orders', fulfilment_sla: 'Fulfilment SLA', returns: 'Returns', listings_qc: 'Listings / QC', inventory: 'Inventory', payouts: 'Payouts', account_health: 'Account health', ads: 'Advertising', security: 'Security' };
+const CHANNELS = [['inPanel', 'In-panel'], ['email', 'Email'], ['sms', 'SMS'], ['whatsapp', 'WhatsApp'], ['push', 'Push']];
 export default function NotificationsPage() {
-  const { message } = App.useApp();
-  const user = useSessionStore((s) => s.user);
-  const patchUser = useSessionStore((s) => s.patchUser);
-
-  const mut = useMutation({
-    mutationFn: (payload) => settingsApi.updateNotifications(payload),
-    onSuccess: (fresh) => { patchUser(fresh); message.success('Preferences saved.'); },
-    onError: (e) => message.error(e?.message ?? 'Could not save.'),
-  });
-
-  return (
-    <Flex vertical gap={16}>
-      <PageHeader title="Notifications" breadcrumbs={[{ label: 'Settings' }, { label: 'Notifications' }]} subtitle="Choose how we reach you about orders, payments and your account." />
-      <Card>
-        <Flex vertical gap={20}>
-          <Flex justify="space-between" align="center">
-            <div>
-              <Typography.Text strong>In-panel notifications</Typography.Text>
-              <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>Alerts shown inside the seller panel.</Typography.Text></div>
-            </div>
-            <Switch checked={Boolean(user?.notifyInPanel ?? true)} loading={mut.isPending} onChange={(v) => mut.mutate({ notifyInPanel: v })} />
-          </Flex>
-          <Flex justify="space-between" align="center">
-            <div>
-              <Typography.Text strong>Email notifications</Typography.Text>
-              <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>Order, payout and policy updates by email.</Typography.Text></div>
-            </div>
-            <Switch checked={Boolean(user?.notifyEmail ?? true)} loading={mut.isPending} onChange={(v) => mut.mutate({ notifyEmail: v })} />
-          </Flex>
-        </Flex>
-      </Card>
-    </Flex>
-  );
+  const { message } = App.useApp(); const client = useQueryClient(); const [contact, setContact] = useState(''); const query = useQuery({ queryKey: securityKeys.notifications, queryFn: securityApi.notificationPolicy }); const policy = query.data;
+  const mutation = useMutation({ mutationFn: securityApi.updateNotificationPolicy, onSuccess: () => { client.invalidateQueries({ queryKey: securityKeys.notifications }); message.success('Notification policy saved.'); }, onError: (error) => message.error(error?.message ?? 'Could not save policy.') });
+  const patch = (payload) => mutation.mutate(payload); const rows = policy ? Object.keys(policy.matrix).map((event) => ({ event, ...policy.matrix[event] })) : [];
+  return <Flex vertical gap={16}><PageHeader title="Notification policy" breadcrumbs={[{ label: 'Settings' }, { label: 'Notifications' }]} subtitle="Choose event channels, quiet hours and escalation contacts. Security alerts always remain enabled in-panel and by email." /><Card styles={{ body: { padding: 0 } }}><Table rowKey="event" loading={query.isLoading} dataSource={rows} pagination={false} scroll={{ x: 'max-content' }} columns={[{ title: 'Event', dataIndex: 'event', fixed: 'left', render: (value) => <Typography.Text strong>{LABELS[value]}</Typography.Text> }, ...CHANNELS.map(([key, label]) => ({ title: label, dataIndex: key, align: 'center', render: (value, row) => <Switch checked={value} disabled={row.event === 'security' && ['inPanel', 'email'].includes(key)} onChange={(checked) => patch({ matrix: { [row.event]: { ...policy.matrix[row.event], [key]: checked } } })} /> }))]} /></Card><Card title="Quiet hours" size="small"><Flex gap={12} wrap="wrap" align="center"><Switch checked={policy?.quietHours.enabled} onChange={(enabled) => patch({ quietHours: { ...policy.quietHours, enabled } })} /><TimePicker value={policy ? dayjs(policy.quietHours.from, 'HH:mm') : null} format="HH:mm" onChange={(value) => value && patch({ quietHours: { ...policy.quietHours, from: value.format('HH:mm') } })} /><TimePicker value={policy ? dayjs(policy.quietHours.to, 'HH:mm') : null} format="HH:mm" onChange={(value) => value && patch({ quietHours: { ...policy.quietHours, to: value.format('HH:mm') } })} /><Select value={policy?.quietHours.timezone} options={[{ value: 'Asia/Kolkata', label: 'Asia/Kolkata' }, { value: 'UTC', label: 'UTC' }]} onChange={(timezone) => patch({ quietHours: { ...policy.quietHours, timezone } })} /></Flex></Card><Card title="Escalation contacts" size="small"><Flex gap={8}><Input value={contact} onChange={(event) => setContact(event.target.value)} placeholder="ops@example.com" /><Button onClick={() => { if (contact.trim()) { patch({ escalationContacts: [...new Set([...(policy?.escalationContacts ?? []), contact.trim()])] }); setContact(''); } }}>Add contact</Button></Flex><Typography.Paragraph type="secondary" style={{ marginTop: 12 }}>{policy?.escalationContacts.join(', ') || 'No escalation contacts configured.'}</Typography.Paragraph></Card></Flex>;
 }

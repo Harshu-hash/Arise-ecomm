@@ -65,6 +65,12 @@ export default function SellerDetailPage() {
     onError: (e) => message.error(e.message),
   });
 
+  const decideChange = useMutation({
+    mutationFn: ({ requestId, approve, reason }) => sellersApi.decideChangeRequest(id, requestId, { approve, reason }),
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: sellerKeys.detail(id) }); queryClient.invalidateQueries({ queryKey: ['audit'] }); message.success('Change request decided.'); },
+    onError: (e) => message.error(e.message),
+  });
+
   if (isLoading) return <FullPageSpinner label="Loading seller…" />;
   if (error) {
     const scoped = error instanceof ApiError && error.code === 'OUT_OF_SCOPE';
@@ -180,6 +186,8 @@ export default function SellerDetailPage() {
           meta={data.meta}
           onAddNote={(text) => addNote.mutateAsync(text)}
           addingNote={addNote.isPending}
+          onDecideChange={(requestId, approve, reason) => decideChange.mutateAsync({ requestId, approve, reason })}
+          decidingChange={decideChange.isPending}
         />
       </Card>
 

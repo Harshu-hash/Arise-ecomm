@@ -89,7 +89,11 @@ export function makeOrderColumns({ onAction, pendingId }) {
       sorter: true,
       render: (by, row) =>
         row.stage === 'NEW' || row.stage === 'PROCESSING' ? (
-          <Tag color={row.slaBreached ? 'red' : 'default'} icon={<ClockCircleOutlined />} style={{ margin: 0 }}>
+          <Tag
+            color={row.slaBreached ? 'red' : 'default'}
+            icon={<ClockCircleOutlined />}
+            style={{ margin: 0 }}
+          >
             {row.slaBreached ? 'Overdue' : <DateText value={by} />}
           </Tag>
         ) : (
@@ -105,7 +109,9 @@ export function makeOrderColumns({ onAction, pendingId }) {
         if (row.fulfillmentType === 'ARISE') {
           return (
             <Tooltip title="Arise picks, packs and ships this order.">
-              <Tag color="geekblue" style={{ margin: 0 }}>By Arise</Tag>
+              <Tag color="geekblue" style={{ margin: 0 }}>
+                By Arise
+              </Tag>
             </Tooltip>
           );
         }

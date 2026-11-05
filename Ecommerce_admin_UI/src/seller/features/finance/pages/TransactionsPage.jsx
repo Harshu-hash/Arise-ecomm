@@ -2,6 +2,7 @@ import { Card, Drawer, Flex, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
+import DateRangeCompare from '@ui/components/DateRangeCompare';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import useListQuery from '@ui/hooks/useListQuery';
@@ -28,11 +29,13 @@ const columns = [
 export default function TransactionsPage() {
   const state = useUrlTableState({ defaultSort: '-deliveredAt', defaultTab: 'all' });
   const [line, setLine] = useState(null);
+  const [period, setPeriod] = useState({ from: '2020-01-01T00:00:00.000Z', to: '2030-12-31T23:59:59.999Z', compare: false });
+  const params = { ...state.queryParams, from: period.from.slice(0, 10), to: period.to.slice(0, 10), compare: period.compare };
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
-    queryKey: financeKeys.transactions({ ...state.queryParams, tab: state.tab }),
+    queryKey: financeKeys.transactions({ ...params, tab: state.tab }),
     url: '/finance/transactions',
-    params: { ...state.queryParams, ...(state.tab && state.tab !== 'all' ? { tab: state.tab } : {}) },
+    params: { ...params, ...(state.tab && state.tab !== 'all' ? { tab: state.tab } : {}) },
   });
   const counts = meta?.counts ?? {};
 
@@ -56,6 +59,10 @@ export default function TransactionsPage() {
           error={error}
           onRetry={refetch}
           tableState={state}
+          savedViews
+          toolbarLeft={<DateRangeCompare value={period} onChange={setPeriod} />}
+          exportJob={{ resource: 'transactions', label: 'Export transactions', filters: { from: params.from, to: params.to, compare: params.compare } }}
+          exportPerm="exports.job.create"
           tabs={TABS}
           onRowClick={(row) => setLine(row)}
           emptyProps={{ title: 'No transactions', description: 'Delivered orders and their settlement appear here.' }}

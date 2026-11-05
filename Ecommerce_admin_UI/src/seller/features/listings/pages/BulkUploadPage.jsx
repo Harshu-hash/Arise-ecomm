@@ -1,36 +1,62 @@
-import { CheckCircleTwoTone, CloseCircleTwoTone, DownloadOutlined, InboxOutlined } from '@ant-design/icons';
-import { App, Alert, Button, Card, Flex, Space, Table, Tag, Typography, Upload } from 'antd';
-import { useState } from 'react';
+/* eslint-disable max-lines */
+import { DownloadOutlined, InboxOutlined, ReloadOutlined } from '@ant-design/icons';
+import {
+  App,
+  Alert,
+  Button,
+  Card,
+  Flex,
+  Select,
+  Space,
+  Table,
+  Tag,
+  Typography,
+  Upload,
+} from 'antd';
+import { useEffect, useState } from 'react';
 import Papa from 'papaparse';
 import { useNavigate } from 'react-router-dom';
 import PageHeader from '@ui/components/PageHeader';
 import { listingsApi } from '../api/listings.api';
 
-const TEMPLATE_COLUMNS = [
-  'title', 'category', 'brand', 'mrp', 'price', 'stock', 'sku', 'images', 'description',
-  'weightG', 'dimsL', 'dimsW', 'dimsH', 'returnWindowDays', 'returnType', 'colour', 'size',
-];
-const SAMPLE_ROWS = [
-  ['Nova Cotton T-Shirt', 'T-Shirts', 'Nova', '999', '499', '30', 'NOVA-TEE-RED-M', 'https://example.com/tee-red.jpg', 'Soft combed cotton', '220', '30', '25', '3', '10', 'RETURN', 'Red', 'M'],
-  ['Nova Cotton T-Shirt', 'T-Shirts', 'Nova', '999', '519', '20', 'NOVA-TEE-BLUE-L', 'https://example.com/tee-blue.jpg', 'Soft combed cotton', '230', '30', '25', '3', '10', 'RETURN', 'Blue', 'L'],
+const OPERATIONS = [
+  ['CREATE_PRODUCTS', 'Create new products'],
+  ['ATTACH_OFFERS', 'Attach offers to catalogue products'],
+  ['UPDATE_PRICE', 'Update prices'],
+  ['UPDATE_STOCK', 'Update stock'],
+  ['UPDATE_CONTENT', 'Update product content'],
 ];
 
 export default function BulkUploadPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
+  const [operation, setOperation] = useState('UPDATE_PRICE');
   const [rows, setRows] = useState([]);
-  const [result, setResult] = useState(null);
-  const [submitting, setSubmitting] = useState(false);
+  const [preflight, setPreflight] = useState(null);
+  const [jobs, setJobs] = useState([]);
+  const [busy, setBusy] = useState(false);
 
-  const downloadTemplate = () => {
-    const csv = Papa.unparse({ fields: TEMPLATE_COLUMNS, data: SAMPLE_ROWS });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'arise-listings-template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+  const loadJobs = async () => setJobs(await listingsApi.bulkJobs());
+  useEffect(() => {
+    loadJobs().catch(() => undefined);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const downloadTemplate = async () => {
+    try {
+      const template = await listingsApi.bulkTemplates(null, operation);
+      const csv = Papa.unparse({
+        fields: template.columns,
+        data: [Object.fromEntries(template.columns.map((column) => [column, '']))],
+      });
+      const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = `${operation.toLowerCase()}-template.csv`;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch (error) {
+      message.error(error?.message ?? 'Could not download the template.');
+    }
   };
 
   const parseFile = (file) => {
@@ -38,114 +64,204 @@ export default function BulkUploadPage() {
       header: true,
       skipEmptyLines: true,
       complete: ({ data }) => {
-        setResult(null);
-        setRows(data.map((r, i) => ({ key: i, ...r })));
+        setRows(data);
+        setPreflight(null);
         message.success(`Parsed ${data.length} rows.`);
       },
       error: () => message.error('Could not read that CSV file.'),
     });
-    return false; // prevent AntD auto-upload
+    return false;
   };
 
-  const submit = async () => {
-    setSubmitting(true);
+  const validate = async () => {
+    setBusy(true);
     try {
-      const res = await listingsApi.bulk(rows.map(({ key, ...r }) => r)); // eslint-disable-line no-unused-vars
-      setResult(res);
-      if (res.created) message.success(`${res.created} listing${res.created === 1 ? '' : 's'} submitted for QC.`);
-      if (res.failed) message.warning(`${res.failed} row${res.failed === 1 ? '' : 's'} had errors.`);
-    } catch (e) {
-      message.error(e?.message ?? 'Bulk upload failed.');
+      setPreflight(await listingsApi.bulkPreflight({ operation, rows }));
+    } catch (error) {
+      message.error(error?.message ?? 'Preflight failed.');
     } finally {
-      setSubmitting(false);
+      setBusy(false);
     }
   };
 
-  const previewColumns = TEMPLATE_COLUMNS.map((c) => ({
-    title: c[0].toUpperCase() + c.slice(1),
-    dataIndex: c,
-    ellipsis: true,
-  }));
+  const commit = async () => {
+    setBusy(true);
+    try {
+      const job = await listingsApi.createBulkJob({ operation, rows });
+      message.success(`Bulk job ${job.id} completed.`);
+      setRows([]);
+      setPreflight(null);
+      await loadJobs();
+    } catch (error) {
+      message.error(error?.message ?? 'Could not start the bulk job.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const retry = async (job) => {
+    setBusy(true);
+    try {
+      await listingsApi.retryBulkJob(job.id, rows.length ? rows : undefined);
+      message.success('Failed rows retried.');
+      await loadJobs();
+    } catch (error) {
+      message.error(error?.message ?? 'Retry failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="Bulk upload"
-        breadcrumbs={[{ label: 'Listings', to: '/listings' }, { label: 'Bulk upload' }]}
+        title="Bulk catalogue jobs"
+        breadcrumbs={[{ label: 'Listings', to: '/listings' }, { label: 'Bulk jobs' }]}
         onBack={() => navigate('/listings')}
-        subtitle="Upload a CSV to create many listings at once. Each goes through QC."
+        subtitle="Preflight every row before committing catalogue, offer, price, stock, or content changes."
         actions={
           <Button icon={<DownloadOutlined />} onClick={downloadTemplate}>
             Download template
           </Button>
         }
       />
-
-      <Alert
-        type="info"
-        showIcon
-        message="Rows with the same title and category become one product"
-        description="Give each colour/size combination its own row with the same title — they'll be created as variants of a single listing. Separate multiple image URLs in the images column with a | character."
-      />
-
       <Card>
-        <Upload.Dragger accept=".csv" multiple={false} beforeUpload={parseFile} showUploadList={false}>
-          <p className="ant-upload-drag-icon"><InboxOutlined /></p>
-          <p className="ant-upload-text">Click or drag your CSV here</p>
-          <p className="ant-upload-hint">Columns: {TEMPLATE_COLUMNS.join(', ')}</p>
-        </Upload.Dragger>
+        <Space direction="vertical" size={16} style={{ width: '100%' }}>
+          <Select
+            value={operation}
+            style={{ width: 360, maxWidth: '100%' }}
+            onChange={(value) => {
+              setOperation(value);
+              setRows([]);
+              setPreflight(null);
+            }}
+            options={OPERATIONS.map(([value, label]) => ({ value, label }))}
+          />
+          <Upload.Dragger
+            accept=".csv"
+            multiple={false}
+            beforeUpload={parseFile}
+            showUploadList={false}
+          >
+            <p className="ant-upload-drag-icon">
+              <InboxOutlined />
+            </p>
+            <p className="ant-upload-text">Drop the completed CSV here</p>
+            <p className="ant-upload-hint">
+              Nothing is changed until preflight is reviewed and committed.
+            </p>
+          </Upload.Dragger>
+          {rows.length > 0 && (
+            <Button type="primary" loading={busy} onClick={validate}>
+              Run preflight for {rows.length} rows
+            </Button>
+          )}
+        </Space>
       </Card>
 
-      {rows.length > 0 && !result && (
+      {preflight && (
         <Card
-          title={`Preview — ${rows.length} rows`}
+          title="Preflight results"
           extra={
-            <Space>
-              <Button onClick={() => setRows([])}>Clear</Button>
-              <Button type="primary" loading={submitting} onClick={submit}>
-                Submit {rows.length} listings
-              </Button>
-            </Space>
+            <Button type="primary" loading={busy} disabled={!preflight.validRows} onClick={commit}>
+              Commit {preflight.validRows} valid rows
+            </Button>
           }
         >
-          <Table size="small" columns={previewColumns} dataSource={rows} pagination={{ pageSize: 10 }} scroll={{ x: 'max-content' }} />
+          <Alert
+            type={preflight.invalidRows ? 'warning' : 'success'}
+            showIcon
+            message={`${preflight.validRows} valid · ${preflight.invalidRows} invalid · ${preflight.warningRows} with warnings`}
+            style={{ marginBottom: 12 }}
+          />
+          <Table
+            rowKey="line"
+            size="small"
+            dataSource={preflight.rows}
+            pagination={{ pageSize: 10 }}
+            columns={[
+              { title: 'Line', dataIndex: 'line', width: 70 },
+              {
+                title: 'Status',
+                dataIndex: 'valid',
+                width: 100,
+                render: (valid) => (
+                  <Tag color={valid ? 'green' : 'red'}>{valid ? 'VALID' : 'ERROR'}</Tag>
+                ),
+              },
+              {
+                title: 'Errors',
+                dataIndex: 'errors',
+                render: (items) => items?.join(' · ') || '—',
+              },
+              {
+                title: 'Warnings',
+                dataIndex: 'warnings',
+                render: (items) => items?.join(' · ') || '—',
+              },
+            ]}
+          />
         </Card>
       )}
 
-      {result && (
-        <Card title="Upload result">
-          <Space direction="vertical" size={12} style={{ width: '100%' }}>
-            <Space>
-              <Tag color="green">{result.created} created</Tag>
-              {result.failed > 0 && <Tag color="red">{result.failed} failed</Tag>}
-            </Space>
-            <Table
-              size="small"
-              rowKey="line"
-              pagination={{ pageSize: 10 }}
-              dataSource={result.results}
-              columns={[
-                { title: 'Line', dataIndex: 'line', width: 70 },
-                { title: 'Title', dataIndex: 'title', ellipsis: true },
-                {
-                  title: 'Result',
-                  dataIndex: 'ok',
-                  width: 220,
-                  render: (okFlag, row) =>
-                    okFlag ? (
-                      <Space><CheckCircleTwoTone twoToneColor="#26A541" /> <Typography.Text>Submitted</Typography.Text></Space>
-                    ) : (
-                      <Space><CloseCircleTwoTone twoToneColor="#FF4D4F" /> <Typography.Text type="danger">{row.errors?.join(', ')}</Typography.Text></Space>
-                    ),
-                },
-              ]}
-            />
-            {result.created > 0 && (
-              <Alert type="success" showIcon message={<>Your new listings are in QC. <Typography.Link onClick={() => navigate('/listings?tab=QC_PENDING')}>View them</Typography.Link></>} />
-            )}
-          </Space>
-        </Card>
-      )}
+      <Card
+        title="Job history"
+        extra={
+          <Button
+            icon={<ReloadOutlined />}
+            onClick={() => loadJobs().catch(() => message.error('Could not refresh jobs.'))}
+          >
+            Refresh
+          </Button>
+        }
+      >
+        <Table
+          rowKey="id"
+          size="small"
+          dataSource={jobs}
+          pagination={{ pageSize: 10 }}
+          columns={[
+            {
+              title: 'Job',
+              dataIndex: 'label',
+              render: (label, job) => (
+                <>
+                  <Typography.Text strong>{label}</Typography.Text>
+                  <br />
+                  <Typography.Text type="secondary">{job.id}</Typography.Text>
+                </>
+              ),
+            },
+            {
+              title: 'Status',
+              dataIndex: 'status',
+              render: (status) => (
+                <Tag color={status === 'COMPLETED' ? 'green' : 'orange'}>{status}</Tag>
+              ),
+            },
+            { title: 'Rows', render: (_, job) => `${job.processedRows}/${job.totalRows}` },
+            { title: 'Failed', dataIndex: 'failRows' },
+            {
+              title: 'Result',
+              render: (_, job) =>
+                job.resultUrl ? (
+                  <Typography.Link href={job.resultUrl}>Error file</Typography.Link>
+                ) : (
+                  '—'
+                ),
+            },
+            {
+              title: '',
+              render: (_, job) =>
+                job.failRows > 0 ? (
+                  <Button size="small" loading={busy} onClick={() => retry(job)}>
+                    Retry failed
+                  </Button>
+                ) : null,
+            },
+          ]}
+        />
+      </Card>
     </Flex>
   );
 }

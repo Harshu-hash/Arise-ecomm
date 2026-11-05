@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Alert, Button, Card, Flex, Form, Input, Modal, Select, Table, Tag, Typography } from 'antd';
+import { App, Alert, Button, Card, Flex, Form, Input, Modal, Select, Space, Table, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Can } from '@core/rbac/Can';
@@ -7,6 +7,8 @@ import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
+import StepUpModal from '@seller/features/security/components/StepUpModal';
+import { securityApi } from '@seller/features/security/api/security.api';
 import { settingsApi, settingsKeys } from '../api/settings.api';
 
 const STATUS_COLOR = { ACTIVE: 'green', INVITED: 'gold', DEACTIVATED: 'default' };
@@ -17,6 +19,9 @@ export default function UsersRolesPage() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [invited, setInvited] = useState(null);
+  const [editing, setEditing] = useState(null);
+  const [sensitiveAction, setSensitiveAction] = useState(null);
+  const [editForm] = Form.useForm();
 
   const { data, isLoading, isError, error, refetch } = useQuery({ queryKey: settingsKeys.team, queryFn: settingsApi.team });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: settingsKeys.team });
@@ -31,6 +36,9 @@ export default function UsersRolesPage() {
     onSuccess: () => { message.success('Access removed.'); invalidate(); },
     onError: (e) => message.error(e?.message ?? 'Could not remove this user.'),
   });
+  const quickAction = async (user, action) => { try { await securityApi.userAction(user.id, action); message.success(action === 'resend-invite' ? 'Invite resent.' : 'Invite cancelled.'); invalidate(); } catch (error) { message.error(error?.message); } };
+  const requestEdit = async () => { const values = await editForm.validateFields(); setSensitiveAction({ type: 'update', user: editing, values }); };
+  const verified = async (token) => { if (sensitiveAction.type === 'transfer') await securityApi.userAction(sensitiveAction.user.id, 'transfer-ownership', token); else await securityApi.updateUser(sensitiveAction.user.id, sensitiveAction.values, token); message.success(sensitiveAction.type === 'transfer' ? 'Ownership transferred.' : 'User access updated.'); setEditing(null); setSensitiveAction(null); invalidate(); };
 
   if (isLoading) return <FullPageSpinner label="Loading your team…" />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
@@ -55,9 +63,7 @@ export default function UsersRolesPage() {
             { title: 'Role', dataIndex: 'roleName' },
             { title: 'Status', dataIndex: 'status', render: (s) => <Tag color={STATUS_COLOR[s] ?? 'default'}>{s}</Tag> },
             { title: 'Last login', dataIndex: 'lastLoginAt', render: (v) => (v ? <DateText value={v} /> : '—') },
-            { title: '', dataIndex: 'id', render: (id, r) => r.roleKey !== 'owner' && r.status !== 'DEACTIVATED' && (
-              <Can perm="settings.user.manage"><Typography.Link type="danger" onClick={() => revokeMut.mutate(id)}>Remove</Typography.Link></Can>
-            ) },
+            { title: 'Actions', dataIndex: 'id', render: (userId, user) => <Can perm="settings.user.manage"><Space wrap>{user.status === 'INVITED' && <><Button size="small" onClick={() => quickAction(user, 'resend-invite')}>Resend</Button><Button size="small" danger onClick={() => quickAction(user, 'cancel-invite')}>Cancel invite</Button></>}{user.roleKey !== 'owner' && <Button size="small" onClick={() => { setEditing(user); editForm.setFieldsValue({ roleKey: user.roleKey, status: user.status }); }}>Edit access</Button>}{user.roleKey !== 'owner' && user.status === 'ACTIVE' && <Button size="small" onClick={() => setSensitiveAction({ type: 'transfer', user })}>Transfer ownership</Button>}{user.roleKey !== 'owner' && user.status !== 'DEACTIVATED' && <Button danger type="text" size="small" loading={revokeMut.isPending} onClick={() => revokeMut.mutate(userId)}>Remove</Button>}</Space></Can> },
           ]}
         />
       </Card>
@@ -71,6 +77,11 @@ export default function UsersRolesPage() {
           </Form.Item>
         </Form>
       </Modal>
+
+      <Modal title={`Edit access · ${editing?.name ?? ''}`} open={Boolean(editing)} onCancel={() => setEditing(null)} onOk={requestEdit} okText="Review change">
+        <Form form={editForm} layout="vertical"><Form.Item name="roleKey" label="Role" rules={[{ required: true }]}><Select options={data.roles.map((role) => ({ value: role.key, label: role.name }))} /></Form.Item><Form.Item name="status" label="Access state"><Select options={[{ value: 'ACTIVE', label: 'Active' }, { value: 'DEACTIVATED', label: 'Suspended' }]} /></Form.Item></Form>
+      </Modal>
+      <StepUpModal open={Boolean(sensitiveAction)} onCancel={() => setSensitiveAction(null)} onVerified={verified} title={sensitiveAction?.type === 'transfer' ? 'Confirm ownership transfer' : 'Confirm access change'} />
 
       <Modal title="Invite sent" open={Boolean(invited)} onCancel={() => setInvited(null)} footer={<Button type="primary" onClick={() => setInvited(null)}>Done</Button>}>
         <Alert

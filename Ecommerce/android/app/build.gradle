@@ -2,6 +2,11 @@ apply plugin: "com.android.application"
 apply plugin: "org.jetbrains.kotlin.android"
 apply plugin: "com.facebook.react"
 
+// Load values from the selected .env file into BuildConfig before React Native
+// autolinking configures react-native-config. Override with ENVFILE when needed,
+// for example: ENVFILE=.env.production ./gradlew assembleRelease.
+apply from: project(':react-native-config').projectDir.getPath() + "/dotenv.gradle"
+
 // Bundle react-native-vector-icons fonts (Feather, MaterialCommunityIcons, FontAwesome).
 apply from: file("../../node_modules/react-native-vector-icons/fonts.gradle")
 

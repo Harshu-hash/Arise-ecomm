@@ -6,33 +6,89 @@ import { ApiError } from '@core/api/errors';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { IS_MOCK } from '@core/config/env';
 import { sellerAuthApi } from '../api/auth.api';
+import BackupCodesStep from '../components/BackupCodesStep';
+import EnrolTwoFactorStep from '../components/EnrolTwoFactorStep';
+import TwoFactorStep from '../components/TwoFactorStep';
 
 /**
- * Seller sign-in. Single-step email + password for S1 (seller 2FA is a later
- * hardening pass); the shared session machine then routes an onboarding-
- * incomplete seller to the wizard via `defaultLanding`.
+ * Credentials are followed by verification or first-time authenticator
+ * enrolment. The challenge remains local state and cannot be bookmarked.
  */
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
+  const [stage, setStage] = useState('credentials');
+  const [challenge, setChallenge] = useState(null);
+  const [backupCodes, setBackupCodes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [codeError, setCodeError] = useState(null);
+
+  const finish = (payload) => {
+    setAuthenticated(payload);
+    const target = location.state?.from?.pathname ?? payload.user.defaultLanding ?? '/';
+    navigate(payload.user.mustChangePassword ? '/change-password' : target, { replace: true });
+  };
 
   const submit = async (values) => {
     setLoading(true);
     setFormError(null);
     try {
-      const payload = await sellerAuthApi.login({ email: values.email.trim(), password: values.password });
-      setAuthenticated(payload);
-      const target = location.state?.from?.pathname ?? payload.user.defaultLanding ?? '/';
-      navigate(payload.user.mustChangePassword ? '/change-password' : target, { replace: true });
+      const result = await sellerAuthApi.login({ email: values.email.trim(), password: values.password });
+      setChallenge(result);
+      setStage(result.stage);
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : 'Could not sign you in.');
     } finally {
       setLoading(false);
     }
   };
+
+  const submitCode = async ({ code }) => {
+    setLoading(true);
+    setCodeError(null);
+    try {
+      finish(await sellerAuthApi.verify2fa({ challengeId: challenge.challengeId, code }));
+    } catch (error) {
+      setCodeError(error instanceof ApiError ? (error.fieldErrors?.code ?? error.message) : 'That did not work.');
+      if (error instanceof ApiError && error.status === 401 && !error.fieldErrors) {
+        setStage('credentials');
+        setChallenge(null);
+        setFormError(error.message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitEnrolment = async ({ code }) => {
+    setLoading(true);
+    setCodeError(null);
+    try {
+      const payload = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code });
+      if (payload.backupCodes?.length) {
+        setBackupCodes({ codes: payload.backupCodes, payload });
+        setStage('backup_codes');
+      } else finish(payload);
+    } catch (error) {
+      setCodeError(error instanceof ApiError ? (error.fieldErrors?.code ?? error.message) : 'That did not work.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (stage === 'verify_2fa') {
+    return <TwoFactorStep challenge={challenge} loading={loading} error={codeError} onSubmit={submitCode} onBack={() => { setStage('credentials'); setChallenge(null); setCodeError(null); }} />;
+  }
+
+  if (stage === 'enrol_2fa') {
+    return <EnrolTwoFactorStep challenge={challenge} loading={loading} error={codeError} onSubmit={submitEnrolment} />;
+  }
+
+  if (stage === 'backup_codes') {
+    return <BackupCodesStep codes={backupCodes.codes} onContinue={() => finish(backupCodes.payload)} />;
+  }
 
   return (
     <div>

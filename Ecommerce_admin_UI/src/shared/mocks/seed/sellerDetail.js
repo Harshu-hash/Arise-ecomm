@@ -35,6 +35,7 @@ function docStatusFor(sellerStatus, index) {
 }
 
 export function seedSellerDetail() {
+  const firstActiveSellerId = db.sellers.find((seller) => seller.status === 'ACTIVE')?.id;
   for (const seller of db.sellers) {
     const settled = !PENDING_STATES.includes(seller.status) && seller.status !== 'REJECTED';
 
@@ -52,7 +53,7 @@ export function seedSellerDetail() {
         status,
         rejectionReason: status === 'REJECTED' ? 'Document is illegible — please re-upload a clear scan.' : null,
         // Licenses expire; the panel warns 30 days out.
-        expiresAt: null,
+        expiresAt: seller.id === firstActiveSellerId && type === 'ADDRESS_PROOF' ? new Date(mockNow() - 5 * 86400_000).toISOString() : null,
         version: 1,
       });
     });

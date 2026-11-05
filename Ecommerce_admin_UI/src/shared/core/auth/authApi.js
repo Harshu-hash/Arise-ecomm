@@ -1,11 +1,13 @@
 import { api } from '@core/api/axiosInstance';
+import { IS_MOCK } from '@core/config/env';
 
 /** Thin wrappers over the auth endpoints; all return the unwrapped `data`. */
 export const authApi = {
   login: (payload) => api.post('/auth/login', payload).then((r) => r.data),
   verify2fa: (payload) => api.post('/auth/2fa/verify', payload).then((r) => r.data),
   enrol2fa: (payload) => api.post('/auth/2fa/enrol', payload).then((r) => r.data),
-  refresh: (refreshToken) => api.post('/auth/refresh', { refreshToken }).then((r) => r.data),
+  refresh: (refreshToken) =>
+    api.post('/auth/refresh', IS_MOCK ? { refreshToken } : {}).then((r) => r.data),
   logout: () => api.post('/auth/logout', {}).then((r) => r.data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }).then((r) => r.data),
   resetPassword: (payload) => api.post('/auth/reset-password', payload).then((r) => r.data),

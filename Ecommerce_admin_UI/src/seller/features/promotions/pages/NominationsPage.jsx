@@ -4,11 +4,14 @@ import { useNavigate } from 'react-router-dom';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import ErrorState from '@ui/components/ErrorState';
 import { promotionsApi, promotionsKeys } from '../api/promotions.api';
 
 export default function NominationsPage() {
   const navigate = useNavigate();
-  const { data = [], isLoading } = useQuery({ queryKey: promotionsKeys.nominations, queryFn: promotionsApi.nominations });
+  const { data = [], isLoading, isError, error, refetch } = useQuery({ queryKey: promotionsKeys.nominations, queryFn: promotionsApi.nominations });
+
+  if (isError) return <ErrorState error={error} onRetry={refetch} title="Could not load nominations" />;
 
   return (
     <Flex vertical gap={12}>

@@ -1,5 +1,6 @@
+/* eslint-disable max-lines -- the table intentionally keeps desktop/mobile/selection behavior in one audited primitive */
 import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
-import { Badge, Button, Card, Flex, Segmented, Space, Table, Tabs, Tooltip, Typography } from 'antd';
+import { Alert, Badge, Button, Card, Descriptions, Flex, Segmented, Space, Table, Tabs, Tooltip, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useThemeStore } from '@theme/themeStore';
 import { Can } from '@core/rbac/Can';
@@ -7,6 +8,8 @@ import useBreakpoint from '@ui/hooks/useBreakpoint';
 import { glossify } from '@ui/utils/glossify';
 import EmptyState from '../EmptyState';
 import ErrorState from '../ErrorState';
+import ExportJobButton from '../ExportJobButton';
+import SavedViewsMenu from '../SavedViewsMenu';
 import BulkActionBar from './BulkActionBar';
 import ColumnChooser from './ColumnChooser';
 import MobileCardList from './MobileCardList';
@@ -38,19 +41,25 @@ export default function DataTable({
   toolbarLeft,
   toolbarRight,
   onExport,
+  exportJob,
   exportPerm,
   emptyProps,
   mobileCard,
   virtual = false,
   scrollX,
+  savedViews = false,
+  refreshing = false,
+  partialError,
+  stale = false,
 }) {
   const { isMobile, columnPriorityCutoff } = useBreakpoint();
-  const density = useThemeStore((s) => s.density);
+  const globalDensity = useThemeStore((s) => s.density);
   const setDensity = useThemeStore((s) => s.setDensity);
 
   const [prefs, setPrefs] = useState(() => loadPrefs(tableId));
   const [selectedKeys, setSelectedKeys] = useState([]);
   const [allMatchingSelected, setAllMatchingSelected] = useState(false);
+  const density = prefs?.density ?? globalDensity;
 
   useEffect(() => {
     // Clearing the selection when the result set changes avoids acting on rows
@@ -62,6 +71,11 @@ export default function DataTable({
   const updatePrefs = (next) => {
     setPrefs(next);
     savePrefs(tableId, next);
+  };
+
+  const updateDensity = (next) => {
+    updatePrefs({ ...(prefs ?? {}), density: next });
+    setDensity(next);
   };
 
   const visibleColumns = useMemo(
@@ -90,6 +104,16 @@ export default function DataTable({
   );
 
   const total = meta?.total ?? rows.length;
+
+  const defaultMobileCard = (row) => (
+    <Descriptions size="small" column={1} colon={false}>
+      {columns.filter((column) => (column.priority ?? 1) <= 2 && column.key !== 'actions').map((column) => {
+        const key = column.key ?? column.dataIndex;
+        const raw = typeof column.dataIndex === 'string' ? row[column.dataIndex] : undefined;
+        return <Descriptions.Item key={key} label={typeof column.title === 'string' ? column.title : column.exportLabel ?? key}>{column.render ? column.render(raw, row) : String(raw ?? '—')}</Descriptions.Item>;
+      })}
+    </Descriptions>
+  );
 
   if (error) {
     return (
@@ -121,6 +145,9 @@ export default function DataTable({
 
   return (
     <div>
+      {refreshing && <Alert type="info" showIcon message="Refreshing results…" style={{ marginBottom: 8 }} />}
+      {partialError && <Alert type="warning" showIcon message="Some result details could not be loaded" description={partialError.message} action={onRetry ? <Button size="small" onClick={onRetry}>Retry</Button> : null} style={{ marginBottom: 8 }} />}
+      {stale && <Alert type="warning" showIcon message="These results may be out of date" action={onRetry ? <Button size="small" onClick={onRetry}>Refresh</Button> : null} style={{ marginBottom: 8 }} />}
       {tabItems && (
         <Tabs
           activeKey={tableState?.tab ?? 'all'}
@@ -157,11 +184,12 @@ export default function DataTable({
 
         <Space size={8} wrap>
           {toolbarRight}
+          {savedViews && tableState && <SavedViewsMenu tableId={tableId} tableState={tableState} />}
           {!isMobile && (
             <Segmented
               size="small"
               value={density}
-              onChange={setDensity}
+              onChange={updateDensity}
               options={[
                 { label: 'Compact', value: 'small' },
                 { label: 'Default', value: 'middle' },
@@ -181,6 +209,18 @@ export default function DataTable({
                   {isMobile ? null : 'Export'}
                 </Button>
               </Tooltip>
+            </Can>
+          )}
+          {exportJob && (
+            <Can perm={exportPerm} disable reason="You do not have permission to export this data">
+              <ExportJobButton
+                {...exportJob}
+                filters={{ ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) }}
+                selection={allMatchingSelected
+                  ? { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}), ...(tableState?.tab ? { tab: tableState.tab } : {}) } }
+                  : selectedKeys.length ? { mode: 'SELECTED', ids: selectedKeys } : { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) } }}
+                estimatedRows={allMatchingSelected ? total : selectedKeys.length || total}
+              />
             </Can>
           )}
           {!isMobile && (
@@ -215,17 +255,20 @@ export default function DataTable({
                 selectedKeys,
                 selectedRows: rows.filter((r) => selectedKeys.includes(r[rowKey])),
                 total,
+                selection: allMatchingSelected
+                  ? { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(tableState?.tab ? { tab: tableState.tab } : {}) } }
+                  : { mode: 'SELECTED', ids: selectedKeys },
               }),
           }))}
         />
       )}
 
-      {isMobile && mobileCard ? (
+      {isMobile ? (
         <MobileCardList
           rows={rows}
           rowKey={rowKey}
           loading={loading}
-          render={mobileCard}
+          render={mobileCard ?? defaultMobileCard}
           onRowClick={onRowClick}
           empty={emptyNode}
           page={tableState?.page}
@@ -249,6 +292,14 @@ export default function DataTable({
             onRowClick
               ? (record) => ({
                   onClick: () => onRowClick(record),
+                  onKeyDown: (event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      onRowClick(record);
+                    }
+                  },
+                  tabIndex: 0,
+                  'aria-label': `Open ${record.name ?? record.title ?? record[rowKey]}`,
                   style: { cursor: 'pointer' },
                 })
               : undefined

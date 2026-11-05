@@ -72,7 +72,7 @@ export function resolveCaller(request) {
 
   const user = findById('sellerUsers', session.userId);
   if (!user) return { error: 'invalid' };
-  if (user.status === 'SUSPENDED') return { error: 'inactive' };
+  if (user.status !== 'ACTIVE') return { error: 'inactive' };
 
   session.lastActiveAt = mockNowIso();
   return { user, session };
@@ -114,6 +114,7 @@ export function publicUser(user) {
     onboardingStep: onboarding?.step ?? (onboardingComplete ? null : 0),
     onboardingComplete,
     mustChangePassword: Boolean(user.mustChangePassword),
+    twoFactorEnrolled: Boolean(user.twoFactorEnrolled),
     notifyEmail: user.notifyEmail ?? true,
     notifyInPanel: user.notifyInPanel ?? true,
     lastLoginAt: user.lastLoginAt ?? null,

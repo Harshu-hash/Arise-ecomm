@@ -1,5 +1,5 @@
 import axios from 'axios';
-import { ENV } from '@core/config/env';
+import { ENV, IS_MOCK } from '@core/config/env';
 import { sessionSnapshot, useSessionStore } from '@core/auth/sessionStore';
 import { toApiError } from './errors';
 
@@ -28,10 +28,23 @@ function requestId() {
   return `req_${Math.random().toString(36).slice(2, 10)}${Date.now().toString(36)}`;
 }
 
+function commandId() {
+  if (globalThis.crypto?.randomUUID) return globalThis.crypto.randomUUID();
+  return `cmd_${Math.random().toString(36).slice(2, 12)}${Date.now().toString(36)}`;
+}
+
 http.interceptors.request.use((config) => {
   const { accessToken } = sessionSnapshot();
   if (accessToken) config.headers.Authorization = `Bearer ${accessToken}`;
   config.headers['X-Request-Id'] = requestId();
+  const method = String(config.method ?? 'GET').toUpperCase();
+  const isCommand = ['POST', 'PUT', 'PATCH', 'DELETE'].includes(method);
+  const isAuthentication = String(config.url ?? '').includes('/auth/');
+  if (isCommand && !isAuthentication && !config.headers['Idempotency-Key']) {
+    // Axios reuses this config for an interceptor retry, preserving the key.
+    // An explicit key supplied by a workflow always wins.
+    config.headers['Idempotency-Key'] = commandId();
+  }
   return config;
 });
 
@@ -65,7 +78,8 @@ http.interceptors.response.use(
     const config = error?.config ?? {};
     const isAuthCall = String(config.url ?? '').includes('/auth/');
 
-    if (status === 401 && !config.__retried && !isAuthCall && sessionSnapshot().refreshToken) {
+    const canRefresh = !IS_MOCK || Boolean(sessionSnapshot().refreshToken);
+    if (status === 401 && !config.__retried && !isAuthCall && canRefresh) {
       config.__retried = true;
       try {
         refreshPromise = refreshPromise ?? refreshAccessToken().finally(() => {

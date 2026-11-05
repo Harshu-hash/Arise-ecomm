@@ -5,6 +5,8 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { sellerAuthApi } from '../api/auth.api';
+import BackupCodesStep from '../components/BackupCodesStep';
+import EnrolTwoFactorStep from '../components/EnrolTwoFactorStep';
 
 /** A sub-user accepts an invitation, sets a password, and is signed in. */
 export default function AcceptInvitePage() {
@@ -16,6 +18,9 @@ export default function AcceptInvitePage() {
   const [status, setStatus] = useState('loading');
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
+  const [authStage, setAuthStage] = useState('invite');
+  const [challenge, setChallenge] = useState(null);
+  const [backupCodes, setBackupCodes] = useState(null);
 
   useEffect(() => {
     if (!token) {
@@ -35,11 +40,32 @@ export default function AcceptInvitePage() {
     setLoading(true);
     setFormError(null);
     try {
-      const payload = await sellerAuthApi.acceptInvite({ token, name: values.name, password: values.password });
-      setAuthenticated(payload);
-      navigate(payload.user.defaultLanding ?? '/', { replace: true });
+      const result = await sellerAuthApi.acceptInvite({ token, name: values.name, password: values.password });
+      setChallenge(result);
+      setAuthStage(result.stage);
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : 'Could not accept this invitation.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const finish = (payload) => {
+    setAuthenticated(payload);
+    navigate(payload.user.defaultLanding ?? '/', { replace: true });
+  };
+
+  const enrol = async ({ code }) => {
+    setLoading(true);
+    setFormError(null);
+    try {
+      const payload = await sellerAuthApi.enrol2fa({ challengeId: challenge.challengeId, code });
+      if (payload.backupCodes?.length) {
+        setBackupCodes({ codes: payload.backupCodes, payload });
+        setAuthStage('backup_codes');
+      } else finish(payload);
+    } catch (error) {
+      setFormError(error instanceof ApiError ? (error.fieldErrors?.code ?? error.message) : 'Could not set up two-step verification.');
     } finally {
       setLoading(false);
     }
@@ -48,6 +74,12 @@ export default function AcceptInvitePage() {
   if (status === 'loading') return <Skeleton active paragraph={{ rows: 4 }} />;
   if (status === 'invalid') {
     return <Result status="warning" title="Invitation not found" subTitle="This invite link is invalid or has already been used." extra={<Link to="/login">Go to sign in</Link>} />;
+  }
+  if (authStage === 'enrol_2fa') {
+    return <EnrolTwoFactorStep challenge={challenge} loading={loading} error={formError} onSubmit={enrol} />;
+  }
+  if (authStage === 'backup_codes') {
+    return <BackupCodesStep codes={backupCodes.codes} onContinue={() => finish(backupCodes.payload)} />;
   }
 
   return (

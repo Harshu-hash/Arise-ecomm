@@ -1,5 +1,5 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Flex, Form, Input, InputNumber, Modal, Progress, Radio, Space, Typography } from 'antd';
+import { Alert, App, Button, Flex, Form, Input, InputNumber, Modal, Popconfirm, Progress, Radio, Space, Typography } from 'antd';
 import { useState } from 'react';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
@@ -15,6 +15,8 @@ export default function CouponsPage() {
   const [open, setOpen] = useState(false);
   const [form] = Form.useForm();
   const [saving, setSaving] = useState(false);
+  const [preview, setPreview] = useState(null);
+  const [previewAmount, setPreviewAmount] = useState(2000);
   const state = useUrlTableState({ defaultSort: '-createdAt' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
@@ -36,6 +38,13 @@ export default function CouponsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  const act = async (row, action) => {
+    try {
+      if (action === 'preview') setPreview(await promotionsApi.couponAction(row.id, action, { amountRupees: previewAmount }));
+      else { await promotionsApi.couponAction(row.id, action); message.success(`Coupon ${action}d.`); refetch(); }
+    } catch (error) { message.error(error?.message ?? 'Could not update the coupon.'); }
   };
 
   return (
@@ -63,6 +72,7 @@ export default function CouponsPage() {
           },
           { key: 'endsAt', title: 'Valid until', dataIndex: 'endsAt', priority: 2, sorter: true, render: (v) => <DateText value={v} /> },
           { key: 'status', title: 'Status', dataIndex: 'status', priority: 1, render: (s) => <StatusTag domain="coupon" code={s} /> },
+          { key: 'actions', title: 'Actions', priority: 1, render: (_value, row) => <Space wrap><Button size="small" onClick={() => act(row, 'preview')}>Preview</Button>{row.status === 'ACTIVE' ? <Button size="small" onClick={() => act(row, 'pause')}>Pause</Button> : row.status === 'PAUSED' ? <Button size="small" type="primary" onClick={() => act(row, 'resume')}>Resume</Button> : null}{['ACTIVE', 'PAUSED'].includes(row.status) && <Popconfirm title="End this coupon now?" onConfirm={() => act(row, 'end')}><Button size="small" danger>End</Button></Popconfirm>}</Space> },
         ]}
         rows={rows}
         meta={meta}
@@ -116,6 +126,9 @@ export default function CouponsPage() {
             <InputNumber style={{ width: '100%' }} min={100} />
           </Form.Item>
         </Form>
+      </Modal>
+      <Modal title="Checkout coupon preview" open={Boolean(preview)} onCancel={() => setPreview(null)} footer={<Button onClick={() => setPreview(null)}>Close</Button>}>
+        <Flex vertical gap={12}><InputNumber addonBefore="Cart value ₹" min={1} value={previewAmount} onChange={setPreviewAmount} /><Alert type={preview?.result?.applicable ? 'success' : 'warning'} showIcon message={preview?.result?.applicable ? `Discount: ₹${((preview.result.discountPaise ?? 0) / 100).toLocaleString('en-IN')}` : 'Coupon is not applicable'} description={(preview?.result?.reasons ?? []).join(' · ') || 'The customer sees this saving at checkout.'} /></Flex>
       </Modal>
     </Flex>
   );

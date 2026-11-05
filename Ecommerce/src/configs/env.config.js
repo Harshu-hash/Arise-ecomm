@@ -40,7 +40,9 @@ export const ENV = Object.freeze({
 
 export const validateRuntimeEnvironment = () => {
   const errors = [];
-  if (!ENV.apiBaseUrl) {
+  // Fixture adapters handle every request locally in mock mode, so a backend
+  // URL is only necessary when real network requests are enabled.
+  if (!ENV.enableApiMocks && !ENV.apiBaseUrl) {
     errors.push('API_BASE_URL is required');
   }
   if (ENV.isProduction && ENV.enableApiMocks) {

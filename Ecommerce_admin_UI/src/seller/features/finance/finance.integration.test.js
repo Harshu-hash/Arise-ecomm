@@ -6,15 +6,13 @@ import { db, filter, find } from '@mocks/db/store';
 import { seedAll } from '@mocks/seed';
 import { sellerHandlers } from '@seller/mocks/handlers';
 import { seedSellerAccounts } from '@seller/mocks/seed/sellerAccounts';
-import { sellerAuthApi } from '../auth/api/auth.api';
+import { signInSeller } from '@seller/test/signInSeller';
 import { financeApi } from './api/finance.api';
 
 const server = setupServer(...sellerHandlers);
 
 async function signIn() {
-  const payload = await sellerAuthApi.login({ email: 'owner@arise.test', password: 'Arise@123456' });
-  useSessionStore.getState().setAuthenticated(payload);
-  return payload.user;
+  return signInSeller();
 }
 
 describe('seller finance', () => {

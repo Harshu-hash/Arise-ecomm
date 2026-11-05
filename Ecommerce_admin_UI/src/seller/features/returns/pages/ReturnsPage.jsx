@@ -1,13 +1,16 @@
-import { Avatar, Flex, Space, Tag, Typography } from 'antd';
+import { Avatar, Button, Col, Flex, Modal, Row, Space, Table, Tag, Typography } from 'antd';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
+import StatCard from '@ui/components/StatCard';
 import StatusTag from '@ui/components/StatusTag';
 import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
-import { returnKeys } from '../api/returns.api';
+import { returnKeys, returnsApi } from '../api/returns.api';
 
 const columns = [
   {
@@ -35,6 +38,7 @@ const columns = [
 
 export default function ReturnsPage() {
   const navigate = useNavigate();
+  const [analyticsOpen, setAnalyticsOpen] = useState(false);
   const state = useUrlTableState({ defaultSort: '-requestedAt', defaultTab: 'REQUESTED' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
@@ -44,6 +48,7 @@ export default function ReturnsPage() {
   });
 
   const counts = meta?.counts ?? {};
+  const analytics = useQuery({ queryKey: returnKeys.analytics, queryFn: returnsApi.analytics, enabled: analyticsOpen });
   const TABS = [
     { key: 'REQUESTED', label: 'Needs decision', count: counts.REQUESTED },
     { key: 'IN_PROGRESS', label: 'In progress', count: counts.IN_PROGRESS },
@@ -57,7 +62,12 @@ export default function ReturnsPage() {
         breadcrumbs={[{ label: 'Orders' }, { label: 'Returns' }]}
         subtitle="Approve or reject return requests, track reverse pickups and QC returned items."
         tags={counts.REQUESTED > 0 && <Tag color="gold">{counts.REQUESTED} awaiting your decision</Tag>}
+        actions={<Button onClick={() => setAnalyticsOpen(true)}>Return analytics</Button>}
       />
+      <Modal width={850} title="Return analytics" open={analyticsOpen} onCancel={() => setAnalyticsOpen(false)} footer={<Button onClick={() => setAnalyticsOpen(false)}>Close</Button>}>
+        <Row gutter={12} style={{ marginBottom: 16 }}><Col span={12}><StatCard label="Returns" value={analytics.data?.totalReturns ?? 0} loading={analytics.isLoading} /></Col><Col span={12}><StatCard label="Financial impact" value={`₹${((analytics.data?.financialImpactPaise ?? 0) / 100).toLocaleString('en-IN')}`} loading={analytics.isLoading} /></Col></Row>
+        <Table size="small" rowKey="key" pagination={false} dataSource={analytics.data?.byReason ?? []} columns={[{ title: 'Reason', dataIndex: 'key' }, { title: 'Returns', dataIndex: 'count', align: 'right' }, { title: 'Impact', dataIndex: 'amountPaise', align: 'right', render: (value) => `₹${(value / 100).toLocaleString('en-IN')}` }]} />
+      </Modal>
       <DataTable
         tableId="seller-returns"
         columns={columns}
