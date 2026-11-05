@@ -147,7 +147,9 @@ export function sellerReconciliation(sellerId) {
     const raw = findById('settlementLines', line.id);
     const item = findById('orderItems', raw?.orderItemId);
     const payout = raw?.payoutId ? findById('sellerPayouts', raw.payoutId) : null;
-    const returnRow = db.returns.find((row) => row.orderItemId === raw?.orderItemId) ?? null;
+    // An item can have historical return attempts. The newest record is the
+    // one whose refund/adjustments belong in the current reconciliation trace.
+    const returnRow = [...db.returns].reverse().find((row) => row.orderItemId === raw?.orderItemId) ?? null;
     const refund = returnRow?.refundId ? findById('refunds', returnRow.refundId) : null;
     const weightDispute = db.weightDisputes.find((row) => row.sellerId === sellerId && (row.shipmentId === item?.shipmentId || row.orderId === line.orderId)) ?? null;
     const adjustments = db.payoutAdjustments.filter((row) => row.sellerId === sellerId && (row.orderId === line.orderId || row.returnId === returnRow?.id || row.referenceId === weightDispute?.id));

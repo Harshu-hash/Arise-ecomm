@@ -1,6 +1,5 @@
 import { sellerAuthHandlers } from './auth';
 import { sellerMeHandlers } from './me';
-import { sellerOnboardingHandlers } from './onboarding';
 import { sellerDashboardHandlers } from './dashboard';
 import { sellerCatalogHandlers } from './catalog';
 import { sellerListingHandlers } from './listings';
@@ -28,7 +27,6 @@ export const sellerHandlers = [
   ...sellerAuthHandlers,
   ...sellerFoundationHandlers,
   ...sellerMeHandlers,
-  ...sellerOnboardingHandlers,
   ...sellerDashboardHandlers,
   ...sellerCatalogHandlers,
   ...sellerListingHandlers,

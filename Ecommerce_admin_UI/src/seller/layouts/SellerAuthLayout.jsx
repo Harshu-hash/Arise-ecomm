@@ -1,6 +1,6 @@
 import { Card, Flex, Space, Typography } from 'antd';
 import { Suspense } from 'react';
-import { Outlet } from 'react-router-dom';
+import { Outlet, useLocation } from 'react-router-dom';
 import { ENV } from '@core/config/env';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
@@ -13,6 +13,8 @@ import { SELLER_ACCENT } from '@seller/theme';
  */
 export default function SellerAuthLayout() {
   const { isDesktop } = useBreakpoint();
+  const location = useLocation();
+  const wide = ['/register', '/application-status'].includes(location.pathname);
 
   return (
     <Flex style={{ minHeight: '100vh' }}>
@@ -56,7 +58,7 @@ export default function SellerAuthLayout() {
       )}
 
       <Flex flex={1} align="center" justify="center" style={{ padding: 20 }}>
-        <div style={{ width: '100%', maxWidth: 420 }}>
+        <div style={{ width: '100%', maxWidth: wide ? 760 : 420 }}>
           {!isDesktop && (
             <Flex justify="center" style={{ marginBottom: 20 }}>
               <Space size={10} align="center">

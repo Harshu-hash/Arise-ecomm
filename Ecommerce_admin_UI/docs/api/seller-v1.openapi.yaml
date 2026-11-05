@@ -10,6 +10,8 @@ security:
 paths:
   /onboarding:
     get:
+      deprecated: true
+      description: Legacy compatibility only; the seller UI uses public three-step registration.
       operationId: getSellerApplication
       x-permission: onboarding.application.view
       responses:
@@ -18,6 +20,8 @@ paths:
           '400': { $ref: '#/components/responses/Error' },
         }
     patch:
+      deprecated: true
+      description: Legacy compatibility only; the seller UI uses public three-step registration.
       operationId: saveSellerApplicationSection
       x-idempotent: true
       x-permission: onboarding.application.edit
@@ -34,6 +38,8 @@ paths:
         }
   /onboarding/submit:
     post:
+      deprecated: true
+      description: Legacy compatibility only; POST /auth/register now submits the application.
       operationId: submitSellerApplication
       x-permission: onboarding.application.submit
       x-idempotent: true
@@ -45,6 +51,8 @@ paths:
         }
   /onboarding/status:
     get:
+      deprecated: true
+      description: Legacy compatibility only; pending state is returned by registration/login.
       operationId: getSellerApplicationStatus
       x-permission: onboarding.application.view
       responses:
@@ -55,6 +63,7 @@ paths:
   /onboarding/sections/{sectionKey}/resubmit:
     parameters: [{ name: sectionKey, in: path, required: true, schema: { type: string } }]
     post:
+      deprecated: true
       operationId: resubmitSellerApplicationSection
       x-permission: onboarding.application.resubmit
       x-idempotent: true
@@ -87,11 +96,13 @@ paths:
         }
   /onboarding/agreement:
     get:
+      deprecated: true
       operationId: getCurrentSellerAgreement
       x-permission: onboarding.agreement.view
       responses: { '200': { description: Current versioned agreement } }
   /onboarding/agreement/accept:
     post:
+      deprecated: true
       operationId: acceptSellerAgreement
       x-permission: onboarding.agreement.accept
       x-idempotent: true
@@ -120,6 +131,7 @@ paths:
     parameters:
       [{ name: pincode, in: path, required: true, schema: { type: string, pattern: '^\\d{6}$' } }]
     get:
+      deprecated: true
       operationId: checkPickupPincode
       x-permission: onboarding.application.edit
       responses:
@@ -2045,7 +2057,32 @@ paths:
     post:
       operationId: postAuthRegister
       security: []
-      requestBody: { $ref: '#/components/requestBodies/Command' }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, shopName, email, phone, password, locality, pincode, city, state, address, lat, lng, radiusKm, emailVerificationToken, phoneVerificationToken, tradeLicense, gstCertificate, idProof]
+              properties:
+                name: { type: string, maxLength: 50, pattern: '^[A-Za-z ]+$' }
+                shopName: { type: string }
+                email: { type: string, format: email }
+                phone: { type: string, pattern: '^\d{10}$' }
+                password: { type: string, format: password, minLength: 8 }
+                locality: { type: string }
+                pincode: { type: string, pattern: '^\d{6}$' }
+                city: { type: string }
+                state: { type: string }
+                address: { type: string }
+                lat: { type: number, minimum: -90, maximum: 90 }
+                lng: { type: number, minimum: -180, maximum: 180 }
+                radiusKm: { type: number, minimum: 1 }
+                emailVerificationToken: { type: string }
+                phoneVerificationToken: { type: string }
+                tradeLicense: { type: string, format: binary }
+                gstCertificate: { type: string, format: binary }
+                idProof: { type: string, format: binary }
       responses:
         '201': { $ref: '#/components/responses/Data' }
         '400': { $ref: '#/components/responses/Error' }
@@ -2053,6 +2090,33 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /auth/register/check-exists:
+    post:
+      operationId: postAuthRegisterCheckExists
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '422': { $ref: '#/components/responses/Error' }
+  /auth/register/send-otp:
+    post:
+      operationId: postAuthRegisterSendOtp
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '409': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+        '429': { $ref: '#/components/responses/Error' }
+  /auth/register/verify-otp:
+    post:
+      operationId: postAuthRegisterVerifyOtp
+      security: []
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '401': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
   /auth/reset-password:
     post:
       operationId: postAuthResetPassword
