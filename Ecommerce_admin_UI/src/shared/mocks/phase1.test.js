@@ -36,13 +36,7 @@ async function call(path, { method = 'GET', body, token } = {}) {
 async function signIn(email) {
   const login = await call('/auth/login', { method: 'POST', body: { email, password: DEMO_PASSWORD } });
   expect(login.status, `login ${email}: ${JSON.stringify(login.json)}`).toBe(200);
-  const { challengeId, devHint, stage } = login.json.data;
-  const verify = await call(`/auth/2fa/${stage === 'enrol_2fa' ? 'enrol' : 'verify'}`, {
-    method: 'POST',
-    body: { challengeId, code: devHint.code },
-  });
-  expect(verify.status).toBe(200);
-  return verify.json.data;
+  return login.json.data;
 }
 
 describe('seller applications', () => {

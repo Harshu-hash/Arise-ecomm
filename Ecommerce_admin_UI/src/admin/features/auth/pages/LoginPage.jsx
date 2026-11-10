@@ -6,29 +6,16 @@ import { ApiError } from '@core/api/errors';
 import { authApi } from '@core/auth/authApi';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { IS_MOCK } from '@core/config/env';
-import BackupCodesStep from '../components/BackupCodesStep';
-import EnrolTwoFactorStep from '../components/EnrolTwoFactorStep';
 import ResetDemoDataLink from '../components/ResetDemoDataLink';
-import TwoFactorStep from '../components/TwoFactorStep';
 
-/**
- * Sign-in flow: credentials → second factor (verify, or first-time enrolment)
- * → optionally the one-time backup codes.
- *
- * The stage lives in local state rather than the URL because a half-finished
- * challenge is not something anyone should be able to bookmark or share.
- */
+/** Sign-in: email and password, straight into the console. */
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const setAuthenticated = useSessionStore((s) => s.setAuthenticated);
 
-  const [stage, setStage] = useState('credentials');
-  const [challenge, setChallenge] = useState(null);
-  const [backupCodes, setBackupCodes] = useState(null);
   const [loading, setLoading] = useState(false);
   const [formError, setFormError] = useState(null);
-  const [codeError, setCodeError] = useState(null);
 
   const landing = () => location.state?.from?.pathname ?? null;
 
@@ -43,83 +30,13 @@ export default function LoginPage() {
     setLoading(true);
     setFormError(null);
     try {
-      const result = await authApi.login({ email: values.email.trim(), password: values.password });
-      setChallenge(result);
-      setStage(result.stage);
+      finish(await authApi.login({ email: values.email.trim(), password: values.password }));
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : 'Could not sign you in.');
     } finally {
       setLoading(false);
     }
   };
-
-  const submitCode = async ({ code, trustDevice }) => {
-    setLoading(true);
-    setCodeError(null);
-    try {
-      const payload = await authApi.verify2fa({ challengeId: challenge.challengeId, code, trustDevice });
-      finish(payload);
-    } catch (e) {
-      const fieldMsg = e instanceof ApiError ? (e.fieldErrors?.code ?? e.message) : 'That did not work.';
-      setCodeError(fieldMsg);
-      // An expired or burnt-out challenge cannot be retried; send them back.
-      if (e instanceof ApiError && e.code === 'SESSION_EXPIRED') {
-        setStage('credentials');
-        setFormError(e.message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const submitEnrolment = async ({ code }) => {
-    setLoading(true);
-    setCodeError(null);
-    try {
-      const payload = await authApi.enrol2fa({ challengeId: challenge.challengeId, code });
-      if (payload.backupCodes?.length) {
-        setBackupCodes({ codes: payload.backupCodes, payload });
-        setStage('backup_codes');
-      } else {
-        finish(payload);
-      }
-    } catch (e) {
-      setCodeError(e instanceof ApiError ? (e.fieldErrors?.code ?? e.message) : 'That did not work.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (stage === 'verify_2fa') {
-    return (
-      <TwoFactorStep
-        challenge={challenge}
-        loading={loading}
-        error={codeError}
-        onSubmit={submitCode}
-        onBack={() => {
-          setStage('credentials');
-          setChallenge(null);
-          setCodeError(null);
-        }}
-      />
-    );
-  }
-
-  if (stage === 'enrol_2fa') {
-    return (
-      <EnrolTwoFactorStep
-        challenge={challenge}
-        loading={loading}
-        error={codeError}
-        onSubmit={submitEnrolment}
-      />
-    );
-  }
-
-  if (stage === 'backup_codes') {
-    return <BackupCodesStep codes={backupCodes.codes} onContinue={() => finish(backupCodes.payload)} />;
-  }
 
   return (
     <div>

@@ -146,64 +146,7 @@ export const authHandlers = [
 
     if (user.status === 'LOCKED') update('adminUsers', user.id, { status: 'ACTIVE', lockedUntil: null });
 
-    // Second factor is mandatory for every admin (plan §11).
-    const stage = user.twoFactorEnrolled ? 'verify_2fa' : 'enrol_2fa';
-    const challenge = createChallenge(user, stage);
-    scheduleSave();
-
-    return ok({
-      stage,
-      challengeId: challenge.id,
-      maskedEmail: user.email.replace(/^(.{2}).*(@.*)$/, '$1•••••$2'),
-      ...(stage === 'enrol_2fa'
-        ? {
-            secret: user.twoFactorSecret,
-            otpauthUrl: `otpauth://totp/Arise%20Admin:${encodeURIComponent(user.email)}?secret=${user.twoFactorSecret}&issuer=Arise%20Admin`,
-          }
-        : {}),
-      // Mock-only affordance: the UI shows this as a dev hint on the 2FA screen.
-      devHint: { code: challenge.code },
-    });
-  }),
-
-  /* ------------------------------------------------------------ 2FA verify */
-  mswHttp.post(`${BASE}/auth/2fa/verify`, async ({ request }) => {
-    const injected = await simulateNetwork('/auth/2fa/verify');
-    if (injected) return injected;
-
-    const body = await request.json();
-    const challenge = liveChallenge(body?.challengeId);
-    if (!challenge) return unauthorized('This sign-in attempt expired. Please sign in again.');
-
-    const user = findById('adminUsers', challenge.userId);
-    if (!user) return unauthorized('This sign-in attempt expired. Please sign in again.');
-
-    const code = String(body?.code ?? '').trim();
-    const backup = (user.backupCodes ?? []).find((b) => !b.usedAt && b.code === code.toUpperCase());
-
-    if (code !== challenge.code && !backup) {
-      update('authChallenges', challenge.id, { attempts: challenge.attempts + 1 });
-      if (challenge.attempts + 1 >= 5) {
-        update('authChallenges', challenge.id, { consumedAt: mockNowIso() });
-        return unauthorized('Too many incorrect codes. Please sign in again.');
-      }
-      return validationFailed({ code: 'That code is not correct.' }, 'That code is not correct.');
-    }
-
-    if (backup) {
-      backup.usedAt = mockNowIso();
-      writeAudit({
-        actor: user,
-        action: 'auth.backup_code_used',
-        entityType: 'adminUser',
-        entityId: user.id,
-        entityLabel: user.name,
-        severity: 'warning',
-      });
-    }
-
-    update('authChallenges', challenge.id, { consumedAt: mockNowIso() });
-    return issue(user, body, { usedBackupCode: Boolean(backup) });
+    return issue(user, body);
   }),
 
   /* ------------------------------------------------------------- 2FA enrol */

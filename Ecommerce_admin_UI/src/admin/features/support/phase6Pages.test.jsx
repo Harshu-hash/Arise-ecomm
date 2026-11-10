@@ -54,11 +54,7 @@ beforeEach(async () => {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ email: 'supportlead@arise.test', password: DEMO_PASSWORD }),
   }).then((r) => r.json());
-  const verify = await fetch(`${window.location.origin}/api/admin/v1/auth/2fa/verify`, {
-    method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ challengeId: login.data.challengeId, code: login.data.devHint.code }),
-  }).then((r) => r.json());
-  useSessionStore.getState().setAuthenticated(verify.data);
+  useSessionStore.getState().setAuthenticated(login.data);
 });
 
 function mount(ui, { route } = {}) {

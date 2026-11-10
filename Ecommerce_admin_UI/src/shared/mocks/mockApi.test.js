@@ -52,49 +52,24 @@ async function signIn(email) {
     body: { email, password: DEMO_PASSWORD },
   });
   expect(login.status, `login for ${email} failed: ${JSON.stringify(login.json)}`).toBe(200);
-  const { challengeId, devHint, stage } = login.json.data;
-  const verify = await call(`/auth/2fa/${stage === 'enrol_2fa' ? 'enrol' : 'verify'}`, {
-    method: 'POST',
-    body: { challengeId, code: devHint.code },
-  });
-  expect(verify.status).toBe(200);
-  return verify.json.data;
+  return login.json.data;
 }
 
 describe('authentication', () => {
-  it('requires a second factor before issuing a session', async () => {
+  it('issues a session straight after the password', async () => {
     const login = await call('/auth/login', {
       method: 'POST',
       body: { email: 'super@arise.test', password: DEMO_PASSWORD },
     });
     expect(login.status).toBe(200);
-    expect(login.json.data.stage).toBe('verify_2fa');
-    // Crucially, no token yet.
-    expect(login.json.data.accessToken).toBeUndefined();
+    expect(login.json.data.accessToken).toBeTruthy();
+    expect(login.json.data.stage).toBeUndefined();
   });
 
-  it('completes sign-in once the code is supplied', async () => {
+  it('returns the permission set with the session', async () => {
     const session = await signIn('super@arise.test');
     expect(session.accessToken).toBeTruthy();
     expect(session.user.permissions).toContain('*');
-  });
-
-  it('rejects a wrong code without ending the challenge', async () => {
-    const login = await call('/auth/login', {
-      method: 'POST',
-      body: { email: 'ops@arise.test', password: DEMO_PASSWORD },
-    });
-    const bad = await call('/auth/2fa/verify', {
-      method: 'POST',
-      body: { challengeId: login.json.data.challengeId, code: '000000' },
-    });
-    expect(bad.status).toBe(422);
-
-    const good = await call('/auth/2fa/verify', {
-      method: 'POST',
-      body: { challengeId: login.json.data.challengeId, code: login.json.data.devHint.code },
-    });
-    expect(good.status).toBe(200);
   });
 
   it('gives the same answer for a wrong password and an unknown email', async () => {
@@ -134,13 +109,13 @@ describe('authentication', () => {
     expect(correct.status).toBe(403);
   });
 
-  it('routes a never-enrolled admin into 2FA setup', async () => {
+  it('signs a never-enrolled admin straight in', async () => {
     const login = await call('/auth/login', {
       method: 'POST',
       body: { email: 'ads@arise.test', password: DEMO_PASSWORD },
     });
-    expect(login.json.data.stage).toBe('enrol_2fa');
-    expect(login.json.data.secret).toBeTruthy();
+    expect(login.status).toBe(200);
+    expect(login.json.data.accessToken).toBeTruthy();
   });
 
   it('refuses an invited account until the invitation is accepted', async () => {
