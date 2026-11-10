@@ -13,6 +13,8 @@ export function requestContextMiddleware(req, res, next) {
       requestId,
       actorId: null,
       sellerId: null,
+      ip: req.ip,
+      userAgent: (req.get('user-agent') ?? '').slice(0, 256),
       startedAt: Date.now(),
     },
     next,
@@ -26,4 +28,3 @@ export function getRequestContext() {
 export function enrichRequestContext(values) {
   Object.assign(storage.getStore() ?? {}, values);
 }
-
