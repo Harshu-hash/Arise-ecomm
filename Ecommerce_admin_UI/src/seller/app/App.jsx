@@ -4,31 +4,18 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider } from 'react-router-dom';
 import { queryClient } from '@core/api/queryClient';
 import { buildTheme } from '@theme/antdTheme';
+import { DARK, LIGHT } from '@theme/tokens';
 import { useThemeEffect } from '@theme/themeStore';
-import { SELLER_ACCENT, SELLER_ACCENT_HOVER } from '@seller/theme';
 import { router } from './router';
-
-function sellerTheme(mode) {
-  const base = buildTheme(mode);
-  return {
-    ...base,
-    token: {
-      ...base.token,
-      colorPrimary: SELLER_ACCENT,
-      colorInfo: SELLER_ACCENT,
-      colorLink: SELLER_ACCENT,
-      colorLinkHover: SELLER_ACCENT_HOVER,
-    },
-  };
-}
 
 export default function App() {
   const mode = useThemeEffect();
+  const tokens = mode === 'dark' ? DARK : LIGHT;
 
   return (
     <ConfigProvider
       locale={enUS}
-      theme={sellerTheme(mode)}
+      theme={buildTheme(mode)}
       form={{ validateMessages: { required: 'This field is required' } }}
     >
       <AntApp
@@ -36,7 +23,7 @@ export default function App() {
         notification={{ placement: 'bottomRight', duration: 4 }}
         message={{ duration: 3, maxCount: 3 }}
       >
-        <div style={{ '--arise-focus': SELLER_ACCENT, height: '100%' }}>
+        <div style={{ '--arise-focus': tokens.colorPrimary, height: '100%' }}>
           <QueryClientProvider client={queryClient}>
             <RouterProvider router={router} />
           </QueryClientProvider>

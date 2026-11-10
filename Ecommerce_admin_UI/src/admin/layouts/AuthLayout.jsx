@@ -1,7 +1,7 @@
 import { Card, Flex, Space, Typography } from 'antd';
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
-import { ARISE } from '@theme/tokens';
+import { CHROME } from '@theme/tokens';
 import { ENV } from '@core/config/env';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
@@ -24,39 +24,27 @@ export default function AuthLayout() {
             maxWidth: 560,
             padding: 40,
             color: '#fff',
-            background: `linear-gradient(150deg, ${ARISE.campaignGradientStart}, ${ARISE.campaignGradientEnd})`,
+            borderInlineEnd: `1px solid ${CHROME.border}`,
+            background: `radial-gradient(900px 520px at 0% 0%, rgba(245,158,11,0.22), transparent 60%), ${CHROME.siderBg}`,
           }}
         >
           <Space size={10} align="center">
-            <div
-              aria-hidden
-              style={{
-                width: 30,
-                height: 30,
-                borderRadius: 8,
-                background: 'rgba(255,255,255,0.22)',
-                display: 'grid',
-                placeItems: 'center',
-                fontWeight: 700,
-              }}
-            >
+            <div className="arise-brand-mark" aria-hidden style={{ background: CHROME.accent }}>
               A
             </div>
-            <Typography.Text strong style={{ color: '#fff', fontSize: 17 }}>
-              Arise Admin
-            </Typography.Text>
+            <span className="arise-brand-name">Arise Admin</span>
           </Space>
 
           <div>
             <Typography.Title level={2} style={{ color: '#fff', marginBottom: 12, fontSize: 28 }}>
               The control room for the Arise marketplace
             </Typography.Title>
-            <Typography.Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: 15, marginBottom: 0 }}>
+            <Typography.Paragraph style={{ color: CHROME.text, fontSize: 15, marginBottom: 0 }}>
               Sellers, catalog, orders, fulfilment, payouts and support — in one place.
             </Typography.Paragraph>
           </div>
 
-          <Typography.Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>
+          <Typography.Text style={{ color: '#71717A', fontSize: 12 }}>
             Authorised access only. All activity in this panel is logged.
           </Typography.Text>
         </Flex>
@@ -67,19 +55,7 @@ export default function AuthLayout() {
           {!isDesktop && (
             <Flex justify="center" style={{ marginBottom: 20 }}>
               <Space size={10} align="center">
-                <div
-                  aria-hidden
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 7,
-                    background: 'linear-gradient(135deg, #2874F0, #4C8DF6)',
-                    color: '#fff',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontWeight: 700,
-                  }}
-                >
+                <div className="arise-brand-mark" aria-hidden style={{ background: CHROME.accent }}>
                   A
                 </div>
                 <Typography.Text strong style={{ fontSize: 16 }}>

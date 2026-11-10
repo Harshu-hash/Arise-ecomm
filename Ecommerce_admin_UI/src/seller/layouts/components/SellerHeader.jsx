@@ -17,14 +17,8 @@ export default function SellerHeader({ onToggleSidebar, onSignOut }) {
 
   return (
     <Layout.Header
-      style={{
-        position: 'sticky',
-        top: 0,
-        zIndex: 20,
-        padding: '0 12px',
-        borderBottom: '1px solid var(--ant-color-border-secondary)',
-        background: 'var(--ant-color-bg-container)',
-      }}
+      className="arise-header"
+      style={{ position: 'sticky', top: 0, zIndex: 20, padding: '0 16px' }}
     >
       <Flex align="center" justify="space-between" gap={8} style={{ height: '100%' }}>
         <Flex align="center" gap={8} style={{ minWidth: 0 }}>

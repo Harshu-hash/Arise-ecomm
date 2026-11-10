@@ -1,104 +1,104 @@
 /**
- * Brand tokens for the admin panel.
+ * Design tokens for the admin and seller panels.
  *
- * Source of truth for the hues is the mobile app's palette
- * (Ecommerce/src/constants/colors.js). Values below are the admin-panel
- * adaptations documented in docs/ADMIN_PANEL_PLAN.md §8.1 — a few are
- * deliberately darker or lighter than the app's so text and icons clear
- * WCAG AA against admin surfaces, which are denser than the app's.
+ * The palette follows the MasterAriseAdmin reference: a neutral zinc scale,
+ * near-black primary actions, a dark navigation rail and top bar in both
+ * themes, and amber as the single brand accent. Semantic colours (success,
+ * warning, error, info) keep their meaning and are tuned to clear WCAG AA.
  */
 
-/** Hues taken unchanged from the app, for parity in charts, badges and previews. */
-export const ARISE = {
-  primary: '#2874F0',
-  primaryDark: '#1B5FC7',
-  primaryLight: '#EFF6FF',
-  ctaYellow: '#FFC200',
-  ctaGold: '#FFE11B',
-  ratingGreen: '#26A541',
-  ratingGreenBg: '#EAF7EC',
-  badgeDark: '#212121',
-  offerRed: '#CC0C39',
-  offerRedLight: '#FBE7EC',
-  campaignGradientStart: '#F5443A',
-  campaignGradientEnd: '#FF8A3D',
-  error: '#FF6161',
-  warning: '#FFA41C',
+/** The rail and top bar stay dark in light and dark mode alike. */
+export const CHROME = {
+  siderBg: '#09090B',
+  headerBg: '#000000',
+  border: '#27272A',
+  text: '#A1A1AA',
+  textHover: '#F4F4F5',
+  textActive: '#FFFFFF',
+  itemHoverBg: '#18181B',
+  itemActiveBg: '#27272A',
+  accent: '#F59E0B',
 };
 
 export const LIGHT = {
-  colorPrimary: ARISE.primary,
-  colorPrimaryHover: '#3D83F2',
-  colorPrimaryActive: ARISE.primaryDark,
-  colorPrimaryBg: ARISE.primaryLight,
-  colorSuccess: ARISE.ratingGreen,
-  colorSuccessBg: ARISE.ratingGreenBg,
-  colorWarning: ARISE.warning,
-  colorWarningBg: '#FFF3E0',
-  // The app's #FF6161 fails AA on white for text, so destructive text and
-  // buttons use the deeper offer red while #FF6161 stays for large accents.
-  colorError: ARISE.offerRed,
-  colorErrorBg: ARISE.offerRedLight,
-  colorErrorAccent: ARISE.error,
-  colorInfo: ARISE.primary,
-  colorText: '#212121',
-  // App's #878787 is 3.5:1 on white — darkened to clear 4.5:1 for body text.
-  colorTextSecondary: '#6B6B6B',
+  colorPrimary: '#171717',
+  colorPrimaryHover: '#404040',
+  colorPrimaryActive: '#0A0A0A',
+  colorPrimaryBg: '#F5F5F5',
+  colorPrimaryBgHover: '#EDEDED',
+  colorPrimaryBorder: '#D4D4D4',
+  colorPrimaryBorderHover: '#A3A3A3',
+  colorSuccess: '#059669',
+  colorSuccessBg: '#ECFDF5',
+  colorWarning: '#D97706',
+  colorWarningBg: '#FFFBEB',
+  colorError: '#DC2626',
+  colorErrorBg: '#FEF2F2',
+  colorInfo: '#2563EB',
+  colorInfoBg: '#EFF6FF',
+  colorLink: '#2563EB',
+  colorLinkHover: '#1D4ED8',
+  colorText: '#0A0A0A',
+  colorTextSecondary: '#737373',
   colorTextTertiary: '#8A8A8A',
-  colorBgLayout: '#F1F3F6',
+  colorTextPlaceholder: '#8A8A8A',
+  colorBgLayout: '#F5F5F5',
   colorBgContainer: '#FFFFFF',
   colorBgElevated: '#FFFFFF',
-  colorBorder: '#E0E0E0',
-  colorBorderSecondary: '#F0F0F0',
-  colorFillQuaternary: '#F7F8FA',
-  // Sidebar is a dark rail in both themes, the way large ops consoles read best.
-  colorSiderBg: '#111418',
-  colorSiderText: 'rgba(255,255,255,0.72)',
-  colorSiderTextActive: '#FFFFFF',
-  colorSiderItemActiveBg: 'rgba(40,116,240,0.20)',
-  colorHeaderBg: '#FFFFFF',
-  colorAccent: ARISE.ctaYellow,
+  colorBorder: '#E5E5E5',
+  colorBorderSecondary: '#EDEDED',
+  colorFillQuaternary: '#F5F5F5',
+  colorTextLightSolid: '#FFFFFF',
+  tableHeaderBg: '#FAFAFA',
+  tableRowHoverBg: '#FAFAFA',
+  focusRing: 'rgba(10,10,10,0.08)',
+  shadow: '0 1px 2px rgba(0,0,0,0.04)',
 };
 
 export const DARK = {
-  // Primary is lifted two steps: #2874F0 on a #181B21 surface is too dim.
-  colorPrimary: '#4C8DF6',
-  colorPrimaryHover: '#6FA3F8',
-  colorPrimaryActive: '#3D83F2',
-  colorPrimaryBg: '#16243B',
-  colorSuccess: '#3DBE5A',
-  colorSuccessBg: '#14271A',
-  colorWarning: '#FFB547',
-  colorWarningBg: '#2A1F0E',
-  colorError: '#FF7A7A',
-  colorErrorBg: '#2E1417',
-  colorErrorAccent: '#FF7A7A',
-  colorInfo: '#4C8DF6',
-  colorText: '#E8EAED',
-  colorTextSecondary: '#A0A4AB',
-  colorTextTertiary: '#7C818B',
-  colorBgLayout: '#0F1115',
-  colorBgContainer: '#181B21',
-  colorBgElevated: '#1F232B',
-  colorBorder: '#2A2E36',
-  colorBorderSecondary: '#22262D',
-  colorFillQuaternary: '#1C2027',
-  colorSiderBg: '#13161B',
-  colorSiderText: 'rgba(255,255,255,0.70)',
-  colorSiderTextActive: '#FFFFFF',
-  colorSiderItemActiveBg: 'rgba(76,141,246,0.22)',
-  colorHeaderBg: '#181B21',
-  colorAccent: ARISE.ctaYellow,
+  colorPrimary: '#E5E5E5',
+  colorPrimaryHover: '#F5F5F5',
+  colorPrimaryActive: '#D4D4D4',
+  colorPrimaryBg: '#262626',
+  colorPrimaryBgHover: '#303030',
+  colorPrimaryBorder: '#525252',
+  colorPrimaryBorderHover: '#737373',
+  colorSuccess: '#34D399',
+  colorSuccessBg: '#052E22',
+  colorWarning: '#FBBF24',
+  colorWarningBg: '#2B1D05',
+  colorError: '#F87171',
+  colorErrorBg: '#2E1213',
+  colorInfo: '#60A5FA',
+  colorInfoBg: '#10233F',
+  colorLink: '#60A5FA',
+  colorLinkHover: '#93C5FD',
+  colorText: '#FAFAFA',
+  colorTextSecondary: '#A3A3A3',
+  colorTextTertiary: '#8A8A8A',
+  colorTextPlaceholder: '#8A8A8A',
+  colorBgLayout: '#0A0A0A',
+  colorBgContainer: '#171717',
+  colorBgElevated: '#1F1F1F',
+  colorBorder: '#2E2E2E',
+  colorBorderSecondary: '#262626',
+  colorFillQuaternary: '#1F1F1F',
+  // Text on a solid primary fill: the primary is near-white in dark mode.
+  colorTextLightSolid: '#0A0A0A',
+  tableHeaderBg: '#1C1C1C',
+  tableRowHoverBg: '#1F1F1F',
+  focusRing: 'rgba(250,250,250,0.12)',
+  shadow: '0 1px 2px rgba(0,0,0,0.5)',
 };
 
-/** Shared, theme-independent shape and type scale (plan §8.1). */
+/** Shared, theme-independent shape and type scale. */
 export const SHAPE = {
-  borderRadius: 6,
-  borderRadiusLG: 8,
-  borderRadiusSM: 4,
+  borderRadius: 8,
+  borderRadiusLG: 12,
+  borderRadiusSM: 6,
   controlHeight: 36,
   fontFamily:
-    "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
+    "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif",
   fontFamilyCode: "ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace",
   fontSize: 14,
   fontSizeSM: 12,
@@ -115,8 +115,8 @@ export const SHAPE = {
 export const SPACE = { xs: 4, s: 8, m: 12, l: 16, xl: 24, xxl: 32 };
 
 export const LAYOUT = {
-  siderWidth: 248,
-  siderCollapsedWidth: 64,
-  headerHeight: 56,
+  siderWidth: 272,
+  siderCollapsedWidth: 72,
+  headerHeight: 64,
   contentMaxWidth: 1680,
 };

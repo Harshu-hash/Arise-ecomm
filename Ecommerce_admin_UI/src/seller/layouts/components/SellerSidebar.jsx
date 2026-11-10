@@ -1,4 +1,4 @@
-import { Menu, Tag, Typography } from 'antd';
+import { Menu, Tag } from 'antd';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LAYOUT } from '@theme/tokens';
@@ -59,40 +59,16 @@ export default function SellerSidebar({ collapsed, onNavigate }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
       <div
-        style={{
-          height: LAYOUT.headerHeight,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: collapsed ? '0 20px' : '0 16px',
-          flexShrink: 0,
-        }}
+        className="arise-brand"
+        style={{ height: LAYOUT.headerHeight, padding: collapsed ? '0 22px' : '0 20px' }}
       >
-        <div
-          aria-hidden
-          style={{
-            width: 24,
-            height: 24,
-            borderRadius: 6,
-            background: `linear-gradient(135deg, ${SELLER_ACCENT}, #6366F1)`,
-            color: '#fff',
-            fontSize: 13,
-            fontWeight: 700,
-            display: 'grid',
-            placeItems: 'center',
-            flexShrink: 0,
-          }}
-        >
+        <div aria-hidden className="arise-brand-mark" style={{ background: SELLER_ACCENT, color: '#fff' }}>
           A
         </div>
-        {!collapsed && (
-          <Typography.Text strong style={{ color: '#fff', fontSize: 15, whiteSpace: 'nowrap' }}>
-            Arise Seller
-          </Typography.Text>
-        )}
+        {!collapsed && <span className="arise-brand-name">Arise Seller</span>}
       </div>
 
-      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', paddingBottom: 16 }}>
+      <div style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '12px 0 16px' }}>
         <Menu
           theme="dark"
           mode="inline"

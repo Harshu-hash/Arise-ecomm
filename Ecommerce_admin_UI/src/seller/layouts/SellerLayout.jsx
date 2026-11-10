@@ -58,6 +58,7 @@ export default function SellerLayout() {
       {!isMobile && (
         <Layout.Sider
           theme="dark"
+          className="arise-sider"
           collapsible={false}
           collapsed={railCollapsed}
           width={LAYOUT.siderWidth}
@@ -78,7 +79,7 @@ export default function SellerLayout() {
           styles={{ body: { padding: 0, background: 'var(--ant-color-bg-container)' }, wrapper: { boxShadow: 'none' } }}
           className="arise-nav-drawer"
         >
-          <div style={{ height: '100%', background: '#111418' }}>
+          <div className="arise-sider" style={{ height: '100%', background: 'var(--arise-chrome-bg)' }}>
             <SellerSidebar collapsed={false} onNavigate={() => setDrawerOpen(false)} />
           </div>
         </Drawer>
@@ -94,7 +95,7 @@ export default function SellerLayout() {
 
         <Layout.Content
           style={{
-            padding: isMobile ? 12 : 20,
+            padding: isMobile ? 16 : 24,
             maxWidth: LAYOUT.contentMaxWidth,
             width: '100%',
             margin: '0 auto',

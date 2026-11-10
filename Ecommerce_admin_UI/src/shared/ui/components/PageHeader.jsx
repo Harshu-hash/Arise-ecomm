@@ -29,7 +29,7 @@ export default function PageHeader({
     >
       {breadcrumbs.length > 0 && (
         <Breadcrumb
-          style={{ marginBottom: 6, fontSize: 12 }}
+          style={{ marginBottom: 10, fontSize: 12 }}
           items={breadcrumbs.map((b) => ({
             title: b.to ? <Link to={b.to}>{b.label}</Link> : b.label,
           }))}
@@ -46,14 +46,17 @@ export default function PageHeader({
         <div style={{ minWidth: 0 }}>
           <Space size={10} align="center" wrap>
             {onBack}
-            <Typography.Title level={3} style={{ margin: 0, fontSize: 20, lineHeight: 1.3 }}>
+            <Typography.Title
+              level={3}
+              style={{ margin: 0, fontSize: isMobile ? 22 : 28, lineHeight: 1.2, fontWeight: 700 }}
+            >
               {title}
             </Typography.Title>
             {tags}
           </Space>
 
           {subtitle && (
-            <Typography.Paragraph type="secondary" style={{ margin: '4px 0 0', fontSize: 13 }}>
+            <Typography.Paragraph type="secondary" style={{ margin: '6px 0 0', fontSize: 14 }}>
               {subtitle}
             </Typography.Paragraph>
           )}
@@ -72,7 +75,7 @@ export default function PageHeader({
         )}
       </Flex>
 
-      {tabs && <div style={{ marginTop: 8 }}>{tabs}</div>}
+      {tabs && <div style={{ marginTop: 16 }}>{tabs}</div>}
     </div>
   );
 }

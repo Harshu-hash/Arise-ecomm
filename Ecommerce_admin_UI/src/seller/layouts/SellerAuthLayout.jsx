@@ -4,6 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { ENV } from '@core/config/env';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
+import { CHROME } from '@theme/tokens';
 import { SELLER_ACCENT } from '@seller/theme';
 
 /**
@@ -27,31 +28,27 @@ export default function SellerAuthLayout() {
             maxWidth: 560,
             padding: 40,
             color: '#fff',
-            background: `linear-gradient(150deg, ${SELLER_ACCENT}, #7C3AED)`,
+            borderInlineEnd: `1px solid ${CHROME.border}`,
+            background: `radial-gradient(900px 520px at 0% 0%, ${SELLER_ACCENT}55, transparent 60%), ${CHROME.siderBg}`,
           }}
         >
           <Space size={10} align="center">
-            <div
-              aria-hidden
-              style={{ width: 30, height: 30, borderRadius: 8, background: 'rgba(255,255,255,0.22)', display: 'grid', placeItems: 'center', fontWeight: 700 }}
-            >
+            <div className="arise-brand-mark" aria-hidden style={{ background: SELLER_ACCENT, color: '#fff' }}>
               A
             </div>
-            <Typography.Text strong style={{ color: '#fff', fontSize: 17 }}>
-              Arise Seller
-            </Typography.Text>
+            <span className="arise-brand-name">Arise Seller</span>
           </Space>
 
           <div>
             <Typography.Title level={2} style={{ color: '#fff', marginBottom: 12, fontSize: 28 }}>
               Sell to millions of Arise customers
             </Typography.Title>
-            <Typography.Paragraph style={{ color: 'rgba(255,255,255,0.9)', fontSize: 15, marginBottom: 0 }}>
+            <Typography.Paragraph style={{ color: CHROME.text, fontSize: 15, marginBottom: 0 }}>
               List products, manage orders, track payments and grow — all in one place.
             </Typography.Paragraph>
           </div>
 
-          <Typography.Text style={{ color: 'rgba(255,255,255,0.75)', fontSize: 12 }}>
+          <Typography.Text style={{ color: '#71717A', fontSize: 12 }}>
             Your seller account, protected. All activity is logged.
           </Typography.Text>
         </Flex>
@@ -62,10 +59,7 @@ export default function SellerAuthLayout() {
           {!isDesktop && (
             <Flex justify="center" style={{ marginBottom: 20 }}>
               <Space size={10} align="center">
-                <div
-                  aria-hidden
-                  style={{ width: 28, height: 28, borderRadius: 7, background: `linear-gradient(135deg, ${SELLER_ACCENT}, #7C3AED)`, color: '#fff', display: 'grid', placeItems: 'center', fontWeight: 700 }}
-                >
+                <div className="arise-brand-mark" aria-hidden style={{ background: SELLER_ACCENT, color: '#fff' }}>
                   A
                 </div>
                 <Typography.Text strong style={{ fontSize: 16 }}>

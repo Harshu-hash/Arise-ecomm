@@ -24,7 +24,7 @@ export default function StatCard({
 }) {
   if (loading) {
     return (
-      <Card size="small" styles={{ body: { padding: 14 } }}>
+      <Card size="small" styles={{ body: { padding: 16 } }}>
         <Skeleton active paragraph={{ rows: 1, width: '60%' }} title={{ width: '40%' }} />
       </Card>
     );
@@ -40,24 +40,20 @@ export default function StatCard({
   const up = (deltaPct ?? 0) > 0;
   const flat = !deltaPct;
   const good = invertDelta ? !up : up;
-  // A thin accent on top of an otherwise plain tile, carrying the same
-  // good/bad/flat signal as the arrow below it — reinforcement, not the only
-  // signal, since status is never colour-alone in this panel.
-  const accent = flat ? 'var(--ant-color-primary)' : good ? 'var(--ant-color-success)' : 'var(--ant-color-error)';
 
   const body = (
     <Card
       size="small"
       hoverable={Boolean(to)}
-      styles={{ body: { padding: 14 } }}
-      style={{ height: '100%', borderTop: `3px solid ${accent}` }}
+      styles={{ body: { padding: 16 } }}
+      style={{ height: '100%' }}
     >
-      <Flex vertical gap={6}>
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+      <Flex vertical gap={4}>
+        <Typography.Text type="secondary" style={{ fontSize: 13, fontWeight: 500 }}>
           {glossify(label)}
         </Typography.Text>
 
-        <Typography.Text strong className="tabular" style={{ fontSize: 24, lineHeight: 1.15 }}>
+        <Typography.Text strong className="tabular" style={{ fontSize: 26, lineHeight: 1.15, fontWeight: 700, letterSpacing: '-0.02em' }}>
           {display}
         </Typography.Text>
 

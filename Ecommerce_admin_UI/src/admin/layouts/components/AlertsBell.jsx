@@ -39,8 +39,9 @@ export default function AlertsBell() {
         maxHeight: 420,
         overflowY: 'auto',
         background: 'var(--ant-color-bg-elevated)',
-        borderRadius: 8,
-        boxShadow: '0 6px 16px rgba(0,0,0,0.12)',
+        border: '1px solid var(--ant-color-border-secondary)',
+        borderRadius: 'var(--ant-border-radius-lg)',
+        boxShadow: 'var(--ant-box-shadow-secondary)',
       }}
     >
       <Flex justify="space-between" align="center" style={{ padding: '10px 14px' }}>

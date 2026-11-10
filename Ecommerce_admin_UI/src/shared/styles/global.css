@@ -39,11 +39,300 @@ body {
   text-overflow: ellipsis;
 }
 
-/* A touch of elevation on every card — flat bordered boxes otherwise read as
-   plain rectangles. Uses the theme's own shadow token, so it still adapts to
-   dark mode. */
+/* Cards are flat with a hairline border, like the reference. The shadow token
+   stays a barely-there lift so they still separate from the page. */
 .ant-card {
   box-shadow: var(--ant-box-shadow-tertiary);
+}
+
+:root {
+  --arise-pill-bg: #f1f1f1;
+}
+
+html[data-theme='dark'] {
+  --arise-pill-bg: #262626;
+}
+
+/* ── Cards: borderless header, title then content, like the reference ── */
+.ant-card {
+  border-radius: 12px;
+}
+
+.ant-card .ant-card-head {
+  min-height: 0;
+  padding: 16px 20px 0;
+  border-bottom: 0;
+}
+
+.ant-card .ant-card-head-title,
+.ant-card .ant-card-extra {
+  padding: 0;
+}
+
+.ant-card .ant-card-head-title {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.ant-card .ant-card-head + .ant-card-body {
+  padding-top: 14px;
+}
+
+.ant-card-small > .ant-card-head {
+  padding: 12px 14px 0;
+}
+
+/* ── Tabs: segmented pill (active = filled), line tabs only ── */
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav {
+  margin-bottom: 16px;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav::before,
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-ink-bar {
+  display: none;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-nav-list {
+  padding: 4px;
+  gap: 2px;
+  background: var(--arise-pill-bg);
+  border-radius: 12px;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab {
+  margin: 0;
+  padding: 6px 14px;
+  border-radius: 8px;
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab + .ant-tabs-tab {
+  margin: 0;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab-btn {
+  font-weight: 600;
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab-active {
+  background: var(--ant-color-primary);
+}
+
+.ant-tabs-top:not(.ant-tabs-card) > .ant-tabs-nav .ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--ant-color-text-light-solid);
+}
+
+/* ── Tags and badges: pill, 20px ── */
+.ant-tag {
+  padding-inline: 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+/* ── Tables: hairline frame, 12px semibold header, compact header row ── */
+.ant-table-wrapper .ant-table-thead > tr > th {
+  padding-block: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.ant-table-wrapper .ant-table-container {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 12px;
+}
+
+.ant-card .ant-table-wrapper .ant-table-container {
+  border: 0;
+  border-radius: 0;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td {
+  border-bottom: 0;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td:first-child {
+  border-end-start-radius: 11px;
+}
+
+.ant-table-wrapper .ant-table-tbody > tr:last-child > td:last-child {
+  border-end-end-radius: 11px;
+}
+
+/* ── Popups: rounded, hairline border, padded rounded options ── */
+.ant-select-dropdown,
+.ant-dropdown .ant-dropdown-menu,
+.ant-picker-dropdown .ant-picker-panel-container {
+  border: 1px solid var(--ant-color-border-secondary);
+  border-radius: 12px;
+}
+
+.ant-select-dropdown {
+  padding: 4px;
+}
+
+.ant-select-dropdown .ant-select-item,
+.ant-dropdown .ant-dropdown-menu .ant-dropdown-menu-item {
+  border-radius: 8px;
+}
+
+.ant-modal .ant-modal-content {
+  border: 1px solid var(--ant-color-border-secondary);
+}
+
+h1,
+h2,
+h3,
+h4,
+.ant-typography h1,
+.ant-typography h2,
+.ant-typography h3,
+.ant-typography h4 {
+  letter-spacing: -0.015em;
+}
+
+.ant-form-item-label > label {
+  font-weight: 500;
+}
+
+/* ── Navigation chrome ────────────────────────────────────────────────────
+   The rail and top bar are dark in both themes (see CHROME in tokens.js). */
+:root {
+  --arise-chrome-bg: #09090b;
+  --arise-chrome-header-bg: #000;
+  --arise-chrome-border: #27272a;
+  --arise-chrome-accent: #f59e0b;
+}
+
+.arise-sider {
+  border-inline-end: 1px solid var(--arise-chrome-border);
+}
+
+.arise-sider .ant-menu-item-selected,
+.arise-sider .ant-menu-submenu-selected > .ant-menu-submenu-title {
+  font-weight: 600;
+}
+
+.arise-sider .ant-menu-item,
+.arise-sider .ant-menu-submenu-title {
+  transition: background-color 0.15s, color 0.15s;
+}
+
+.arise-sider ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.18);
+  background-clip: content-box;
+}
+
+.arise-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--arise-chrome-border);
+}
+
+.arise-brand-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: #09090b;
+}
+
+.arise-brand-name {
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  white-space: nowrap;
+}
+
+.arise-header {
+  background: var(--arise-chrome-header-bg);
+  border-bottom: 1px solid var(--arise-chrome-border);
+}
+
+.arise-header .ant-btn-text {
+  color: #d4d4d8;
+}
+
+.arise-header .ant-btn-text:hover,
+.arise-header .ant-btn-text:focus-visible {
+  color: #fff;
+  background: #18181b;
+}
+
+.arise-header .ant-input-affix-wrapper {
+  background: #18181b;
+  border-color: var(--arise-chrome-border);
+  box-shadow: none;
+}
+
+.arise-header .ant-input-affix-wrapper:hover,
+.arise-header .ant-input-affix-wrapper-focused {
+  border-color: #3f3f46;
+  box-shadow: none;
+}
+
+.arise-header .ant-input {
+  background: transparent;
+  color: #f4f4f5;
+}
+
+.arise-header .ant-input::placeholder {
+  color: #71717a;
+}
+
+.arise-header .ant-input-prefix .anticon {
+  color: #a1a1aa;
+  opacity: 1;
+}
+
+.arise-header .ant-input-suffix .ant-tag {
+  background: var(--arise-chrome-border);
+  color: #d4d4d8;
+}
+
+.arise-header .ant-typography {
+  color: #fafafa;
+}
+
+.arise-header .ant-typography.ant-typography-secondary {
+  color: #a1a1aa;
+}
+
+.arise-header .ant-badge-count {
+  box-shadow: 0 0 0 1px #000;
+}
+
+.arise-header .ant-avatar {
+  color: #fff;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.45);
+}
+
+/* Dark mode: the primary is near-white, so marks drawn in white on it need to
+   flip, and tooltips (which size their text off the same token) stay legible. */
+html[data-theme='dark'] .ant-checkbox-checked .ant-checkbox-inner::after {
+  border-color: #0a0a0a;
+}
+
+html[data-theme='dark'] .ant-switch-checked .ant-switch-handle::before {
+  background: #0a0a0a;
+}
+
+html[data-theme='dark'] .ant-tooltip .ant-tooltip-inner {
+  background: #3f3f46;
+  color: #fafafa;
+}
+
+html[data-theme='dark'] .ant-tooltip .ant-tooltip-arrow::before {
+  background: #3f3f46;
 }
 
 .mono {
