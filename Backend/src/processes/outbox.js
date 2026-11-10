@@ -1,6 +1,12 @@
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { logger } from '../config/logger.js';
+import { bullmqEnabled } from '../config/redis.js';
 import { createOutboxDispatcher } from '../infrastructure/events/outboxDispatcher.js';
+
+if (!bullmqEnabled) {
+  logger.warn('BullMQ/Redis disabled; this process has nothing to run');
+  process.exit(0);
+}
 
 const dispatcher = createOutboxDispatcher();
 
