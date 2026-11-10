@@ -29,3 +29,21 @@ export class ConflictError extends AppError {
   }
 }
 
+
+export class UnauthorizedError extends AppError {
+  constructor(message = 'Authentication is required.') {
+    super({ code: 'UNAUTHORIZED', message, status: 401 });
+  }
+}
+
+export class ForbiddenError extends AppError {
+  constructor(message = 'You do not have permission to perform this action.') {
+    super({ code: 'FORBIDDEN', message, status: 403 });
+  }
+}
+
+export class RateLimitError extends AppError {
+  constructor(message = 'Too many requests. Please try again later.') {
+    super({ code: 'RATE_LIMITED', message, status: 429, retryable: true });
+  }
+}

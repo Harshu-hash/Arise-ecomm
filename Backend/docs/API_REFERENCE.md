@@ -17,6 +17,10 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/api/customer/v1/health` | none | Liveness/readiness check for the customer API surface. |
+| `GET` | `/metrics` | Bearer `METRICS_TOKEN` (404 if unset) | Prometheus scrape: HTTP latency by route, queue depth/failures, outbox lag, webhook backlog, socket count. Used for SLO dashboards and alerts. |
+| `POST` | `/api/{customer|seller|admin}/v1/uploads` | Bearer JWT (role per `purpose`) | Multipart (`purpose` + `file`) upload of images/videos/PDFs to local disk. Type is sniffed from file bytes, size-limited, saved under the owner id from the token; returns `{ key, mime, sizeBytes, url? }` (`url` only for public files). |
+| `GET` | `/api/{customer|seller|admin}/v1/uploads/private/:folder/:ownerId/:file` | Bearer JWT (owner or admin) | Download a private file (KYC docs, return proofs). Others get 404; private files are never served statically. |
+| `GET` | `/uploads/*` | none | Public media (product/review/CMS images & videos), long-cached. In production nginx serves the same folder directly. |
 
 ---
 
@@ -59,6 +63,7 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `POST` | `/webhooks/v1/payments/razorpay` | Razorpay HMAC signature (`x-razorpay-signature`) | Receives Razorpay payment/refund events; verifies the signature on the raw body, stores a deduplicated receipt (unique `x-razorpay-event-id`), enqueues it to the `webhooks` queue for idempotent processing, and acknowledges fast so Razorpay retries stay harmless. Not rate-limited by IP (signature-gated). |
 
 ## shipping
 

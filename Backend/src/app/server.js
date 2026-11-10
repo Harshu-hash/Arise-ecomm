@@ -1,21 +1,18 @@
 import { createServer } from 'node:http';
-import { Server as SocketServer } from 'socket.io';
 import { createApp } from './app.js';
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { connectRedis, disconnectRedis } from '../config/redis.js';
+import { closeMailer } from '../infrastructure/external/notification/mailer.js';
+import { closeMetrics } from '../infrastructure/observability/metrics.js';
+import { closeNotificationQueue } from '../infrastructure/queue/notification.queue.js';
+import { closeWebhookQueue } from '../infrastructure/queue/webhook.queue.js';
+import { closeSocketServer, createSocketServer } from '../infrastructure/realtime/socket.js';
 
 const app = createApp();
 const server = createServer(app);
-const io = new SocketServer(server, {
-  cors: { origin: env.corsOrigins, credentials: true },
-  transports: ['websocket', 'polling'],
-});
-
-io.on('connection', (socket) => {
-  socket.on('disconnect', () => undefined);
-});
+createSocketServer(server);
 
 async function start() {
   if (!env.DISABLE_INFRASTRUCTURE) {
@@ -38,8 +35,9 @@ async function shutdown(signal) {
     process.exit(1);
   }, env.SHUTDOWN_GRACE_MS).unref();
 
-  io.close();
+  await closeSocketServer(); // Socket.IO close also stops the HTTP server from accepting connections
   await new Promise((resolve) => server.close(resolve));
+  await Promise.allSettled([closeNotificationQueue(), closeWebhookQueue(), closeMetrics(), closeMailer()]);
   if (!env.DISABLE_INFRASTRUCTURE) {
     await Promise.allSettled([disconnectDatabase(), disconnectRedis()]);
   }
@@ -51,8 +49,9 @@ for (const signal of ['SIGINT', 'SIGTERM']) {
   process.once(signal, () => shutdown(signal).then(() => process.exit(0)));
 }
 
+process.on('unhandledRejection', (reason) => logger.error({ err: reason }, 'Unhandled promise rejection'));
+
 start().catch((error) => {
   logger.fatal({ err: error }, 'Application startup failed');
   process.exit(1);
 });
-
