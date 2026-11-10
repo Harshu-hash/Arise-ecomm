@@ -1,13 +1,19 @@
 import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { logger } from '../config/logger.js';
-import { createDomainEventsQueue } from '../infrastructure/queue/domainEvents.queue.js';
+import { bullmqEnabled } from '../config/redis.js';
+import { createMaintenanceQueue, registerMaintenanceSchedules } from '../infrastructure/queue/maintenance.queue.js';
 
-const { queue, connection } = createDomainEventsQueue();
+if (!bullmqEnabled) {
+  logger.warn('BullMQ/Redis disabled; this process has nothing to run');
+  process.exit(0);
+}
+
+const { queue, connection } = createMaintenanceQueue();
 
 async function start() {
   await connectDatabase();
-  // Repeatable reconciliation and cleanup jobs are registered here as their
-  // owning modules are implemented. Only one scheduler replica should run.
+  // Only one scheduler replica should run. Module-owned jobs are registered here as modules are implemented.
+  await registerMaintenanceSchedules(queue);
   logger.info('Scheduler started');
 }
 
@@ -26,4 +32,3 @@ start().catch((error) => {
   logger.fatal({ err: error }, 'Scheduler process failed');
   process.exit(1);
 });
-
