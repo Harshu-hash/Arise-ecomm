@@ -2,7 +2,6 @@ import { App, Button, Flex, Space, Tag, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
@@ -108,7 +107,7 @@ export default function AttributesPage() {
         breadcrumbs={[{ label: 'Catalog' }, { label: 'Attributes' }]}
         subtitle="The structured fields listings are built from. Variant-defining attributes create SKUs; filterable ones become app filters."
         actions={
-          <Can perm="catalog.attribute.create">
+          <>
             <Button
               type="primary"
               onClick={() => {
@@ -118,7 +117,7 @@ export default function AttributesPage() {
             >
               New attribute
             </Button>
-          </Can>
+          </>
         }
       />
 

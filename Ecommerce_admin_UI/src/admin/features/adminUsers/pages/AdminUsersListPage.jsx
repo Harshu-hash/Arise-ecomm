@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { qk } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import { avatarColor, initials } from '@core/utils/misc';
 import { statusOptions } from '@ui/constants/statusMaps';
 import DataTable from '@ui/components/DataTable/DataTable';
@@ -160,11 +159,11 @@ export default function AdminUsersListPage() {
         breadcrumbs={[{ label: 'Administration' }, { label: 'Admin users' }]}
         subtitle="Who can sign in to this panel, and what they can reach."
         actions={
-          <Can perm="admin.user.invite" disable reason="You cannot invite admins">
+          <>
             <Button type="primary" icon={<PlusOutlined />} onClick={() => setInviteOpen(true)}>
               Invite admin
             </Button>
-          </Can>
+          </>
         }
       />
 

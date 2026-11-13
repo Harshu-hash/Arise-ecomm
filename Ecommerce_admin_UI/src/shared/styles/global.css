@@ -253,6 +253,78 @@ h4,
   white-space: nowrap;
 }
 
+/* Uppercase section dividers in the sidebar nav. */
+.arise-nav-section {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #71717a;
+  white-space: nowrap;
+}
+
+.ant-menu-dark .ant-menu-item-group-title {
+  padding-top: 16px;
+  padding-bottom: 4px;
+}
+
+/* First section title sits flush under the brand, no extra top gap. */
+.ant-menu-dark .ant-menu-item-group:first-child .ant-menu-item-group-title {
+  padding-top: 0;
+}
+
+/*
+ * Even metric grid for KPI tiles and the action center. Caps at five columns
+ * so a 10-tile KPI band reads as two full rows and a 15-tile queue as three —
+ * no ragged trailing row. minmax(0,1fr) keeps long labels from overflowing.
+ */
+.arise-metric-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 768px) {
+  .arise-metric-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (min-width: 992px) {
+  .arise-metric-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+@media (min-width: 1200px) {
+  .arise-metric-grid {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+}
+
+/* Soft rounded icon badge for calm page placeholders. */
+.arise-placeholder-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 18px;
+  display: grid;
+  place-items: center;
+  font-size: 28px;
+  color: var(--ant-color-primary);
+  background: var(--ant-color-primary-bg);
+}
+
+/* Small pill used to hint at what a screen can do. */
+.arise-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--ant-color-text-secondary);
+  background: var(--ant-color-fill-quaternary);
+  border: 1px solid var(--ant-color-border-secondary);
+}
+
 .arise-header {
   background: var(--arise-chrome-header-bg);
   border-bottom: 1px solid var(--arise-chrome-border);

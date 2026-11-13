@@ -1,7 +1,6 @@
 import { App, Alert, Button, Drawer, Flex, Input, List, Skeleton, Switch, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Can } from '@core/rbac/Can';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import { cmsApi, cmsKeys } from '../api/cms.api';
@@ -47,9 +46,9 @@ export default function StaticPageEditorDrawer({ pageId, onClose, onSaved }) {
       width={560}
       title={page?.title ?? 'Static page'}
       extra={
-        <Can perm="cms.page.edit">
+        <>
           <Button type="primary" onClick={() => save.mutate()} loading={save.isPending}>Publish</Button>
-        </Can>
+        </>
       }
     >
       {query.isLoading ? <Skeleton active paragraph={{ rows: 10 }} /> : null}

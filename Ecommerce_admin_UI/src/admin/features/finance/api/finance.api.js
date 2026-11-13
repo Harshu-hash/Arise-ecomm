@@ -14,20 +14,25 @@ export const financeApi = {
   retryRefund: (id) => api.post(`/refunds/${id}/retry`, {}),
   switchRefundMode: (id, payload) => api.post(`/refunds/${id}/mode`, payload),
 
+  // Per-order-item seller settlements (the payout flow). A seller is paid for
+  // one delivered item once its return window closes; see the settlements mock.
   settlements: (params) => api.get('/settlements', params),
   settlementSummary: () => api.get('/settlements/summary'),
-
-  batches: (params) => api.get('/payout-batches', params),
-  batch: (id) => api.get(`/payout-batches/${id}`),
-  createBatch: (payload) => api.post('/payout-batches', payload),
-  releaseBatch: (id) => api.post(`/payout-batches/${id}/release`, {}),
-  retryBatch: (id) => api.post(`/payout-batches/${id}/retry`, {}),
-
-  payouts: (params) => api.get('/payouts', params),
-  payout: (id) => api.get(`/payouts/${id}`),
-  adjustments: (params) => api.get('/payout-adjustments', params),
-  createAdjustment: (payload) => api.post('/payout-adjustments', payload),
+  settlement: (id) => api.get(`/settlements/${id}`),
+  setSettlementIssues: (id, issues) => api.patch(`/settlements/${id}/issues`, { issues }),
+  reviewSettlement: (id) => api.post(`/settlements/${id}/review`, {}),
+  paySettlement: (id, payload) => api.post(`/settlements/${id}/pay`, payload),
+  retrySettlement: (id, payload) => api.post(`/settlements/${id}/retry`, payload),
+  releaseSettlementHold: (id) => api.post(`/settlements/${id}/release-hold`, {}),
   holdSellerPayouts: (sellerId, payload) => api.post(`/sellers/${sellerId}/payout-hold`, payload),
+
+  // Bulk settlement: pay many of one seller's ready items under one reference.
+  bulkSellers: () => api.get('/settlements/bulk/sellers'),
+  bulkSellerLines: (sellerId) => api.get(`/settlements/bulk/sellers/${sellerId}/lines`),
+  bulkPreview: (payload) => api.post('/settlements/bulk/preview', payload),
+  bulkPay: (payload) => api.post('/settlements/bulk/pay', payload),
+  bulkList: (params) => api.get('/settlements/bulk', params),
+  bulk: (refNo) => api.get(`/settlements/bulk/${refNo}`),
 
   commissionRules: (params) => api.get('/commission-rules', params),
   updateCommissionRule: (id, payload) => api.patch(`/commission-rules/${id}`, payload),
@@ -53,11 +58,10 @@ export const financeKeys = {
   refunds: (p) => ['finance', 'refunds', p],
   settlements: (p) => ['finance', 'settlements', p],
   settlementSummary: ['finance', 'settlements', 'summary'],
-  batches: (p) => ['finance', 'batches', p],
-  batch: (id) => ['finance', 'batches', 'detail', id],
-  payouts: (p) => ['finance', 'payouts', p],
-  payout: (id) => ['finance', 'payouts', 'detail', id],
-  adjustments: (p) => ['finance', 'adjustments', p],
+  settlement: (id) => ['finance', 'settlements', 'detail', id],
+  bulkSellers: ['finance', 'settlements', 'bulk', 'sellers'],
+  bulkSellerLines: (sellerId) => ['finance', 'settlements', 'bulk', 'sellers', sellerId],
+  bulkList: (p) => ['finance', 'settlements', 'bulk', 'list', p],
   commission: (p) => ['finance', 'commission', p],
   tax: (p) => ['finance', 'tax', p],
   cod: (p) => ['finance', 'cod', p],

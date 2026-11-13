@@ -2,7 +2,6 @@ import { App, Alert, Button, Drawer, Flex, Image, Rate, Skeleton, Space, Tag, Ty
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
@@ -80,22 +79,22 @@ export default function ReviewModerationDrawer({ reviewId, onClose, onChanged })
           )}
 
           <Space wrap>
-            <Can perm="reviews.review.moderate">
+            <>
               <Button type="primary" disabled={review.status === 'PUBLISHED'} onClick={() => act.mutate(() => reviewsApi.publishReview(review.id))}>
                 Publish
               </Button>
-            </Can>
-            <Can perm="reviews.review.moderate">
+            </>
+            <>
               <Button danger onClick={() => setRejecting(true)}>Reject</Button>
-            </Can>
+            </>
             {review.mediaCount > 0 && (
-              <Can perm="reviews.review.moderate">
+              <>
                 <Button onClick={() => act.mutate(() => reviewsApi.hideMedia(review.id))}>Hide media only</Button>
-              </Can>
+              </>
             )}
-            <Can perm="reviews.review.moderate">
+            <>
               <Button onClick={() => act.mutate(() => reviewsApi.flagIncentivised(review.id))}>Mark seller-incentivised</Button>
-            </Can>
+            </>
           </Space>
         </Flex>
       ) : null}

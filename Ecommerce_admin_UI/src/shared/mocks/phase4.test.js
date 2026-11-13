@@ -1,6 +1,6 @@
 import { setupServer } from 'msw/node';
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest';
-import { db, filter, findById } from './db/store';
+import { db, findById } from './db/store';
 import { handlers } from './handlers';
 import { seedAll } from './seed';
 import { DEMO_PASSWORD } from './seed/adminUsers';
@@ -141,17 +141,20 @@ describe('payments and refunds', () => {
 });
 
 describe('settlements', () => {
-  it('only treats delivered, unencumbered items as payable', async () => {
+  it('summarises payable, in-window, held and settled items', async () => {
     const s = await signIn('finance@arise.test');
     const r = await call('/settlements/summary', { token: s.accessToken });
 
     expect(r.status).toBe(200);
-    expect(r.json.data.eligible.count).toBeGreaterThan(0);
-    expect(r.json.data.held.count).toBeGreaterThan(0);
-    // Every held line has to say why, or finance cannot answer the seller.
-    expect(Object.keys(r.json.data.held.byReason).length).toBeGreaterThan(0);
-    expect(Object.values(r.json.data.held.byReason).reduce((a, b) => a + b, 0))
-      .toBe(r.json.data.held.count);
+    const d = r.json.data;
+    expect(d.total).toBeGreaterThan(0);
+    // Money is only released once the return window closes, so at any moment
+    // some items are still inside their window and some have cleared to pay.
+    expect(d.inWindowCount).toBeGreaterThan(0);
+    expect(d.payableCount).toBeGreaterThan(0);
+    expect(d.total).toBe(
+      d.payableCount + d.inWindowCount + d.heldCount + d.settledCount + d.failedCount,
+    );
   });
 
   it('never loses money across a settlement line', async () => {
@@ -175,136 +178,6 @@ describe('settlements', () => {
     expect(seller.json.data.length).toBeGreaterThan(0);
     for (const line of arise.json.data) expect(line.pickPackFeePaise).toBeGreaterThan(0);
     for (const line of seller.json.data) expect(line.pickPackFeePaise).toBe(0);
-  });
-});
-
-describe('payout batches', () => {
-  const period = () => ({
-    periodStart: new Date(Date.now() - 400 * 86400_000).toISOString(),
-    periodEnd: new Date().toISOString(),
-  });
-
-  it('builds a batch only from eligible, unbatched lines', async () => {
-    const s = await signIn('finance@arise.test');
-    const eligibleBefore = filter('settlementLines', (l) => l.eligible && !l.batchId).length;
-    expect(eligibleBefore).toBeGreaterThan(0);
-
-    const r = await call('/payout-batches', { method: 'POST', token: s.accessToken, body: period() });
-    expect(r.status).toBe(201);
-    expect(r.json.data.status).toBe('PENDING_APPROVAL');
-    expect(r.json.data.lineCount).toBe(eligibleBefore);
-    // Those lines are now claimed, so a second batch has nothing to pay.
-    expect(filter('settlementLines', (l) => l.eligible && !l.batchId).length).toBe(0);
-
-    const again = await call('/payout-batches', { method: 'POST', token: s.accessToken, body: period() });
-    expect(again.status).toBe(409);
-    expect(again.json.error.code).toBe('NOTHING_TO_PAY');
-  });
-
-  it('matches each payout to the lines it was built from', async () => {
-    const s = await signIn('finance@arise.test');
-    const batch = await call('/payout-batches', { method: 'POST', token: s.accessToken, body: period() });
-    const detail = await call(`/payout-batches/${batch.json.data.id}`, { token: s.accessToken });
-
-    for (const payout of detail.json.data.payouts) {
-      const lines = filter('settlementLines', (l) => l.payoutId === payout.id);
-      expect(lines.length).toBe(payout.lineCount);
-      expect(lines.reduce((n, l) => n + l.salePaise, 0)).toBe(payout.grossPaise);
-      expect(lines.reduce((n, l) => n + l.netPaise, 0) + payout.adjustmentsPaise).toBe(payout.netPaise);
-    }
-    expect(detail.json.data.totals.netPaise).toBe(batch.json.data.netPaise);
-  });
-
-  it('carries a negative payout forward instead of sending it to the bank', async () => {
-    const finance = await signIn('finance@arise.test');
-    const seller = db.sellers.find((x) => x.status === 'ACTIVE' && !x.payoutOnHold);
-
-    // A penalty larger than the seller's earnings.
-    const adj = await call('/payout-adjustments', {
-      method: 'POST', token: finance.accessToken,
-      body: { sellerId: seller.id, amountPaise: -50000000, type: 'SHORTFALL_RECOVERY', note: 'Recovery of an overpayment.' },
-    });
-    expect(adj.status).toBe(202);
-    await decide(adj.json.error.details.approvalId, 'approver@arise.test');
-
-    const batch = await call('/payout-batches', { method: 'POST', token: finance.accessToken, body: period() });
-    const detail = await call(`/payout-batches/${batch.json.data.id}`, { token: finance.accessToken });
-    const payout = detail.json.data.payouts.find((p) => p.sellerId === seller.id);
-
-    expect(payout.netPaise).toBeLessThan(0);
-    expect(payout.carriedForward).toBe(true);
-
-    const approver = await signIn('approver@arise.test');
-    const release = await call(`/payout-batches/${batch.json.data.id}/release`, {
-      method: 'POST', token: approver.accessToken, body: {},
-    });
-    await decide(release.json.error.details.approvalId, 'super@arise.test');
-
-    const after = findById('sellerPayouts', payout.id);
-    expect(after.status).toBe('CARRIED_FORWARD');
-    expect(after.utr).toBeNull();
-  });
-
-  it('will not let the person who built a batch release it', async () => {
-    const finance = await signIn('finance@arise.test');
-    const batch = await call('/payout-batches', { method: 'POST', token: finance.accessToken, body: period() });
-
-    // The executive has no release permission at all.
-    const own = await call(`/payout-batches/${batch.json.data.id}/release`, {
-      method: 'POST', token: finance.accessToken, body: {},
-    });
-    expect(own.status).toBe(403);
-
-    const detail = await call(`/payout-batches/${batch.json.data.id}`, { token: finance.accessToken });
-    expect(detail.json.data.releasableByCaller).toBe(false);
-  });
-
-  it('refuses to release a batch twice', async () => {
-    const finance = await signIn('finance@arise.test');
-    const approver = await signIn('approver@arise.test');
-    const batch = await call('/payout-batches', { method: 'POST', token: finance.accessToken, body: period() });
-
-    const first = await call(`/payout-batches/${batch.json.data.id}/release`, {
-      method: 'POST', token: approver.accessToken, body: {},
-    });
-    expect(first.status).toBe(202);
-    await decide(first.json.error.details.approvalId, 'super@arise.test');
-
-    const second = await call(`/payout-batches/${batch.json.data.id}/release`, {
-      method: 'POST', token: approver.accessToken, body: {},
-    });
-    expect(second.status).toBe(409);
-    expect(second.json.error.code).toBe('ILLEGAL_TRANSITION');
-  });
-
-  it('holds a seller’s money and releases it again, with approval each way', async () => {
-    const approver = await signIn('approver@arise.test');
-    const seller = db.sellers.find(
-      (x) => x.status === 'ACTIVE' && !x.payoutOnHold
-        && db.settlementLines.some((l) => l.sellerId === x.id && l.eligible && !l.batchId),
-    );
-    const eligibleBefore = filter('settlementLines', (l) => l.sellerId === seller.id && l.eligible && !l.batchId).length;
-
-    const hold = await call(`/sellers/${seller.id}/payout-hold`, {
-      method: 'POST', token: approver.accessToken,
-      body: { onHold: true, reason: 'GST registration under verification.' },
-    });
-    expect(hold.status).toBe(202);
-    await decide(hold.json.error.details.approvalId, 'super@arise.test');
-
-    expect(findById('sellers', seller.id).payoutOnHold).toBe(true);
-    expect(filter('settlementLines', (l) => l.sellerId === seller.id && l.eligible && !l.batchId).length).toBe(0);
-
-    const release = await call(`/sellers/${seller.id}/payout-hold`, {
-      method: 'POST', token: approver.accessToken,
-      body: { onHold: false, reason: 'GSTIN verified.' },
-    });
-    await decide(release.json.error.details.approvalId, 'super@arise.test');
-
-    // Releasing the hold restores exactly the lines it blocked — not the ones
-    // held for an open return or an unexpired window.
-    expect(filter('settlementLines', (l) => l.sellerId === seller.id && l.eligible && !l.batchId).length)
-      .toBe(eligibleBefore);
   });
 });
 
@@ -620,88 +493,5 @@ describe('finance overview', () => {
     // Liabilities the platform owes customers are tracked, not netted off.
     expect(r.json.data.walletLiabilityPaise).toBeGreaterThan(0);
     expect(r.json.data.giftCardLiabilityPaise).toBeGreaterThan(0);
-  });
-});
-
-/**
- * Journey 4 — the weekly payout cycle, end to end.
- *
- * Eligible settlements → batch built by the maker → release requested by a
- * second person → approved by a third → bank partially fails → retried → paid.
- */
-describe('Journey 4 — the payout cycle', () => {
-  it('runs a full weekly payout, including a bank failure and its retry', async () => {
-    const maker = await signIn('finance@arise.test');
-    const approver = await signIn('approver@arise.test');
-
-    // 1. There is money waiting, and the held money is excluded from it.
-    const summary = await call('/settlements/summary', { token: maker.accessToken });
-    const payable = summary.json.data.eligible.netPaise;
-    expect(payable).toBeGreaterThan(0);
-
-    // Approved adjustments — penalties, claim payouts, ad spend — are swept
-    // into whichever batch comes next, so the batch total is the settled
-    // lines plus those, not the lines alone.
-    const sweptPaise = filter('payoutAdjustments', (a) => a.status === 'APPROVED' && !a.batchId)
-      .reduce((n, a) => n + a.amountPaise, 0);
-    expect(sweptPaise).not.toBe(0);
-
-    // 2. The maker builds the batch.
-    const batch = await call('/payout-batches', {
-      method: 'POST', token: maker.accessToken,
-      body: {
-        periodStart: new Date(Date.now() - 400 * 86400_000).toISOString(),
-        periodEnd: new Date().toISOString(),
-      },
-    });
-    expect(batch.status).toBe(201);
-    const batchId = batch.json.data.id;
-    expect(batch.json.data.status).toBe('PENDING_APPROVAL');
-    expect(batch.json.data.netPaise).toBe(payable + sweptPaise);
-    expect(filter('payoutAdjustments', (a) => a.status === 'APPROVED' && !a.batchId)).toHaveLength(0);
-
-    // 3. A second person asks for it to be released; nothing moves yet.
-    const release = await call(`/payout-batches/${batchId}/release`, {
-      method: 'POST', token: approver.accessToken, body: {},
-    });
-    expect(release.status).toBe(202);
-    expect(findById('payoutBatches', batchId).releasedAt).toBeNull();
-
-    // 4. A third person approves it, and the money moves.
-    await decide(release.json.error.details.approvalId, 'super@arise.test');
-    const released = findById('payoutBatches', batchId);
-    expect(released.releasedAt).toBeTruthy();
-    expect(['PAID', 'PARTIALLY_FAILED']).toContain(released.status);
-
-    // 5. Some transfers bounced, as they do.
-    expect(released.status).toBe('PARTIALLY_FAILED');
-    const failed = filter('sellerPayouts', (p) => p.batchId === batchId && p.status === 'FAILED');
-    expect(failed.length).toBeGreaterThan(0);
-    for (const payout of failed) {
-      expect(payout.utr).toBeNull();
-      expect(payout.failureReason).toBeTruthy();
-    }
-
-    // 6. Retrying clears them, and the batch closes.
-    const retry = await call(`/payout-batches/${batchId}/retry`, {
-      method: 'POST', token: approver.accessToken, body: {},
-    });
-    expect(retry.status).toBe(200);
-    expect(retry.json.data.status).toBe('PAID');
-    expect(retry.json.data.failedCount).toBe(0);
-
-    // 7. Every seller either has a UTR or was carried forward — nobody is
-    //    left in limbo, which is the failure mode that generates tickets.
-    for (const payout of filter('sellerPayouts', (p) => p.batchId === batchId)) {
-      if (payout.status === 'CARRIED_FORWARD') expect(payout.netPaise).toBeLessThanOrEqual(0);
-      else {
-        expect(payout.status).toBe('PAID');
-        expect(payout.utr).toMatch(/^UTR\d{12}$/);
-      }
-    }
-
-    // 8. A second run has nothing left to pay.
-    const again = await call('/settlements/summary', { token: maker.accessToken });
-    expect(again.json.data.eligible.count).toBe(0);
   });
 });

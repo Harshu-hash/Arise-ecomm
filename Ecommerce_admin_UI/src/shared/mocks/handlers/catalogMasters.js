@@ -128,6 +128,8 @@ export const catalogMasterHandlers = [
       slug: String(body.name).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, ''),
       parentId: body.parentId ?? null,
       level,
+      imageUrl: body.imageUrl ?? null,
+      icon: body.icon ?? null,
       rootName: parent ? parent.rootName : String(body.name).trim(),
       sortOrder: siblings.length + 1,
       status: 'ACTIVE',
@@ -180,6 +182,7 @@ export const catalogMasterHandlers = [
     for (const key of [
       'name', 'status', 'sortOrder', 'returnWindowDays', 'returnTypes', 'gated',
       'codAllowed', 'gstRate', 'hsnCode', 'attributeSetId', 'assuredEligible',
+      'imageUrl', 'icon',
     ]) {
       if (body[key] !== undefined) patch[key] = body[key];
     }
@@ -464,7 +467,7 @@ export const catalogMasterHandlers = [
     const before = { ...brand };
 
     const patch = {};
-    for (const key of ['name', 'gated', 'ownerType', 'status']) {
+    for (const key of ['name', 'gated', 'ownerType', 'status', 'rootCategory', 'imageUrl']) {
       if (body[key] !== undefined) patch[key] = body[key];
     }
     update('brands', brand.id, patch);
@@ -499,6 +502,7 @@ export const catalogMasterHandlers = [
       ownerType: body.ownerType ?? 'BRAND_OWNER',
       status: body.status ?? 'VERIFIED',
       rootCategory: body.rootCategory ?? null,
+      imageUrl: body.imageUrl ?? null,
       authorisedSellerCount: 0,
       listings: 0,
       createdAt: mockNowIso(),
@@ -662,5 +666,66 @@ export const catalogMasterHandlers = [
     });
     scheduleSave();
     return ok(findById('sizeCharts', chart.id));
+  }),
+
+  mswHttp.post(`${BASE}/size-charts`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'catalog.sizechart.create');
+    if (g.response) return g.response;
+
+    const body = await request.json();
+    const fieldErrors = {};
+    const name = String(body?.name ?? '').trim();
+    const columns = Array.isArray(body?.columns) ? body.columns.map((c) => String(c ?? '').trim()) : [];
+    const rows = Array.isArray(body?.rows) ? body.rows : [];
+    if (!name) fieldErrors.name = 'Give the size chart a name.';
+    if (columns.length < 2) fieldErrors.columns = 'Add at least two columns.';
+    else if (columns.some((c) => !c)) fieldErrors.columns = 'Every column needs a heading.';
+    if (!rows.length) fieldErrors.rows = 'Add at least one row.';
+    else if (rows.some((r) => r.length !== columns.length)) {
+      fieldErrors.rows = 'Every row must have one value per column.';
+    }
+    if (Object.keys(fieldErrors).length) return validationFailed(fieldErrors);
+
+    const row = insert('sizeCharts', {
+      id: id('SZC', 3),
+      name,
+      categoryId: body.categoryId ?? null,
+      brandId: null,
+      unit: String(body.unit ?? '').trim() || 'in',
+      columns,
+      rows: rows.map((r) => r.map((v) => String(v ?? ''))),
+      guideImage: null,
+      version: 1,
+    });
+    writeAudit({
+      actor: g.user,
+      action: 'catalog.sizechart.create',
+      entityType: 'sizeChart',
+      entityId: row.id,
+      entityLabel: row.name,
+    });
+    scheduleSave();
+    return created(row);
+  }),
+
+  mswHttp.delete(`${BASE}/size-charts/:id`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'catalog.sizechart.delete');
+    if (g.response) return g.response;
+
+    const chart = findById('sizeCharts', params.id);
+    if (!chart) return notFound('That size chart no longer exists.');
+    if (db.products.some((p) => p.sizeChartId === chart.id)) {
+      return conflict('Products still use this size chart.', 'SIZECHART_IN_USE');
+    }
+    remove('sizeCharts', chart.id);
+    writeAudit({
+      actor: g.user,
+      action: 'catalog.sizechart.delete',
+      entityType: 'sizeChart',
+      entityId: chart.id,
+      entityLabel: chart.name,
+    });
+    scheduleSave();
+    return ok({ id: chart.id });
   }),
 ];

@@ -2,7 +2,6 @@ import { App, Alert, Button, Flex, Segmented, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import { ApiError } from '@core/api/errors';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import ErrorState from '@ui/components/ErrorState';
@@ -60,9 +59,9 @@ export default function HomeLayoutPage() {
         actions={
           <Space>
             <Button onClick={() => setHistory(true)}>Version history</Button>
-            <Can perm="cms.home.publish">
+            <>
               <Button type="primary" onClick={() => setPublishing(true)}>Publish</Button>
-            </Can>
+            </>
           </Space>
         }
       />

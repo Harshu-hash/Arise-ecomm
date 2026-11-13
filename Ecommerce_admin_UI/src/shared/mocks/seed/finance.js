@@ -1,5 +1,5 @@
 import { fakerEN_IN as faker } from '@faker-js/faker';
-import { db, filter, id, insert } from '../db/store';
+import { db, filter, findById, id, insert, update } from '../db/store';
 import { mockNow, mockNowIso } from '../engine/settings';
 import { computeSettlement, settlementEligibility, summariseSettlements } from '../engine/settlement';
 
@@ -144,107 +144,86 @@ export function seedSettlementLines() {
   return rows;
 }
 
-const BATCH_STATES = ['PAID', 'PAID', 'PARTIALLY_FAILED', 'PROCESSING', 'PENDING_APPROVAL', 'DRAFT'];
+/**
+ * Historic per-item settlements. Each delivered item whose return window closed
+ * a while ago is treated as already paid: one per-line seller payout is created
+ * and the settlement line is locked as SETTLED. A few fail, to exercise the
+ * retry flow. Everything else stays READY (payable now) or WINDOW_OPEN / HELD,
+ * all derived live from the line and its order item — no batches.
+ */
+export function seedHistoricSettlements() {
+  const payouts = [];
+  const eligibleLines = filter('settlementLines', (l) => l.eligible && !l.settledAt && l.netPaise > 0);
 
-/** Weekly payout batches, most already settled, one awaiting approval. */
-export function seedPayoutBatches() {
-  const batches = [];
+  eligibleLines.forEach((line, i) => {
+    const item = findById('orderItems', line.orderItemId);
+    const deliveredMs = item?.deliveredAt ? new Date(item.deliveredAt).getTime() : null;
+    const ageDays = deliveredMs ? (mockNow() - deliveredMs) / 86400_000 : 0;
+    const windowDays = item?.returnWindowDays ?? 0;
+    // Only long-delivered items are "already settled"; recent ones stay payable.
+    if (ageDays < windowDays + 7) return;
 
-  BATCH_STATES.forEach((status, i) => {
-    const weeksAgo = BATCH_STATES.length - i;
-    const periodEnd = mockNow() - weeksAgo * 7 * 86400_000;
-    const periodStart = periodEnd - 6 * 86400_000;
+    // Every so often a historic payout bounced on a stale bank account — the
+    // case the retry flow exists for.
+    if (i % 23 === 0) {
+      update('settlementLines', line.id, {
+        reviewed: true,
+        mode: 'AUTOMATIC',
+        payoutState: 'FAILED',
+        failureReason: 'NEFT returned by the beneficiary bank — account details stale',
+      });
+      return;
+    }
 
-    const batch = insert('payoutBatches', {
-      id: id('PYB', 5),
-      periodStart: new Date(periodStart).toISOString(),
-      periodEnd: new Date(periodEnd).toISOString(),
-      status,
-      createdAt: new Date(periodEnd + 86400_000).toISOString(),
-      createdByName: 'Nikhil Joshi',
-      approvedByName: ['PAID', 'PARTIALLY_FAILED', 'PROCESSING'].includes(status) ? 'Meera Krishnan' : null,
-      approvedAt: ['PAID', 'PARTIALLY_FAILED', 'PROCESSING'].includes(status)
-        ? new Date(periodEnd + 2 * 86400_000).toISOString() : null,
-      releasedAt: ['PAID', 'PARTIALLY_FAILED'].includes(status)
-        ? new Date(periodEnd + 2 * 86400_000).toISOString() : null,
-      sellerCount: 0,
-      grossPaise: 0,
-      netPaise: 0,
+    const seller = db.sellers.find((s) => s.id === line.sellerId);
+    const settled = line.netPaise;
+    const paidAt = new Date(deliveredMs + (windowDays + 3) * 86400_000).toISOString();
+    const invoiceNo = `ARS/STL/${new Date(paidAt).getFullYear()}/${String(line.id).replace(/\D/g, '').slice(-6)}`;
+    const utr = `UTR${faker.string.numeric(12)}`;
+
+    const payout = insert('sellerPayouts', {
+      id: id('PYO', 6),
+      batchId: null,
+      sellerId: line.sellerId,
+      sellerName: seller?.storeName ?? line.sellerName,
+      orderId: line.orderId,
+      orderItemId: line.orderItemId,
+      lineCount: 1,
+      grossPaise: line.salePaise,
+      feesPaise: line.feesBeforeTaxPaise,
+      gstOnFeesPaise: line.gstOnFeesPaise,
+      tcsPaise: line.tcsPaise,
+      tdsPaise: line.tdsPaise,
+      adjustmentsPaise: 0,
+      netPaise: settled,
+      carriedForward: false,
+      status: 'PAID',
+      mode: 'AUTOMATIC',
+      txnNo: '',
+      utr,
+      invoiceNo,
+      failureReason: null,
+      bankLast4: faker.string.numeric(4),
+      paidAt,
       version: 1,
     });
 
-    // Attach a slice of the eligible lines to each historic batch.
-    const unassigned = filter('settlementLines', (l) => l.eligible && !l.batchId);
-    const bySeller = new Map();
-    for (const line of unassigned.slice(0, status === 'DRAFT' ? 0 : 90)) {
-      if (!bySeller.has(line.sellerId)) bySeller.set(line.sellerId, []);
-      bySeller.get(line.sellerId).push(line);
-    }
-
-    let gross = 0;
-    let net = 0;
-    let n = 0;
-    for (const [sellerId, lines] of bySeller) {
-      n += 1;
-      const seller = db.sellers.find((s) => s.id === sellerId);
-      const totals = summariseSettlements(lines);
-      // Most payouts land; a few bounce on a stale bank account, which is the
-      // case the retry flow exists for.
-      const failed = status === 'PARTIALLY_FAILED' && n % 9 === 0;
-      const payoutStatus = status === 'PAID'
-        ? 'PAID'
-        : status === 'PARTIALLY_FAILED'
-          ? (failed ? 'FAILED' : 'PAID')
-          : status === 'PROCESSING' ? 'INCLUDED' : 'INCLUDED';
-
-      // Adjustments finance already marked APPLIED belong to a real batch:
-      // penalties, claim payouts and ad-spend recovery all land here, and a
-      // large penalty can genuinely push a payout negative.
-      const adjustments = status === 'DRAFT'
-        ? []
-        : filter('payoutAdjustments', (a) => a.sellerId === sellerId && a.status === 'APPLIED' && !a.batchId);
-      const adjustmentsPaise = adjustments.reduce((n, a) => n + a.amountPaise, 0);
-
-      const payout = insert('sellerPayouts', {
-        id: id('PYO', 6),
-        batchId: batch.id,
-        sellerId,
-        sellerName: seller?.storeName ?? '—',
-        lineCount: lines.length,
-        grossPaise: totals.grossPaise,
-        feesPaise: totals.feesPaise,
-        gstOnFeesPaise: totals.gstOnFeesPaise,
-        tcsPaise: totals.tcsPaise,
-        tdsPaise: totals.tdsPaise,
-        adjustmentsPaise,
-        netPaise: totals.netPaise + adjustmentsPaise,
-        // A negative net is carried forward against the seller's next payout
-        // rather than being collected, which is what the UI has to explain.
-        carriedForward: totals.netPaise + adjustmentsPaise < 0,
-        status: payoutStatus,
-        utr: payoutStatus === 'PAID' ? `UTR${faker.string.numeric(12)}` : null,
-        failureReason: failed ? 'Bank account closed — NEFT returned by the beneficiary bank' : null,
-        bankLast4: faker.string.numeric(4),
-        paidAt: payoutStatus === 'PAID' ? new Date(periodEnd + 3 * 86400_000).toISOString() : null,
-        version: 1,
-      });
-
-      for (const line of lines) {
-        line.batchId = batch.id;
-        line.payoutId = payout.id;
-      }
-      for (const adjustment of adjustments) adjustment.batchId = batch.id;
-      gross += totals.grossPaise;
-      net += payout.netPaise;
-    }
-
-    batch.sellerCount = n;
-    batch.grossPaise = gross;
-    batch.netPaise = net;
-    batches.push(batch);
+    update('settlementLines', line.id, {
+      reviewed: true,
+      payoutId: payout.id,
+      settledAt: paidAt,
+      settledPaise: settled,
+      invoiceNo,
+      utr,
+      mode: 'AUTOMATIC',
+      payoutState: 'SETTLED',
+      eligible: false,
+      holdReason: 'Settled',
+    });
+    payouts.push(payout);
   });
 
-  return batches;
+  return payouts;
 }
 
 /** Cash the couriers collected and owe us. */

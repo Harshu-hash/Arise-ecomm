@@ -266,6 +266,25 @@ const RAW = {
     LIVE: ['Live', T.good],
     ENDED: ['Ended', T.idle],
   },
+  // Promotional campaigns sellers opt into (flash deals / offers / sales).
+  promoCampaign: {
+    DRAFT: ['Draft', T.idle],
+    SCHEDULED: ['Scheduled', T.waiting],
+    OPEN: ['Accepting products', T.progress],
+    ACTIVE: ['Live', T.good],
+    PAUSED: ['Paused', T.waiting],
+    ENDED: ['Ended', T.idle],
+    CANCELLED: ['Cancelled', T.idle],
+  },
+  // A seller's product entry into a campaign, awaiting admin approval.
+  campaignSubmission: {
+    DRAFT: ['Draft', T.idle],
+    PENDING: ['Pending approval', T.waiting],
+    APPROVED: ['Approved — live', T.good],
+    NEEDS_CHANGES: ['Needs changes', T.waiting],
+    REJECTED: ['Rejected', T.bad],
+    WITHDRAWN: ['Withdrawn', T.idle],
+  },
   referral: {
     SIGNED_UP: ['Signed up', T.idle],
     FIRST_ORDER_PLACED: ['First order placed', T.progress],

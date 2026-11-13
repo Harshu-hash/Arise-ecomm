@@ -2,7 +2,7 @@ import { MenuOutlined, MoonOutlined, QuestionCircleOutlined, StarFilled, SunOutl
 import { Button, Flex, Layout, Space, Tag, Tooltip, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@theme/themeStore';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import { ENV } from '@core/config/env';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
 import SellerAlertsBell from './SellerAlertsBell';

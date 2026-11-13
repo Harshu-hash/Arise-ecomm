@@ -9,7 +9,7 @@ import {
 } from '@ant-design/icons';
 import { Button, Flex, Space, Tag, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import StatusTag from './StatusTag';
 
 /**

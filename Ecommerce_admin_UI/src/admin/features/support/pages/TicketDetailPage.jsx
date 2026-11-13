@@ -3,7 +3,6 @@ import { App, Button, Col, Row, Space } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import { queryClient } from '@core/api/queryClient';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
@@ -70,20 +69,20 @@ export default function TicketDetailPage() {
         actions={
           !closed && (
             <Space wrap>
-              <Can perm="support.ticket.assign">
+              <>
                 <Button onClick={() => setModal('ASSIGN')}>{ticket.assigneeName ? 'Reassign' : 'Assign'}</Button>
-              </Can>
-              <Can perm="support.ticket.escalate">
+              </>
+              <>
                 <Button onClick={() => setModal('ESCALATE')} disabled={ticket.status !== 'OPEN'}>Escalate</Button>
-              </Can>
-              <Can perm="support.ticket.merge">
+              </>
+              <>
                 <Button onClick={() => setModal('MERGE')}>Merge</Button>
-              </Can>
-              <Can perm="support.ticket.close">
+              </>
+              <>
                 <Button type="primary" onClick={() => setModal('RESOLVE')} disabled={ticket.status === 'NEW'}>
                   Resolve
                 </Button>
-              </Can>
+              </>
             </Space>
           )
         }

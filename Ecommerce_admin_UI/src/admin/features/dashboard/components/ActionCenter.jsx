@@ -38,13 +38,7 @@ export default function ActionCenter({ tiles, loading }) {
       }
       styles={{ body: { padding: 8 } }}
     >
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(216px, 1fr))',
-          gap: 8,
-        }}
-      >
+      <div className="arise-metric-grid">
         {sorted.map((tile) => (
           <Link key={tile.key} to={tile.link} style={{ display: 'block' }}>
             <Flex

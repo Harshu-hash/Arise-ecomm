@@ -191,6 +191,8 @@ export const lookupHandlers = [
           status: c.status,
           gated: c.gated,
           liveListings: c.liveListings,
+          imageUrl: c.imageUrl ?? null,
+          icon: c.icon ?? null,
           children: build(c.id),
         }));
     return ok(build('root'));

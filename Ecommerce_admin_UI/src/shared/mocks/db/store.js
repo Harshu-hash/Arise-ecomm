@@ -17,7 +17,7 @@
  * accounts that no longer matched the documented sign-in credentials, with no
  * way to recover from inside the app.
  */
-export const SNAPSHOT_VERSION = 22;
+export const SNAPSHOT_VERSION = 23;
 
 /** Every collection the mock backend holds. Later phases fill in more. */
 export const COLLECTIONS = [
@@ -105,6 +105,7 @@ export const COLLECTIONS = [
   'settlementLines',
   'payoutBatches',
   'sellerPayouts',
+  'sellerBulkSettlements',
   'payoutAdjustments',
   'codRemittances',
   'invoices',

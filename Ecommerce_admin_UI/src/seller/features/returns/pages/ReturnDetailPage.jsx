@@ -2,7 +2,6 @@ import { App, Alert, Button, Card, Col, Descriptions, Flex, Image, Input, List, 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
@@ -54,10 +53,10 @@ export default function ReturnDetailPage() {
         tags={<Space><StatusTag domain="returnRequest" code={data.status} />{isArise && <Tag color="geekblue">By Arise</Tag>}</Space>}
         actions={
           <Space>
-            {actions.includes('reject') && <Can perm="orders.return.manage"><Button danger onClick={() => setRejectOpen(true)}>Reject</Button></Can>}
-            {actions.includes('approve') && <Can perm="orders.return.manage"><Button type="primary" loading={approveMut.isPending} onClick={() => approveMut.mutate()}>Approve & schedule pickup</Button></Can>}
-            {actions.includes('receive') && <Can perm="orders.return.manage"><Button type="primary" loading={receiveMut.isPending} onClick={() => receiveMut.mutate()}>Mark received</Button></Can>}
-            {actions.includes('qc') && <Can perm="orders.return.manage"><Button type="primary" onClick={() => setQcOpen(true)}>Record QC</Button></Can>}
+            {actions.includes('reject') && <><Button danger onClick={() => setRejectOpen(true)}>Reject</Button></>}
+            {actions.includes('approve') && <><Button type="primary" loading={approveMut.isPending} onClick={() => approveMut.mutate()}>Approve & schedule pickup</Button></>}
+            {actions.includes('receive') && <><Button type="primary" loading={receiveMut.isPending} onClick={() => receiveMut.mutate()}>Mark received</Button></>}
+            {actions.includes('qc') && <><Button type="primary" onClick={() => setQcOpen(true)}>Record QC</Button></>}
             {['RETURN_REJECTED', 'QC_FAILED', 'CLOSED'].includes(data.status) && <Button onClick={() => navigate(`/returns/${id}/dispute`)}>Dispute</Button>}
           </Space>
         }

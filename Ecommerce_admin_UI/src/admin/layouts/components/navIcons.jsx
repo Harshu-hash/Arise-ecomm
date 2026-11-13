@@ -15,6 +15,7 @@ import {
   ShoppingOutlined,
   StarOutlined,
   TeamOutlined,
+  ThunderboltOutlined,
   WalletOutlined,
 } from '@ant-design/icons';
 
@@ -30,6 +31,7 @@ export const NAV_ICONS = {
   bank: <BankOutlined />,
   wallet: <WalletOutlined />,
   notification: <NotificationOutlined />,
+  thunderbolt: <ThunderboltOutlined />,
   rise: <RiseOutlined />,
   layout: <LayoutOutlined />,
   star: <StarOutlined />,

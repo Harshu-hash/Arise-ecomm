@@ -3,7 +3,8 @@ import { HttpResponse } from 'msw';
 import { filter, findById, id, insert, update } from '@mocks/db/store';
 import { parseListQuery, listResult } from '@mocks/engine/list';
 import { badRequest, conflict, created, notFound, ok, okList, unauthorized, validationFailed } from '@mocks/engine/respond';
-import { mockNowIso } from '@mocks/engine/settings';
+import { mockNow, mockNowIso } from '@mocks/engine/settings';
+import { enrichSettlement, buildSettlementInvoice } from '@mocks/engine/settlementView';
 import { scheduleSave } from '@mocks/persistence';
 import { resolveCaller } from '@seller/mocks/engine/sellerAuth';
 import {
@@ -28,6 +29,32 @@ function ctx(request) {
 }
 
 export const sellerFinanceHandlers = [
+  /* --------------------------------- per-order-item settlements (payouts) */
+  mswHttp.get(`${SELLER_BASE}/settlements/mine`, async ({ request }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const now = mockNow();
+    const url = new URL(request.url);
+    const query = parseListQuery(url, { defaultSort: '-deliveredAt' });
+    const rows = filter('settlementLines', (l) => l.sellerId === c.user.sellerId).map((l) => enrichSettlement(l, now));
+    const result = listResult(rows, query, {
+      searchFields: ['id', 'orderId', 'productTitle', 'sku', 'customerName'],
+      filterSpec: { state: 'state', fulfillmentType: 'fulfillmentType' },
+      sortable: ['deliveredAt', 'quotedPaise', 'settledPaise'],
+      facetFields: ['state'],
+    });
+    return okList(result.items, result.meta);
+  }),
+
+  mswHttp.get(`${SELLER_BASE}/settlements/:lineId/invoice`, async ({ request, params }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const line = findById('settlementLines', params.lineId);
+    if (!line || line.sellerId !== c.user.sellerId) return notFound('That settlement no longer exists.');
+    if (!line.settledAt) return conflict('This settlement is not paid yet, so it has no invoice.', 'NOT_SETTLED');
+    return ok(buildSettlementInvoice(line));
+  }),
+
   /* ---------------------------------------------------------- dashboard */
   mswHttp.get(`${SELLER_BASE}/finance/summary`, async ({ request }) => {
     const c = ctx(request);
@@ -59,7 +86,7 @@ export const sellerFinanceHandlers = [
     const payout = findById('sellerPayouts', params.id);
     if (!payout || payout.sellerId !== c.user.sellerId) return notFound('That payout is not on your account.');
     const lines = filter('settlementLines', (l) => l.payoutId === payout.id).map(settlementRow);
-    const adjustments = filter('payoutAdjustments', (row) => row.batchId === payout.batchId && row.sellerId === c.user.sellerId);
+    const adjustments = filter('payoutAdjustments', (row) => payout.batchId && row.batchId === payout.batchId && row.sellerId === c.user.sellerId);
     const adjustmentLines = adjustments.map((row) => ({ id: row.id, orderId: row.orderId ?? row.referenceId ?? row.id, productTitle: row.note, salePaise: 0, feesBeforeTaxPaise: 0, gstOnFeesPaise: 0, tcsPaise: 0, tdsPaise: 0, adjustmentsPaise: row.amountPaise, netPaise: row.amountPaise, transactionType: 'ADJUSTMENT', referenceType: row.referenceType, referenceId: row.referenceId }));
     const documents = filter('financeDocuments', (row) => row.sellerId === c.user.sellerId && row.entityType === 'PAYOUT' && row.entityId === payout.id);
     return ok({ ...payoutRow(payout), lines: [...lines, ...adjustmentLines], adjustments, documents, reconciliationTotalPaise: [...lines, ...adjustmentLines].reduce((sum, row) => sum + row.netPaise, 0) });

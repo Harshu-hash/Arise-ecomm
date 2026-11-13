@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   ShoppingOutlined,
   StarOutlined,
+  ThunderboltOutlined,
 } from '@ant-design/icons';
 
 /** Keeps the seller nav model (plain data) free of JSX. */
@@ -20,6 +21,7 @@ export const NAV_ICONS = {
   inbox: <InboxOutlined />,
   bank: <BankOutlined />,
   rise: <RiseOutlined />,
+  thunderbolt: <ThunderboltOutlined />,
   star: <StarOutlined />,
   barChart: <BarChartOutlined />,
   customerService: <CustomerServiceOutlined />,

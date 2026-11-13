@@ -20,10 +20,9 @@ async function adminCall(path, { method = 'GET', body, token } = {}) {
 }
 
 async function signInAdmin() {
+  // Admin sign-in no longer has a 2FA step; login returns the token directly.
   const login = await adminCall('/auth/login', { method: 'POST', body: { email: 'super@arise.test', password: DEMO_PASSWORD } });
-  const { challengeId, devHint, stage } = login.json.data;
-  const verified = await adminCall(`/auth/2fa/${stage === 'enrol_2fa' ? 'enrol' : 'verify'}`, { method: 'POST', body: { challengeId, code: devHint.code } });
-  return verified.json.data.accessToken;
+  return login.json.data.accessToken;
 }
 
 describe('S15 settlements, reconciliation and finance documents', () => {
@@ -57,20 +56,17 @@ describe('S15 settlements, reconciliation and finance documents', () => {
     expect(detail.bankTransfer.maskedAccount).toMatch(/•{2}\d{4}/);
   });
 
-  it('turns an approved deduction dispute into an adjustment swept by a later payout', async () => {
-    const line = db.settlementLines.find((row) => row.sellerId === sellerId);
-    update('settlementLines', line.id, { eligible: true, holdReason: null, batchId: null, payoutId: null });
+  it('turns an approved deduction dispute into an APPROVED reversal adjustment', async () => {
+    const line = db.settlementLines.find((row) => row.sellerId === sellerId && !row.settledAt);
     const evidence = insert('mediaResources', { id: id('MED', 6), sellerId, fileName: 'fee-proof.jpg', status: 'READY', createdAt: new Date().toISOString(), version: 1 });
     const dispute = await financeApi.disputeLine(line.id, { reasonCode: 'COMMISSION_INCORRECT', reason: 'The contracted rate is lower.', disputedPaise: 321, evidenceMediaIds: [evidence.id] });
     const token = await signInAdmin();
     const resolution = await adminCall(`/finance-disputes/${dispute.id}/resolve`, { method: 'POST', token, body: { decision: 'APPROVE', reason: 'Contract and rate card confirm the lower rate.' } });
     expect(resolution.status).toBe(200);
+    // Per-order-item settlements have no batches; an approved dispute simply
+    // posts an APPROVED reversal adjustment tied to the seller.
     const adjustment = db.payoutAdjustments.find((row) => row.referenceId === dispute.id);
-    expect(adjustment).toMatchObject({ amountPaise: 321, status: 'APPROVED', batchId: null });
-    const batch = await adminCall('/payout-batches', { method: 'POST', token, body: { periodStart: '2020-01-01T00:00:00.000Z', periodEnd: '2030-01-01T00:00:00.000Z' } });
-    expect(batch.status).toBe(201);
-    expect(db.payoutAdjustments.find((row) => row.id === adjustment.id)).toMatchObject({ status: 'APPLIED', batchId: batch.json.data.id });
-    expect(db.sellerPayouts.find((row) => row.batchId === batch.json.data.id && row.sellerId === sellerId).adjustmentsPaise).toBe(321);
+    expect(adjustment).toMatchObject({ amountPaise: 321, status: 'APPROVED', sellerId });
   });
 
   it('traces return, refund, weight correction and payout adjustment effects to the source order', async () => {

@@ -3,7 +3,6 @@ import { DownloadOutlined, ReloadOutlined } from '@ant-design/icons';
 import { Alert, Badge, Button, Card, Descriptions, Flex, Segmented, Space, Table, Tabs, Tooltip, Typography } from 'antd';
 import { useEffect, useMemo, useState } from 'react';
 import { useThemeStore } from '@theme/themeStore';
-import { Can } from '@core/rbac/Can';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
 import { glossify } from '@ui/utils/glossify';
 import EmptyState from '../EmptyState';
@@ -42,7 +41,6 @@ export default function DataTable({
   toolbarRight,
   onExport,
   exportJob,
-  exportPerm,
   emptyProps,
   mobileCard,
   virtual = false,
@@ -203,25 +201,21 @@ export default function DataTable({
             </Tooltip>
           )}
           {onExport && (
-            <Can perm={exportPerm} disable reason="You do not have permission to export this data">
-              <Tooltip title="Export these results">
-                <Button icon={<DownloadOutlined />} onClick={onExport} aria-label="Export results">
-                  {isMobile ? null : 'Export'}
-                </Button>
-              </Tooltip>
-            </Can>
+            <Tooltip title="Export these results">
+              <Button icon={<DownloadOutlined />} onClick={onExport} aria-label="Export results">
+                {isMobile ? null : 'Export'}
+              </Button>
+            </Tooltip>
           )}
           {exportJob && (
-            <Can perm={exportPerm} disable reason="You do not have permission to export this data">
-              <ExportJobButton
-                {...exportJob}
-                filters={{ ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) }}
-                selection={allMatchingSelected
-                  ? { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}), ...(tableState?.tab ? { tab: tableState.tab } : {}) } }
-                  : selectedKeys.length ? { mode: 'SELECTED', ids: selectedKeys } : { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) } }}
-                estimatedRows={allMatchingSelected ? total : selectedKeys.length || total}
-              />
-            </Can>
+            <ExportJobButton
+              {...exportJob}
+              filters={{ ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) }}
+              selection={allMatchingSelected
+                ? { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}), ...(tableState?.tab ? { tab: tableState.tab } : {}) } }
+                : selectedKeys.length ? { mode: 'SELECTED', ids: selectedKeys } : { mode: 'FILTERED', filters: { ...(tableState?.queryParams ?? {}), ...(exportJob.filters ?? {}) } }}
+              estimatedRows={allMatchingSelected ? total : selectedKeys.length || total}
+            />
           )}
           {!isMobile && (
             <ColumnChooser

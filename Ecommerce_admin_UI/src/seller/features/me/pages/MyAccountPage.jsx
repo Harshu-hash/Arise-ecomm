@@ -1,7 +1,7 @@
 import { KeyOutlined } from '@ant-design/icons';
 import { Button, Card, Descriptions, Flex, Tag } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import PageHeader from '@ui/components/PageHeader';
 
 /** A read-only account summary for S1; full settings land in Phase S8. */

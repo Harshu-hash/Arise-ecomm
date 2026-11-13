@@ -3,7 +3,6 @@ import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import CopyableId from '@ui/components/CopyableId';
 import DataTable from '@ui/components/DataTable/DataTable';
@@ -116,14 +115,14 @@ export default function RefundsPage() {
       render: (_v, row) => (
         <Space size={4} onClick={(e) => e.stopPropagation()}>
           {row.status === 'FAILED' ? (
-            <Can perm="finance.refund.retry">
+            <>
               <Button size="small" onClick={() => setRetrying(row)}>Retry</Button>
-            </Can>
+            </>
           ) : null}
           {!['COMPLETED'].includes(row.status) ? (
-            <Can perm="finance.refund.switch_mode">
+            <>
               <Button size="small" type="text" onClick={() => setSwitching(row)}>Change mode</Button>
-            </Can>
+            </>
           ) : null}
         </Space>
       ),

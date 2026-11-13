@@ -2,7 +2,6 @@ import { PlusOutlined, UploadOutlined } from '@ant-design/icons';
 import { Button, Flex, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { statusOptions } from '@ui/constants/statusMaps';
-import { Can } from '@core/rbac/Can';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
 import MoneyText from '@ui/components/MoneyText';
@@ -43,12 +42,12 @@ export default function ListingsPage() {
         subtitle="Everything you sell on Arise, with its QC and buy-box status."
         actions={
           <Space>
-            <Can perm="listings.product.create">
+            <>
               <Button icon={<UploadOutlined />} onClick={() => navigate('/listings/bulk')}>
                 Bulk upload
               </Button>
-            </Can>
-            <Can perm="listings.product.create">
+            </>
+            <>
               <Button
                 type="primary"
                 icon={<PlusOutlined />}
@@ -56,7 +55,7 @@ export default function ListingsPage() {
               >
                 Add product
               </Button>
-            </Can>
+            </>
           </Space>
         }
       />

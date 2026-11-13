@@ -2,7 +2,7 @@ import { LockOutlined } from '@ant-design/icons';
 import { Button, Result, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { getPermission } from '@core/rbac/catalog';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 
 /**
  * The 403 surface. It names the missing permission on purpose: an admin who
