@@ -76,22 +76,21 @@ export default function DashboardPage() {
           <ErrorState error={summary.error} onRetry={summary.refetch} title="Could not load the dashboard" />
         </Card>
       ) : (
-        <Row gutter={[12, 12]}>
-          {(summary.data?.kpis ?? Array.from({ length: 8 })).map((kpi, i) => (
-            <Col key={kpi?.key ?? i} xs={12} sm={12} md={8} lg={6} xxl={4}>
-              <StatCard
-                loading={summary.isLoading}
-                label={kpi?.label}
-                value={kpi?.value}
-                valuePaise={kpi?.valuePaise}
-                format={kpi?.format}
-                deltaPct={kpi?.deltaPct}
-                invertDelta={kpi?.invertDelta}
-                comparisonLabel={days === 1 ? 'vs yesterday' : `vs previous ${days} days`}
-              />
-            </Col>
+        <div className="arise-metric-grid">
+          {(summary.data?.kpis ?? Array.from({ length: 10 })).map((kpi, i) => (
+            <StatCard
+              key={kpi?.key ?? i}
+              loading={summary.isLoading}
+              label={kpi?.label}
+              value={kpi?.value}
+              valuePaise={kpi?.valuePaise}
+              format={kpi?.format}
+              deltaPct={kpi?.deltaPct}
+              invertDelta={kpi?.invertDelta}
+              comparisonLabel={days === 1 ? 'vs yesterday' : `vs previous ${days} days`}
+            />
           ))}
-        </Row>
+        </div>
       )}
 
       {true && (

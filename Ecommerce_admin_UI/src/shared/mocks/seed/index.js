@@ -32,8 +32,8 @@ import { rollUpCustomerStats, seedOrderExceptions, seedOrders } from './orders';
 import {
   seedCodRemittances,
   seedCommissionRules,
+  seedHistoricSettlements,
   seedInvoices,
-  seedPayoutBatches,
   seedReconciliation,
   seedSettlementLines,
   seedTaxSummaries,
@@ -186,12 +186,12 @@ export function seedAll() {
   seedRemovalOrders();
 
   // Money. Settlement lines are derived from delivered items, so payouts
-  // reconcile against the orders that produced them; batches then consume
-  // those lines, which is why the order here matters.
+  // reconcile against the orders that produced them; historic settlements then
+  // lock the older lines as paid, which is why the order here matters.
   seedCommissionRules();
   seedSettlementLines();
   seedPayoutAdjustments();
-  seedPayoutBatches();
+  seedHistoricSettlements();
   seedCodRemittances();
   seedInvoices();
   seedTaxSummaries();

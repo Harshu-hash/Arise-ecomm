@@ -1,4 +1,10 @@
-import { PlusOutlined } from '@ant-design/icons';
+import {
+  ApartmentOutlined,
+  LockOutlined,
+  PercentageOutlined,
+  PlusOutlined,
+  RetweetOutlined,
+} from '@ant-design/icons';
 import { App, Button, Card, Col, Empty, Flex, Form, Input, Modal, Row, Tag, Tree, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
@@ -30,6 +36,13 @@ export default function CategoriesPage() {
     queryFn: () => catalogApi.categoryTree(),
   });
 
+  const select = (id) => {
+    const next = new URLSearchParams(params);
+    if (id) next.set('selected', id);
+    else next.delete('selected');
+    setParams(next);
+  };
+
   const createRoot = useMutation({
     // A top-level category has no parent.
     mutationFn: (values) => catalogApi.createCategory({ ...values, parentId: null }),
@@ -38,12 +51,7 @@ export default function CategoriesPage() {
       setAddRootOpen(false);
       rootForm.resetFields();
       message.success('Top category created');
-      const newId = res?.data?.id;
-      if (newId) {
-        const next = new URLSearchParams(params);
-        next.set('selected', newId);
-        setParams(next);
-      }
+      if (res?.data?.id) select(res.data.id);
     },
     onError: (e) => {
       if (e instanceof ApiError && e.fieldErrors) {
@@ -104,46 +112,51 @@ export default function CategoriesPage() {
     return <ErrorState error={tree.error} onRetry={tree.refetch} title="Could not load the taxonomy" />;
   }
 
+  const rootCount = tree.data?.data?.length ?? 0;
+
   return (
-    <Flex vertical gap={12}>
+    <Flex vertical gap={16}>
       <PageHeader
         title="Categories"
         breadcrumbs={[{ label: 'Catalog' }, { label: 'Categories' }]}
-        subtitle="Three levels deep. Policies set here — return windows, GST, gating — apply to every listing below."
+        subtitle="A three-level tree. Policies you set on a category — return window, GST, gating — apply to every listing beneath it."
         actions={
-          <>
-            <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddRootOpen(true)}>
-              New category
-            </Button>
-          </>
+          <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddRootOpen(true)}>
+            New category
+          </Button>
         }
       />
 
-      <Row gutter={[12, 12]}>
+      <Row gutter={[16, 16]} align="stretch">
         <Col xs={24} lg={9}>
-          <Card size="small" title="Taxonomy" styles={{ body: { paddingTop: 10 } }}>
+          <Card
+            size="small"
+            title="Taxonomy"
+            extra={
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                {rootCount} top-level
+              </Typography.Text>
+            }
+            style={{ height: '100%' }}
+            styles={{ body: { paddingTop: 12 } }}
+          >
             <Input.Search
               allowClear
               placeholder="Find a category"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              style={{ marginBottom: 10 }}
+              style={{ marginBottom: 12 }}
             />
             {treeData.length === 0 ? (
-              <Empty description="No categories match" />
+              <Empty image={Empty.PRESENTED_IMAGE_SIMPLE} description="No categories match" style={{ padding: '24px 0' }} />
             ) : (
               <Tree
                 treeData={treeData}
                 selectedKeys={selectedId ? [selectedId] : []}
                 {...(expandedKeys ? { expandedKeys } : {})}
-                onSelect={(keys) => {
-                  const next = new URLSearchParams(params);
-                  if (keys[0]) next.set('selected', keys[0]);
-                  else next.delete('selected');
-                  setParams(next);
-                }}
+                onSelect={(keys) => select(keys[0] ?? null)}
                 blockNode
-                style={{ maxHeight: 560, overflowY: 'auto' }}
+                style={{ maxHeight: 580, overflowY: 'auto' }}
               />
             )}
           </Card>
@@ -151,18 +164,9 @@ export default function CategoriesPage() {
 
         <Col xs={24} lg={15}>
           {selectedId ? (
-            <CategoryEditor
-              categoryId={selectedId}
-              onSelect={(id) => {
-                const next = new URLSearchParams(params);
-                next.set('selected', id);
-                setParams(next);
-              }}
-            />
+            <CategoryEditor categoryId={selectedId} onSelect={select} />
           ) : (
-            <Card size="small">
-              <Empty description="Pick a category to see and edit its policies" />
-            </Card>
+            <NoSelection onCreate={() => setAddRootOpen(true)} />
           )}
         </Col>
       </Row>
@@ -191,5 +195,47 @@ export default function CategoriesPage() {
         </Form>
       </Modal>
     </Flex>
+  );
+}
+
+/** Calm, purposeful placeholder shown until a category is picked. */
+function NoSelection({ onCreate }) {
+  const hints = [
+    { icon: <RetweetOutlined />, label: 'Return windows' },
+    { icon: <PercentageOutlined />, label: 'GST / HSN' },
+    { icon: <LockOutlined />, label: 'Gating' },
+  ];
+
+  return (
+    <Card
+      size="small"
+      style={{ height: '100%' }}
+      styles={{ body: { minHeight: 440, display: 'grid', placeItems: 'center' } }}
+    >
+      <Flex vertical align="center" gap={18} style={{ maxWidth: 420, textAlign: 'center', padding: 24 }}>
+        <div className="arise-placeholder-icon" aria-hidden>
+          <ApartmentOutlined />
+        </div>
+        <Flex vertical gap={6} align="center">
+          <Typography.Title level={5} style={{ margin: 0 }}>
+            Select a category
+          </Typography.Title>
+          <Typography.Text type="secondary">
+            Pick a category from the tree to review and edit the policies that apply to every listing beneath it.
+          </Typography.Text>
+        </Flex>
+        <Flex gap={8} wrap justify="center">
+          {hints.map((h) => (
+            <span key={h.label} className="arise-chip">
+              {h.icon}
+              {h.label}
+            </span>
+          ))}
+        </Flex>
+        <Button type="link" icon={<PlusOutlined />} onClick={onCreate} style={{ padding: 0 }}>
+          Create a top-level category
+        </Button>
+      </Flex>
+    </Card>
   );
 }

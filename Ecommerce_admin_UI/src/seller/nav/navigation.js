@@ -11,11 +11,19 @@
 export const NAV_GROUPS = [
   {
     key: 'overview',
+    section: 'Overview',
     icon: 'dashboard',
     items: [{ label: 'Dashboard', path: '/' }],
   },
   {
+    key: 'analytics',
+    section: 'Overview',
+    icon: 'barChart',
+    items: [{ label: 'Analytics', path: '/analytics' }],
+  },
+  {
     key: 'products',
+    section: 'Catalog & Growth',
     label: 'Products',
     icon: 'appstore',
     items: [
@@ -24,7 +32,15 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    key: 'campaigns',
+    section: 'Catalog & Growth',
+    label: 'Campaigns',
+    icon: 'thunderbolt',
+    items: [{ label: 'Campaigns', path: '/campaigns' }],
+  },
+  {
     key: 'orders',
+    section: 'Orders & Support',
     label: 'Orders',
     icon: 'shopping',
     items: [
@@ -33,19 +49,18 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'campaigns',
-    label: 'Campaigns',
-    icon: 'thunderbolt',
-    items: [{ label: 'Campaigns', path: '/campaigns' }],
-  },
-  {
     key: 'payments',
+    section: 'Finance',
     label: 'Payments',
     icon: 'bank',
-    items: [{ label: 'Payments & Settlements', path: '/payments' }],
+    items: [
+      { label: 'Overview', path: '/payments' },
+      { label: 'Settlements', path: '/payments/settlements' },
+    ],
   },
   {
     key: 'account',
+    section: 'System',
     label: 'Account',
     icon: 'setting',
     items: [

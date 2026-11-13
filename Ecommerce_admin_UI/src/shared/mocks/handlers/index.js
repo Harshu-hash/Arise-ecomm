@@ -28,7 +28,7 @@ import { logisticsHandlers } from './logistics';
 import { lookupHandlers } from './lookups';
 import { notificationHandlers } from './notifications';
 import { orderHandlers } from './orders';
-import { payoutHandlers } from './payouts';
+import { settlementHandlers } from './settlements';
 import { piiHandlers } from './pii';
 import { productHandlers } from './products';
 import { reasonHandlers } from './reasons';
@@ -109,7 +109,7 @@ export const handlers = [
   ...notificationHandlers,
   ...financeConfigHandlers,
   ...financeHandlers,
-  ...payoutHandlers,
+  ...settlementHandlers,
   ...walletHandlers,
   ...sellerOpsHandlers,
   ...sellerHandlers,

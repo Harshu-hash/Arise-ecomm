@@ -16,10 +16,21 @@ export default function Sidebar({ collapsed, onNavigate }) {
   const { items, openKeys } = useMemo(() => {
     const built = [];
     let activeGroup = null;
+    let currentSection = null;
 
     for (const group of NAV_GROUPS) {
       const groupItems = group.items;
       if (!groupItems.length) continue;
+
+      // Emit an uppercase section divider whenever the section changes.
+      if (group.section && group.section !== currentSection) {
+        currentSection = group.section;
+        built.push({
+          key: `section:${currentSection}`,
+          type: 'group',
+          label: <span className="arise-nav-section">{currentSection}</span>,
+        });
+      }
 
       if (groupItems.some((i) => isActive(pathname, i.path))) activeGroup = group.key;
 

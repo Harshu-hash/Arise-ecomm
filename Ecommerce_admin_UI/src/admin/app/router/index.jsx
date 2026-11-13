@@ -14,6 +14,7 @@ const AcceptInvitePage = lazy(() => import('@admin/features/auth/pages/AcceptInv
 const ChangePasswordPage = lazy(() => import('@admin/features/auth/pages/ChangePasswordPage'));
 
 const DashboardPage = lazy(() => import('@admin/features/dashboard/pages/DashboardPage'));
+const AnalyticsPage = lazy(() => import('@admin/features/analytics/pages/AnalyticsPage'));
 
 /* Sellers */
 const SellersListPage = lazy(() => import('@admin/features/sellers/pages/SellersListPage'));
@@ -50,8 +51,8 @@ const StaticPagesPage = lazy(() => import('@admin/features/cms/pages/StaticPages
 /* Finance */
 const PaymentsPage = lazy(() => import('@admin/features/finance/pages/PaymentsPage'));
 const RefundsPage = lazy(() => import('@admin/features/finance/pages/RefundsPage'));
-const PayoutsPage = lazy(() => import('@admin/features/finance/pages/PayoutsPage'));
-const PayoutBatchDetailPage = lazy(() => import('@admin/features/finance/pages/PayoutBatchDetailPage'));
+const SellerSettlementsPage = lazy(() => import('@admin/features/finance/pages/SellerSettlementsPage'));
+const BulkSettlementPage = lazy(() => import('@admin/features/finance/pages/BulkSettlementPage'));
 
 /* Catalog */
 const ProductsListPage = lazy(() => import('@admin/features/catalog/pages/ProductsListPage'));
@@ -73,6 +74,7 @@ const NotFoundPage = lazy(() => import('@admin/features/system/pages/NotFoundPag
 /** Every route in the simplified admin panel. */
 const ROUTES = [
   { path: '/', element: <DashboardPage /> },
+  { path: '/analytics', element: <AnalyticsPage /> },
 
   // Catalog
   { path: '/catalog/products', element: <ProductsListPage /> },
@@ -111,8 +113,8 @@ const ROUTES = [
   // Finance
   { path: '/finance/payments', element: <PaymentsPage /> },
   { path: '/finance/refunds', element: <RefundsPage /> },
-  { path: '/finance/payouts', element: <PayoutsPage /> },
-  { path: '/finance/payouts/:id', element: <PayoutBatchDetailPage /> },
+  { path: '/finance/payouts', element: <SellerSettlementsPage /> },
+  { path: '/finance/payouts/bulk', element: <BulkSettlementPage /> },
 
   // Reviews & support
   { path: '/reviews', element: <ReviewsPage /> },

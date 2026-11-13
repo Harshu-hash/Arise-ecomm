@@ -11,11 +11,19 @@
 export const NAV_GROUPS = [
   {
     key: 'overview',
+    section: 'Overview',
     icon: 'dashboard',
     items: [{ label: 'Dashboard', path: '/' }],
   },
   {
+    key: 'analytics',
+    section: 'Overview',
+    icon: 'barChart',
+    items: [{ label: 'Analytics', path: '/analytics' }],
+  },
+  {
     key: 'catalog',
+    section: 'Catalog & Growth',
     label: 'Catalog',
     icon: 'appstore',
     items: [
@@ -27,32 +35,8 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'orders',
-    label: 'Orders',
-    icon: 'shopping',
-    items: [
-      { label: 'Orders', path: '/orders' },
-      { label: 'Returns & Replacements', path: '/returns' },
-      { label: 'Shipments', path: '/logistics/shipments' },
-    ],
-  },
-  {
-    key: 'sellers',
-    label: 'Sellers',
-    icon: 'shop',
-    items: [
-      { label: 'Sellers', path: '/sellers' },
-      { label: 'Seller Applications', path: '/sellers/applications' },
-    ],
-  },
-  {
-    key: 'customers',
-    label: 'Customers',
-    icon: 'team',
-    items: [{ label: 'Customers', path: '/customers' }],
-  },
-  {
     key: 'marketing',
+    section: 'Catalog & Growth',
     label: 'Marketing',
     icon: 'notification',
     items: [
@@ -65,17 +49,19 @@ export const NAV_GROUPS = [
     ],
   },
   {
-    key: 'finance',
-    label: 'Finance',
-    icon: 'bank',
+    key: 'orders',
+    section: 'Orders & Support',
+    label: 'Orders',
+    icon: 'shopping',
     items: [
-      { label: 'Payments', path: '/finance/payments' },
-      { label: 'Refunds', path: '/finance/refunds' },
-      { label: 'Seller Payouts', path: '/finance/payouts' },
+      { label: 'Orders', path: '/orders' },
+      { label: 'Returns & Replacements', path: '/returns' },
+      { label: 'Shipments', path: '/logistics/shipments' },
     ],
   },
   {
     key: 'support',
+    section: 'Orders & Support',
     label: 'Support',
     icon: 'customerService',
     items: [
@@ -84,7 +70,36 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    key: 'sellers',
+    section: 'People',
+    label: 'Sellers',
+    icon: 'shop',
+    items: [
+      { label: 'Sellers', path: '/sellers' },
+      { label: 'Seller Applications', path: '/sellers/applications' },
+    ],
+  },
+  {
+    key: 'customers',
+    section: 'People',
+    label: 'Customers',
+    icon: 'team',
+    items: [{ label: 'Customers', path: '/customers' }],
+  },
+  {
+    key: 'finance',
+    section: 'Finance',
+    label: 'Finance',
+    icon: 'bank',
+    items: [
+      { label: 'Payments', path: '/finance/payments' },
+      { label: 'Refunds', path: '/finance/refunds' },
+      { label: 'Seller Settlements', path: '/finance/payouts' },
+    ],
+  },
+  {
     key: 'settings',
+    section: 'System',
     label: 'Settings',
     icon: 'setting',
     items: [

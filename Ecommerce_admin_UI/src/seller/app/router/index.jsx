@@ -17,6 +17,7 @@ const OnboardingStatusPage = lazy(
   () => import('@seller/features/onboarding/pages/OnboardingStatusPage'),
 );
 const DashboardPage = lazy(() => import('@seller/features/dashboard/pages/DashboardPage'));
+const AnalyticsPage = lazy(() => import('@seller/features/analytics/pages/AnalyticsPage'));
 const MyAccountPage = lazy(() => import('@seller/features/me/pages/MyAccountPage'));
 
 /* Listings (incl. the Add Product flow) */
@@ -40,7 +41,6 @@ const ReturnDetailPage = lazy(() => import('@seller/features/returns/pages/Retur
 /* Payments */
 const PaymentsPage = lazy(() => import('@seller/features/finance/pages/PaymentsPage'));
 const SettlementsPage = lazy(() => import('@seller/features/finance/pages/SettlementsPage'));
-const PayoutDetailPage = lazy(() => import('@seller/features/finance/pages/PayoutDetailPage'));
 
 /* Support & account */
 const SupportPage = lazy(() => import('@seller/features/support/pages/SupportPage'));
@@ -52,6 +52,7 @@ const NotFoundPage = lazy(() => import('@seller/features/system/pages/NotFoundPa
 /** Every seller navigation destination is backed by a production screen. */
 const ROUTES = [
   { path: '/', element: <DashboardPage /> },
+  { path: '/analytics', element: <AnalyticsPage /> },
   { path: '/account', element: <MyAccountPage /> },
 
   // Products (My Listings + Add Product flow)
@@ -75,7 +76,6 @@ const ROUTES = [
   // Payments
   { path: '/payments', element: <PaymentsPage /> },
   { path: '/payments/settlements', element: <SettlementsPage /> },
-  { path: '/payments/settlements/:id', element: <PayoutDetailPage /> },
 
   // Support & account
   { path: '/support', element: <SupportPage /> },
