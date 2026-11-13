@@ -1,7 +1,6 @@
 import { Button, Flex, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
 import FilterBar from '@ui/components/FilterBar';
@@ -96,12 +95,12 @@ export default function PayoutAdjustmentsTable() {
         searchPlaceholder="Search seller or note"
         extra={
           <Space>
-            <Can perm="finance.payout.hold">
+            <>
               <Button onClick={() => setHolding(true)}>Hold or release a seller</Button>
-            </Can>
-            <Can perm="finance.payout.adjust">
+            </>
+            <>
               <Button type="primary" onClick={() => setRaising(true)}>Raise adjustment</Button>
-            </Can>
+            </>
           </Space>
         }
       />

@@ -2,7 +2,6 @@ import { App, Button, Card, Flex, Input, Segmented, Select } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '@core/api/errors';
-import { Can } from '@core/rbac/Can';
 import { supportApi, supportKeys } from '../api/support.api';
 
 const RESOLUTION_CODES = [
@@ -75,7 +74,7 @@ export default function TicketComposer({ ticket, onSent }) {
               ...(ticket.status !== 'CLOSED' ? [{ value: 'INTERNAL', label: 'Internal note' }] : []),
             ]}
           />
-          <Can perm="support.macro.view">
+          <>
             <Select
               placeholder="Insert a macro"
               style={{ width: 220 }}
@@ -83,7 +82,7 @@ export default function TicketComposer({ ticket, onSent }) {
               options={(macros.data?.data ?? []).map((m) => ({ value: m.id, label: m.name }))}
               onChange={(v) => v && insertMacro(v)}
             />
-          </Can>
+          </>
         </Flex>
 
         <Input.TextArea

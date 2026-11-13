@@ -1,7 +1,6 @@
 import { Alert, Button, Col, Flex, Row, Segmented, Typography } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Can } from '@core/rbac/Can';
 import PageHeader from '@ui/components/PageHeader';
 import StatCard from '@ui/components/StatCard';
 import { financeApi, financeKeys } from '../api/finance.api';
@@ -38,11 +37,11 @@ export default function PayoutsPage() {
         breadcrumbs={[{ label: 'Finance' }, { label: 'Seller payouts' }]}
         subtitle="Settlements are released weekly. One person builds the batch; a second releases it."
         actions={
-          <Can perm="finance.payout.create">
+          <>
             <Button type="primary" onClick={() => setCreating(true)}>
               Build a payout batch
             </Button>
-          </Can>
+          </>
         }
       />
 

@@ -2,7 +2,6 @@ import { App, Button, Flex, Progress, Space, Tag, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
@@ -118,19 +117,19 @@ export default function CouponsListPage() {
       render: (_v, row) => (
         <Space size={4} onClick={(e) => e.stopPropagation()}>
           {['ACTIVE', 'PAUSED', 'SCHEDULED'].includes(row.status) && (
-            <Can perm="marketing.coupon.pause">
+            <>
               <Button size="small" onClick={() => pause.mutate(row.id)}>
                 {row.status === 'PAUSED' ? 'Resume' : 'Pause'}
               </Button>
-            </Can>
+            </>
           )}
-          <Can perm="marketing.coupon.create">
+          <>
             <Button size="small" type="text" onClick={() => clone.mutate(row.id)}>Clone</Button>
-          </Can>
+          </>
           {['ACTIVE', 'PAUSED', 'SCHEDULED'].includes(row.status) && (
-            <Can perm="marketing.coupon.pause">
+            <>
               <Button size="small" type="text" danger onClick={() => setEnding(row)}>End</Button>
-            </Can>
+            </>
           )}
         </Space>
       ),
@@ -144,9 +143,9 @@ export default function CouponsListPage() {
         breadcrumbs={[{ label: 'Marketing' }, { label: 'Coupons' }]}
         subtitle="Discounts customers apply at checkout. Every rate here is checked against a real cart by the same logic that will run at checkout."
         actions={
-          <Can perm="marketing.coupon.create">
+          <>
             <Button type="primary" onClick={() => setCreating(true)}>New coupon</Button>
-          </Can>
+          </>
         }
       />
 

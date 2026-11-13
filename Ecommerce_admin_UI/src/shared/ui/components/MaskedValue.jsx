@@ -2,8 +2,7 @@ import { EyeInvisibleOutlined, EyeOutlined } from '@ant-design/icons';
 import { App, Button, Tooltip, Typography } from 'antd';
 import { useEffect, useRef, useState } from 'react';
 import { api } from '@core/api/axiosInstance';
-import { useCan } from '@core/rbac/useCan';
-import { MASKERS, REVEAL_PERMISSION } from '@core/utils/mask';
+import { MASKERS } from '@core/utils/mask';
 
 const AUTO_HIDE_MS = 30_000;
 
@@ -24,12 +23,9 @@ export default function MaskedValue({
   copyable = false,
 }) {
   const { message } = App.useApp();
-  const can = useCan();
   const [revealed, setRevealed] = useState(false);
   const timer = useRef(null);
 
-  const permission = REVEAL_PERMISSION[kind];
-  const allowed = can(permission);
   const masker = MASKERS[kind] ?? ((v) => v);
 
   useEffect(() => () => clearTimeout(timer.current), []);
@@ -57,29 +53,23 @@ export default function MaskedValue({
       >
         {revealed ? value : masker(value)}
       </Typography.Text>
-      {allowed ? (
-        <Tooltip title={revealed ? 'Hide' : 'Reveal (this access is logged)'}>
-          <Button
-            type="text"
-            size="small"
-            aria-label={revealed ? 'Hide value' : 'Reveal value'}
-            icon={revealed ? <EyeInvisibleOutlined /> : <EyeOutlined />}
-            onClick={(e) => {
-              e.stopPropagation();
-              if (revealed) {
-                clearTimeout(timer.current);
-                setRevealed(false);
-              } else {
-                reveal();
-              }
-            }}
-          />
-        </Tooltip>
-      ) : (
-        <Tooltip title="You do not have permission to reveal personal data">
-          <EyeInvisibleOutlined style={{ opacity: 0.35, fontSize: 12 }} />
-        </Tooltip>
-      )}
+      <Tooltip title={revealed ? 'Hide' : 'Reveal (this access is logged)'}>
+        <Button
+          type="text"
+          size="small"
+          aria-label={revealed ? 'Hide value' : 'Reveal value'}
+          icon={revealed ? <EyeInvisibleOutlined /> : <EyeOutlined />}
+          onClick={(e) => {
+            e.stopPropagation();
+            if (revealed) {
+              clearTimeout(timer.current);
+              setRevealed(false);
+            } else {
+              reveal();
+            }
+          }}
+        />
+      </Tooltip>
     </span>
   );
 }

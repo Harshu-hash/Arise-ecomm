@@ -91,3 +91,6 @@ export const useSessionStore = create((set, get) => ({
 
 /** Non-reactive read, for use inside axios interceptors. */
 export const sessionSnapshot = () => useSessionStore.getState();
+
+/** The signed-in user, or null. */
+export const useCurrentUser = () => useSessionStore((s) => s.user);

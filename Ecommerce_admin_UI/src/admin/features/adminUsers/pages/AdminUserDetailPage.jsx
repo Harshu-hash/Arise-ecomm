@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { qk, queryClient } from '@core/api/queryClient';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import { avatarColor, initials } from '@core/utils/misc';
 import AuditDrawer from '@ui/components/AuditDrawer';
 import DateText from '@ui/components/DateText';

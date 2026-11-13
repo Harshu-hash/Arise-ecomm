@@ -3,7 +3,6 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { ApiError } from '@core/api/errors';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
@@ -44,9 +43,9 @@ export default function VersionHistoryDrawer({ open, onClose }) {
               actions={
                 v.status === 'ARCHIVED'
                   ? [
-                      <Can key="rb" perm="cms.home.rollback">
-                        <Button size="small" onClick={() => setRollingBack(v)}>Roll back to this</Button>
-                      </Can>,
+                      <Button key="rb" size="small" onClick={() => setRollingBack(v)}>
+                        Roll back to this
+                      </Button>,
                     ]
                   : []
               }

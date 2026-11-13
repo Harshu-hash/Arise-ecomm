@@ -1,7 +1,6 @@
 import { App, Button, Flex, Input, Tag, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { useState } from 'react';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
@@ -54,7 +53,7 @@ export default function QaPage() {
     {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
-        <Flex gap={6} justify="end"><Can perm="reviews.qa.moderate">{row.pendingSellerAnswer && <><Button size="small" type="primary" loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'PUBLISHED' }); }}>Publish seller answer</Button><Button size="small" danger loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'REJECTED' }); }}>Reject</Button></>}</Can><Can perm="reviews.qa.answer"><Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button></Can></Flex>
+        <Flex gap={6} justify="end"><>{row.pendingSellerAnswer && <><Button size="small" type="primary" loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'PUBLISHED' }); }}>Publish seller answer</Button><Button size="small" danger loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'REJECTED' }); }}>Reject</Button></>}</><><Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button></></Flex>
       ),
     },
   ];

@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
@@ -87,7 +86,7 @@ export default function PayoutBatchDetailPage() {
         actions={
           <Space>
             {batch.status === 'PENDING_APPROVAL' ? (
-              <Can perm="finance.payout.release">
+              <>
                 <Button
                   type="primary"
                   disabled={!batch.releasableByCaller}
@@ -95,14 +94,14 @@ export default function PayoutBatchDetailPage() {
                 >
                   Release payouts
                 </Button>
-              </Can>
+              </>
             ) : null}
             {batch.status === 'PARTIALLY_FAILED' ? (
-              <Can perm="finance.payout.release">
+              <>
                 <Button type="primary" danger onClick={() => setRetrying(true)}>
                   Retry {batch.failedCount} failed transfers
                 </Button>
-              </Can>
+              </>
             ) : null}
           </Space>
         }

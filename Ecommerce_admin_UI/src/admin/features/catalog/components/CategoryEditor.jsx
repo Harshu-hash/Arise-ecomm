@@ -3,11 +3,11 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ApiError } from '@core/api/errors';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import AuditDrawer from '@ui/components/AuditDrawer';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import { catalogApi, catalogKeys } from '../api/catalog.api';
+import CategoryAppearanceFields from './CategoryAppearanceFields';
 import CategoryPolicyFields from './CategoryPolicyFields';
 
 /** Editor for one category: identity, policies and the attribute set. */
@@ -140,12 +140,12 @@ export default function CategoryEditor({ categoryId, onSelect }) {
         <Space size={6}>
           <AuditDrawer entityType="category" entityId={category.id} entityLabel={category.name} />
           {category.level < 3 && (
-            <Can perm="catalog.category.create">
+            <>
               <Button size="small" onClick={() => setAddOpen(true)}>Add child</Button>
-            </Can>
+            </>
           )}
           {allowedActions.includes('DELETE') && (
-            <Can perm="catalog.category.delete">
+            <>
               <Button
                 size="small"
                 danger
@@ -162,7 +162,7 @@ export default function CategoryEditor({ categoryId, onSelect }) {
               >
                 Delete
               </Button>
-            </Can>
+            </>
           )}
         </Space>
       }
@@ -184,6 +184,8 @@ export default function CategoryEditor({ categoryId, onSelect }) {
             label: `${h.code} — ${h.description} (${h.gstRate}%)`,
           }))}
         />
+
+        <CategoryAppearanceFields />
 
         {isLeaf && (
           <>
@@ -224,11 +226,11 @@ export default function CategoryEditor({ categoryId, onSelect }) {
         )}
 
         <Space>
-          <Can perm="catalog.category.edit" disable reason="You cannot edit categories">
+          <>
             <Button type="primary" htmlType="submit" loading={save.isPending}>
               Save changes
             </Button>
-          </Can>
+          </>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {childCount} child categor{childCount === 1 ? 'y' : 'ies'}
           </Typography.Text>

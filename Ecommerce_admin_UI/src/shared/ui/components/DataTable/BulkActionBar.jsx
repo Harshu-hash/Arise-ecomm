@@ -1,6 +1,5 @@
 import { CloseOutlined } from '@ant-design/icons';
 import { Button, Flex, Space, Typography } from 'antd';
-import { useCan } from '@core/rbac/useCan';
 import { formatNumber, pluralizeSafe } from './helpers';
 
 /**
@@ -16,10 +15,9 @@ export default function BulkActionBar({
   onClear,
   actions = [],
 }) {
-  const can = useCan();
   if (!selectedCount) return null;
 
-  const visible = actions.filter((a) => !a.perm || can(a.perm));
+  const visible = actions;
 
   return (
     <Flex

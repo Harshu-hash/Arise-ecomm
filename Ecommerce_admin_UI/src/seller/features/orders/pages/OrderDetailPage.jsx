@@ -25,7 +25,6 @@ import {
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
@@ -179,13 +178,13 @@ export default function OrderDetailPage() {
         actions={
           !isArise && !isCancelled && data.stage !== 'SHIPPED' && data.stage !== 'DELIVERED' ? (
             <Space>
-              <Can perm="orders.order.cancel">
+              <>
                 <Button danger onClick={() => setCancelOpen(true)}>
                   Cancel order
                 </Button>
-              </Can>
+              </>
               {data.nextAction && (
-                <Can perm="orders.order.process">
+                <>
                   <Button
                     type="primary"
                     loading={actionMut.isPending}
@@ -193,7 +192,7 @@ export default function OrderDetailPage() {
                   >
                     {ACTION_LABELS[data.nextAction]}
                   </Button>
-                </Can>
+                </>
               )}
             </Space>
           ) : null

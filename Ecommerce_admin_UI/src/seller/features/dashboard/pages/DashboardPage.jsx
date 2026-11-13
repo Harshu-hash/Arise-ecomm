@@ -3,7 +3,7 @@ import { Alert, Card, Col, Flex, List, Progress, Row, Space, Tag, Typography } f
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { api } from '@core/api/axiosInstance';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import ActivityTimeline from '@ui/components/ActivityTimeline';
 import PageHeader from '@ui/components/PageHeader';
 import StatCard from '@ui/components/StatCard';

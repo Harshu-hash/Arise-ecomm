@@ -4,7 +4,6 @@ import { useQuery } from '@tanstack/react-query';
 import { cloneElement, useState } from 'react';
 import { api } from '@core/api/axiosInstance';
 import { qk } from '@core/api/queryClient';
-import { useCan } from '@core/rbac/useCan';
 import ActivityTimeline from './ActivityTimeline';
 import ErrorState from './ErrorState';
 import FullPageSpinner from './FullPageSpinner';
@@ -16,16 +15,12 @@ import FullPageSpinner from './FullPageSpinner';
  */
 export default function AuditDrawer({ entityType, entityId, entityLabel, trigger }) {
   const [open, setOpen] = useState(false);
-  const can = useCan();
-  const allowed = can('admin.audit.view');
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: qk.audit.forEntity(entityType, entityId),
     queryFn: () => api.get(`/audit-events/entity/${entityType}/${entityId}`).then((r) => r.data),
-    enabled: open && allowed,
+    enabled: open,
   });
-
-  if (!allowed) return null;
 
   return (
     <>

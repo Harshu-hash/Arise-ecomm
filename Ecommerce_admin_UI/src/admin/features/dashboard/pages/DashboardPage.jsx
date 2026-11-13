@@ -2,7 +2,7 @@ import { Card, Col, Flex, Row, Segmented, Table, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@core/api/axiosInstance';
 import { qk } from '@core/api/queryClient';
-import { useCan, useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import { formatNumber, formatPercent } from '@core/utils/money';
 import ErrorState from '@ui/components/ErrorState';
 import MoneyText from '@ui/components/MoneyText';
@@ -30,7 +30,6 @@ const RANGES = [
  */
 export default function DashboardPage() {
   const user = useCurrentUser();
-  const can = useCan();
   const state = useUrlTableState({ defaultSort: '', defaultPageSize: 25 });
   const days = Number(state.filters.days ?? 7);
 
@@ -42,7 +41,6 @@ export default function DashboardPage() {
   const actionCenter = useQuery({
     queryKey: qk.dashboard.actionCenter,
     queryFn: () => api.get('/dashboard/action-center').then((r) => r.data),
-    enabled: can('dashboard.action_center.view'),
     refetchInterval: 120_000,
   });
 
@@ -63,7 +61,7 @@ export default function DashboardPage() {
     <Flex vertical gap={16}>
       <PageHeader
         title={`Good day, ${firstName}`}
-        subtitle="Everything below is scoped to what your roles can see."
+        subtitle="Here's what's happening across your store today."
         actions={
           <Segmented
             value={days}
@@ -96,7 +94,7 @@ export default function DashboardPage() {
         </Row>
       )}
 
-      {can('dashboard.action_center.view') && (
+      {true && (
         <ActionCenter tiles={actionCenter.data} loading={actionCenter.isLoading} />
       )}
 
@@ -143,7 +141,7 @@ export default function DashboardPage() {
         </Col>
       </Row>
 
-      {can('dashboard.finance_widgets.view') && (
+      {true && (
         <Row gutter={[12, 12]}>
           <Col span={24}>
             <MoneyPositionCard />
@@ -152,7 +150,7 @@ export default function DashboardPage() {
       )}
 
       <Row gutter={[12, 12]}>
-        {can('dashboard.finance_widgets.view') && (
+        {true && (
           <Col xs={24} lg={12}>
             <Card size="small" title="Payment mix" loading={summary.isLoading}>
               <Table
@@ -184,7 +182,7 @@ export default function DashboardPage() {
           </Col>
         )}
 
-        <Col xs={24} lg={can('dashboard.finance_widgets.view') ? 12 : 24}>
+        <Col xs={24} lg={12}>
           <Card size="small" title="Top states by orders" loading={summary.isLoading}>
             <Table
               size="small"

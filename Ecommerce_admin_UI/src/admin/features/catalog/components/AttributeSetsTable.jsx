@@ -1,5 +1,4 @@
 import { Button, Flex, Space, Table, Typography } from 'antd';
-import { Can } from '@core/rbac/Can';
 
 /** The "Attribute sets" block on the Attributes page: a small read/write list beneath the main table. */
 export default function AttributeSetsTable({ sets, loading, onNew, onEdit, onDelete }) {
@@ -14,12 +13,12 @@ export default function AttributeSetsTable({ sets, loading, onNew, onEdit, onDel
       title: '', dataIndex: 'id', align: 'right',
       render: (_v, row) => (
         <Space size={4}>
-          <Can perm="catalog.attribute.edit">
+          <>
             <Button size="small" type="text" onClick={() => onEdit(row)}>Edit</Button>
-          </Can>
-          <Can perm="catalog.attribute.delete">
+          </>
+          <>
             <Button size="small" type="text" danger onClick={() => onDelete(row)}>Delete</Button>
-          </Can>
+          </>
         </Space>
       ),
     },
@@ -36,9 +35,9 @@ export default function AttributeSetsTable({ sets, loading, onNew, onEdit, onDel
             Sets group attributes so a category can adopt them all at once.
           </Typography.Text>
         </div>
-        <Can perm="catalog.attribute.create">
+        <>
           <Button size="small" onClick={onNew}>New set</Button>
-        </Can>
+        </>
       </Flex>
       <Table size="small" rowKey="id" pagination={false} loading={loading} dataSource={sets} columns={columns} />
     </Flex>

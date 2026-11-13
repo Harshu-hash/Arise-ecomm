@@ -3,7 +3,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { ApiError } from '@core/api/errors';
 import { qk, queryClient } from '@core/api/queryClient';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import { adminUsersApi, rolesApi } from '../api/adminUsers.api';
 import { scopeToForm, scopeToPayload } from '../scopeMapping';
 import ScopeFields from './ScopeFields';

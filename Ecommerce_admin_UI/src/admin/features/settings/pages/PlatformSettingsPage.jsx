@@ -2,7 +2,6 @@ import { App, Button, Card, Flex, Menu, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { ApiError } from '@core/api/errors';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
@@ -87,7 +86,7 @@ export default function PlatformSettingsPage() {
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   Last updated <DateText value={active.updatedAt} /> by {active.updatedByName}
                 </Typography.Text>
-                <Can perm="admin.settings.edit">
+                <>
                   <Button
                     type="primary" size="small" disabled={!dirty}
                     onClick={() => (sensitive ? setConfirming(true) : save.mutate({ sectionId: active.id, values: draft }))}
@@ -95,7 +94,7 @@ export default function PlatformSettingsPage() {
                   >
                     Save
                   </Button>
-                </Can>
+                </>
               </Flex>
             }
           >

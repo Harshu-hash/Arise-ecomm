@@ -38,7 +38,9 @@ export const catalogApi = {
   updateHsnCode: (id, payload) => api.patch(`/hsn-codes/${id}`, payload),
 
   sizeCharts: () => api.get('/size-charts'),
+  createSizeChart: (payload) => api.post('/size-charts', payload),
   updateSizeChart: (id, payload) => api.patch(`/size-charts/${id}`, payload),
+  deleteSizeChart: (id) => api.delete(`/size-charts/${id}`),
 
   buyBoxRules: () => api.get('/catalog/buybox-rules'),
   simulateBuyBox: (payload) => api.post('/catalog/buybox-rules/simulate', payload),

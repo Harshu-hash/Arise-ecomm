@@ -2,7 +2,6 @@ import { App, Button, Flex, Segmented, Tag, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
@@ -85,11 +84,11 @@ export default function DealsPage() {
     {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
-        <Can perm="marketing.deal.delete">
+        <>
           <Button size="small" type="text" danger onClick={(e) => { e.stopPropagation(); setDeleting(row); }}>
             Remove
           </Button>
-        </Can>
+        </>
       ),
     },
   ];
@@ -101,9 +100,9 @@ export default function DealsPage() {
         breadcrumbs={[{ label: 'Marketing' }, { label: 'Deals' }]}
         subtitle="Feeds the app's Offers and Top Value Deals rails. Deal of the Day holds one slot per placement per day."
         actions={
-          <Can perm="marketing.deal.create">
+          <>
             <Button type="primary" onClick={() => setCreating(true)}>New deal</Button>
-          </Can>
+          </>
         }
       />
 

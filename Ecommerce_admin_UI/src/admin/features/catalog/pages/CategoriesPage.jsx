@@ -1,9 +1,9 @@
 import { PlusOutlined } from '@ant-design/icons';
-import { App, Button, Card, Col, Empty, Flex, Input, Row, Tag, Tree, Typography } from 'antd';
-import { useQuery } from '@tanstack/react-query';
+import { App, Button, Card, Col, Empty, Flex, Form, Input, Modal, Row, Tag, Tree, Typography } from 'antd';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
+import { ApiError } from '@core/api/errors';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
@@ -18,13 +18,42 @@ import CategoryEditor from '../components/CategoryEditor';
  */
 export default function CategoriesPage() {
   const { message } = App.useApp();
+  const queryClient = useQueryClient();
   const [params, setParams] = useSearchParams();
   const selectedId = params.get('selected');
   const [search, setSearch] = useState('');
+  const [addRootOpen, setAddRootOpen] = useState(false);
+  const [rootForm] = Form.useForm();
 
   const tree = useQuery({
     queryKey: catalogKeys.categoryTree,
     queryFn: () => catalogApi.categoryTree(),
+  });
+
+  const createRoot = useMutation({
+    // A top-level category has no parent.
+    mutationFn: (values) => catalogApi.createCategory({ ...values, parentId: null }),
+    onSuccess: (res) => {
+      queryClient.invalidateQueries({ queryKey: catalogKeys.categoryTree });
+      setAddRootOpen(false);
+      rootForm.resetFields();
+      message.success('Top category created');
+      const newId = res?.data?.id;
+      if (newId) {
+        const next = new URLSearchParams(params);
+        next.set('selected', newId);
+        setParams(next);
+      }
+    },
+    onError: (e) => {
+      if (e instanceof ApiError && e.fieldErrors) {
+        rootForm.setFields(
+          Object.entries(e.fieldErrors).map(([name, msg]) => ({ name, errors: [msg] })),
+        );
+        return;
+      }
+      message.error(e.message);
+    },
   });
 
   const treeData = useMemo(() => {
@@ -82,15 +111,11 @@ export default function CategoriesPage() {
         breadcrumbs={[{ label: 'Catalog' }, { label: 'Categories' }]}
         subtitle="Three levels deep. Policies set here — return windows, GST, gating — apply to every listing below."
         actions={
-          <Can perm="catalog.category.create" disable reason="You cannot create categories">
-            <Button
-              type="primary"
-              icon={<PlusOutlined />}
-              onClick={() => message.info('Pick a parent in the tree, then use “Add child” in the editor.')}
-            >
+          <>
+            <Button type="primary" icon={<PlusOutlined />} onClick={() => setAddRootOpen(true)}>
               New category
             </Button>
-          </Can>
+          </>
         }
       />
 
@@ -141,6 +166,30 @@ export default function CategoriesPage() {
           )}
         </Col>
       </Row>
+
+      <Modal
+        open={addRootOpen}
+        onCancel={() => setAddRootOpen(false)}
+        onOk={() => rootForm.submit()}
+        confirmLoading={createRoot.isPending}
+        title="New top category"
+        okText="Create"
+        destroyOnHidden
+      >
+        <Form
+          form={rootForm}
+          layout="vertical"
+          requiredMark={false}
+          onFinish={(v) => createRoot.mutate(v)}
+        >
+          <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give it a name.' }]}>
+            <Input autoFocus placeholder="e.g. Fashion" />
+          </Form.Item>
+          <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+            Creates a level-1 category. Add sub-categories under it later with “Add child”.
+          </Typography.Text>
+        </Form>
+      </Modal>
     </Flex>
   );
 }

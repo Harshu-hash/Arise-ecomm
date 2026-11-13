@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { qk, queryClient } from '@core/api/queryClient';
 import { authApi } from '@core/auth/authApi';
 import { useSessionStore } from '@core/auth/sessionStore';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import PageHeader from '@ui/components/PageHeader';
 import BackupCodesModal from '../components/BackupCodesModal';
 import { NotificationsCard, ProfileCard, SecurityCard } from '../components/ProfileCards';

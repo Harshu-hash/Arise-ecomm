@@ -4,7 +4,6 @@ import { useThemeStore } from '@theme/themeStore';
 import { ENV } from '@core/config/env';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
 import AlertsBell from './AlertsBell';
-import ApprovalsInboxBadge from './ApprovalsInboxBadge';
 import GlobalSearch from './GlobalSearch';
 import UserMenu from './UserMenu';
 
@@ -41,7 +40,6 @@ export default function AppHeader({ onToggleSidebar, onSignOut }) {
         </Flex>
 
         <Flex align="center" gap={isMobile ? 0 : 4}>
-          <ApprovalsInboxBadge />
           <AlertsBell />
           <Tooltip title={resolved === 'dark' ? 'Switch to light' : 'Switch to dark'}>
             <Button

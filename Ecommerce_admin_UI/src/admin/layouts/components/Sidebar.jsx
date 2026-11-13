@@ -1,18 +1,15 @@
-import { Menu, Tag } from 'antd';
+import { Menu } from 'antd';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CHROME, LAYOUT } from '@theme/tokens';
-import { useCan } from '@core/rbac/useCan';
-import { CURRENT_PHASE, NAV_GROUPS } from '@admin/nav/navigation';
+import { NAV_GROUPS } from '@admin/nav/navigation';
 import { NAV_ICONS } from './navIcons';
 
 /**
- * Permission-filtered navigation. A group disappears entirely when the user
- * holds none of its items, so a Finance Executive does not see an Ads section
- * they can never open.
+ * Sidebar navigation. Every signed-in admin sees the full menu — the panel no
+ * longer filters items by permission.
  */
 export default function Sidebar({ collapsed, onNavigate }) {
-  const can = useCan();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -21,31 +18,21 @@ export default function Sidebar({ collapsed, onNavigate }) {
     let activeGroup = null;
 
     for (const group of NAV_GROUPS) {
-      const allowed = group.items.filter((i) => can(i.perm));
-      if (!allowed.length) continue;
+      const groupItems = group.items;
+      if (!groupItems.length) continue;
 
-      if (allowed.some((i) => isActive(pathname, i.path))) activeGroup = group.key;
+      if (groupItems.some((i) => isActive(pathname, i.path))) activeGroup = group.key;
 
-      const children = allowed.map((i) => ({
+      const children = groupItems.map((i) => ({
         key: i.path,
         label: (
-          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.label}</span>
-            {i.phase > CURRENT_PHASE && (
-              <Tag
-                bordered={false}
-                style={{ margin: 0, fontSize: 10, lineHeight: '16px', padding: '0 4px', opacity: 0.75 }}
-              >
-                P{i.phase}
-              </Tag>
-            )}
-          </span>
+          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{i.label}</span>
         ),
       }));
 
       // A single-item group (Dashboard) reads better as a top-level link.
       if (!group.label) {
-        built.push({ key: allowed[0].path, icon: NAV_ICONS[group.icon], label: allowed[0].label });
+        built.push({ key: groupItems[0].path, icon: NAV_ICONS[group.icon], label: groupItems[0].label });
         continue;
       }
 
@@ -53,7 +40,7 @@ export default function Sidebar({ collapsed, onNavigate }) {
     }
 
     return { items: built, openKeys: activeGroup ? [activeGroup] : [] };
-  }, [can, pathname]);
+  }, [pathname]);
 
   const selected = useMemo(() => {
     // Longest matching path wins, so /orders/cancellations does not also

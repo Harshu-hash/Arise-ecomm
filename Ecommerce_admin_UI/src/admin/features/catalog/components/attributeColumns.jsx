@@ -1,5 +1,4 @@
 import { Button, Space, Tag, Typography } from 'antd';
-import { Can } from '@core/rbac/Can';
 
 /** Column set for the main Attributes DataTable, incl. the row-level edit/delete actions. */
 export function makeAttributeColumns({ onEdit, onDelete }) {
@@ -52,12 +51,12 @@ export function makeAttributeColumns({ onEdit, onDelete }) {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
         <Space size={4}>
-          <Can perm="catalog.attribute.edit">
+          <>
             <Button size="small" type="text" onClick={() => onEdit(row)}>Edit</Button>
-          </Can>
-          <Can perm="catalog.attribute.delete">
+          </>
+          <>
             <Button size="small" type="text" danger onClick={() => onDelete(row)}>Delete</Button>
-          </Can>
+          </>
         </Space>
       ),
     },

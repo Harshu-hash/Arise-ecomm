@@ -3,7 +3,6 @@ import { App, Button, Table, Tag, Tooltip, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import { discountPct } from '@core/utils/money';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
@@ -150,11 +149,11 @@ export default function OfferTable({ offers, productId }) {
           align: 'right',
           render: (_v, row) =>
             row.status === 'LIVE' ? (
-              <Can perm="catalog.product.activate">
+              <>
                 <Button size="small" onClick={() => confirmDeactivate(row)}>
                   Deactivate
                 </Button>
-              </Can>
+              </>
             ) : null,
         },
       ]}

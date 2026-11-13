@@ -9,7 +9,7 @@ import {
 import { Avatar, Dropdown, Flex, Space, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useThemeStore } from '@theme/themeStore';
-import { useCurrentUser } from '@core/rbac/useCan';
+import { useCurrentUser } from '@core/auth/sessionStore';
 import { avatarColor, initials } from '@core/utils/misc';
 import useBreakpoint from '@ui/hooks/useBreakpoint';
 

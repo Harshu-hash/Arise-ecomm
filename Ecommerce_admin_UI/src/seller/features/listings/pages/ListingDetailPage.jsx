@@ -32,7 +32,6 @@ import {
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { Can } from '@core/rbac/Can';
 import { paiseToRupees, rupeesToPaise } from '@core/utils/money';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
@@ -206,7 +205,7 @@ export default function ListingDetailPage() {
         actions={
           <Space>
             {data.status === 'DRAFT' && (
-              <Can perm="listings.product.edit">
+              <>
                 <Button
                   type="primary"
                   icon={<SendOutlined />}
@@ -215,10 +214,10 @@ export default function ListingDetailPage() {
                 >
                   Submit for QC
                 </Button>
-              </Can>
+              </>
             )}
             {data.needsChanges && (
-              <Can perm="listings.product.edit">
+              <>
                 <Button
                   type="primary"
                   icon={<RedoOutlined />}
@@ -227,9 +226,9 @@ export default function ListingDetailPage() {
                 >
                   Resubmit for QC
                 </Button>
-              </Can>
+              </>
             )}
-            <Can perm="listings.product.edit">
+            <>
               <Button
                 icon={<EditOutlined />}
                 onClick={() => {
@@ -247,7 +246,7 @@ export default function ListingDetailPage() {
               >
                 Edit content
               </Button>
-            </Can>
+            </>
             {data.productStatus === 'LIVE' && data.status === 'LIVE' && (
               <Button danger onClick={() => setLifecycleAction('deactivate')}>
                 Deactivate offer
@@ -445,7 +444,7 @@ export default function ListingDetailPage() {
                   valueRender={() => <MoneyText paise={data.mrpPaise} type="secondary" />}
                 />
               </Flex>
-              <Can perm="listings.price.edit">
+              <>
                 <QuickEdit
                   label="Update price (₹)"
                   initial={paiseToRupees(data.sellingPricePaise)}
@@ -464,8 +463,8 @@ export default function ListingDetailPage() {
                 >
                   Schedule price
                 </Button>
-              </Can>
-              <Can perm="listings.stock.edit">
+              </>
+              <>
                 <QuickEdit
                   label="Update stock"
                   initial={data.stock}
@@ -473,7 +472,7 @@ export default function ListingDetailPage() {
                   integer
                   onSave={(v) => stockMut.mutate(v)}
                 />
-              </Can>
+              </>
             </Space>
           </Card>
 

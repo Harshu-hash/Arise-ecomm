@@ -81,54 +81,54 @@ export const qcColumns = [
   },
 ];
 
+const MUTED_DASH = <Typography.Text type="secondary">—</Typography.Text>;
+
+const clampTitle = {
+  fontSize: 13,
+  display: '-webkit-box',
+  WebkitLineClamp: 2,
+  WebkitBoxOrient: 'vertical',
+  overflow: 'hidden',
+  lineHeight: 1.3,
+};
+
 /** Columns for the product catalog list. */
 export const productColumns = [
   {
-    key: 'title', title: 'Product', dataIndex: 'title', sorter: true, alwaysVisible: true,
+    key: 'title', title: 'Product', dataIndex: 'title', sorter: true, alwaysVisible: true, width: 320,
     render: (title, row) => (
-      <Space size={8}>
+      <Space size={10} align="center" style={{ width: '100%' }}>
         <Image
           src={row.images?.[0]}
           alt=""
-          width={34}
-          height={34}
+          width={40}
+          height={40}
           preview={false}
-          style={{ objectFit: 'cover', borderRadius: 6 }}
+          style={{ objectFit: 'cover', borderRadius: 8, flex: 'none', border: '1px solid var(--ant-color-border-secondary)' }}
           fallback={BLANK}
         />
         <div style={{ minWidth: 0 }}>
-          <Typography.Text strong style={{ fontSize: 13 }}>{title}</Typography.Text>
-          <div>
-            <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-              {row.brandName} · {row.id}
-            </Typography.Text>
-          </div>
+          <Typography.Text strong style={clampTitle} title={title}>{title}</Typography.Text>
+          <Typography.Text type="secondary" style={{ fontSize: 11, display: 'block' }}>
+            {row.brandName} · {row.id}
+          </Typography.Text>
         </div>
       </Space>
     ),
   },
-  { key: 'categoryPath', title: 'Category', dataIndex: 'categoryPath', priority: 2 },
   {
-    key: 'status', title: 'Status', dataIndex: 'status', sorter: true, priority: 1,
+    key: 'categoryPath', title: 'Category', dataIndex: 'categoryPath', priority: 2, ellipsis: true, width: 180,
+    render: (v) => <Typography.Text type="secondary" style={{ fontSize: 12 }}>{v}</Typography.Text>,
+  },
+  {
+    key: 'status', title: 'Status', dataIndex: 'status', sorter: true, priority: 1, width: 130,
     render: (code) => <StatusTag domain="listing" code={code} />,
   },
   {
-    key: 'variantCount', title: 'Variants', dataIndex: 'variantCount', align: 'right', priority: 3,
-    render: (v) => <span className="tabular">{v}</span>,
-  },
-  {
-    key: 'sellerCount', title: 'Sellers', dataIndex: 'sellerCount', align: 'right', priority: 2,
-    render: (v) => <span className="tabular">{v}</span>,
-  },
-  {
-    key: 'buyBoxSellerName', title: 'Buy box', dataIndex: 'buyBoxSellerName', priority: 2,
-    render: (v) => v ?? <Typography.Text type="secondary" style={{ fontSize: 12 }}>—</Typography.Text>,
-  },
-  {
-    key: 'minPricePaise', title: 'Price', dataIndex: 'minPricePaise', sorter: true, align: 'right', priority: 1,
+    key: 'minPricePaise', title: 'Price', dataIndex: 'minPricePaise', sorter: true, align: 'right', priority: 1, width: 150,
     render: (min, row) =>
       min === null ? (
-        <Typography.Text type="secondary">—</Typography.Text>
+        MUTED_DASH
       ) : min === row.maxPricePaise ? (
         <MoneyText paise={min} />
       ) : (
@@ -140,7 +140,7 @@ export const productColumns = [
       ),
   },
   {
-    key: 'totalStock', title: 'Stock', dataIndex: 'totalStock', sorter: true, align: 'right', priority: 1,
+    key: 'totalStock', title: 'Stock', dataIndex: 'totalStock', sorter: true, align: 'right', priority: 1, width: 90,
     render: (v) => (
       <Typography.Text className="tabular" type={v === 0 ? 'danger' : v < 20 ? 'warning' : undefined}>
         {v}
@@ -148,7 +148,7 @@ export const productColumns = [
     ),
   },
   {
-    key: 'rating', title: 'Rating', dataIndex: 'rating', sorter: true, align: 'right', priority: 3,
+    key: 'rating', title: 'Rating', dataIndex: 'rating', sorter: true, align: 'right', priority: 2, width: 120,
     render: (v, row) =>
       v ? (
         <Space size={2}>
@@ -156,14 +156,28 @@ export const productColumns = [
           <Typography.Text type="secondary" style={{ fontSize: 11 }}>({row.ratingCount})</Typography.Text>
         </Space>
       ) : (
-        <Typography.Text type="secondary">—</Typography.Text>
+        MUTED_DASH
       ),
   },
   {
-    key: 'contentScore', title: 'Content', dataIndex: 'contentScore', sorter: true, align: 'right', priority: 3,
+    key: 'contentScore', title: 'Content', dataIndex: 'contentScore', sorter: true, align: 'right', priority: 2, width: 100,
     render: (v) => (
       <Typography.Text className="tabular" type={v < 70 ? 'warning' : undefined}>{v}%</Typography.Text>
     ),
+  },
+  // Secondary detail — available from the column chooser, hidden by default to
+  // keep the catalogue readable at a glance.
+  {
+    key: 'variantCount', title: 'Variants', dataIndex: 'variantCount', align: 'right', priority: 3, defaultHidden: true,
+    render: (v) => <span className="tabular">{v}</span>,
+  },
+  {
+    key: 'sellerCount', title: 'Sellers', dataIndex: 'sellerCount', align: 'right', priority: 3, defaultHidden: true,
+    render: (v) => <span className="tabular">{v}</span>,
+  },
+  {
+    key: 'buyBoxSellerName', title: 'Buy box', dataIndex: 'buyBoxSellerName', priority: 3, defaultHidden: true,
+    render: (v) => v ?? MUTED_DASH,
   },
   {
     key: 'assured', title: 'Assured', dataIndex: 'assured', priority: 3, defaultHidden: true,

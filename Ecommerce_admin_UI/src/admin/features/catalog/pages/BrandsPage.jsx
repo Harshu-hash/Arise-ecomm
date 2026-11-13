@@ -1,12 +1,12 @@
-import { App, Button, Flex, Form, Input, Modal, Select, Space, Switch, Tag, Typography } from 'antd';
+import { App, Avatar, Button, Flex, Form, Input, Modal, Select, Space, Switch, Tag, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { queryClient } from '@core/api/queryClient';
-import { Can } from '@core/rbac/Can';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
+import ImageFieldPicker from '@ui/components/ImageFieldPicker';
 import PageHeader from '@ui/components/PageHeader';
 import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
@@ -58,15 +58,20 @@ export default function BrandsPage() {
     {
       key: 'name', title: 'Brand', dataIndex: 'name', sorter: true, alwaysVisible: true,
       render: (name, row) => (
-        <div>
-          <Space size={6}>
-            <Typography.Text strong style={{ fontSize: 13 }}>{name}</Typography.Text>
-            {row.gated && <Tag color="gold" style={{ marginInlineEnd: 0 }}>Gated</Tag>}
-          </Space>
+        <Space size={10}>
+          <Avatar shape="square" size={34} src={row.imageUrl || undefined} style={{ flex: 'none', background: 'var(--ant-color-fill-tertiary)', color: 'var(--ant-color-text-secondary)' }}>
+            {name?.[0]}
+          </Avatar>
           <div>
-            <Typography.Text type="secondary" style={{ fontSize: 11 }}>{row.rootCategory}</Typography.Text>
+            <Space size={6}>
+              <Typography.Text strong style={{ fontSize: 13 }}>{name}</Typography.Text>
+              {row.gated && <Tag color="gold" style={{ marginInlineEnd: 0 }}>Gated</Tag>}
+            </Space>
+            <div>
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>{row.rootCategory}</Typography.Text>
+            </div>
           </div>
-        </div>
+        </Space>
       ),
     },
     {
@@ -100,16 +105,16 @@ export default function BrandsPage() {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
         <Space size={4}>
-          <Can perm="catalog.brand.edit">
+          <>
             <Button size="small" type="text" onClick={() => { setEditing(row); setModalOpen(true); }}>
               Edit
             </Button>
-          </Can>
-          <Can perm="catalog.brand.delete">
+          </>
+          <>
             <Button size="small" type="text" danger onClick={() => setDeleting(row)}>
               Delete
             </Button>
-          </Can>
+          </>
         </Space>
       ),
     },
@@ -122,11 +127,11 @@ export default function BrandsPage() {
         breadcrumbs={[{ label: 'Catalog' }, { label: 'Brands' }]}
         subtitle="Gated brands can only be listed by sellers with an approved authorisation."
         actions={
-          <Can perm="catalog.brand.create">
+          <>
             <Button type="primary" onClick={() => { setEditing(null); setModalOpen(true); }}>
               New brand
             </Button>
-          </Can>
+          </>
         }
       />
 
@@ -217,7 +222,12 @@ function BrandFormModal({ open, editing, onCancel, onSubmit, loading }) {
       destroyOnHidden
     >
       <Form form={form} layout="vertical" requiredMark={false}>
-        <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give it a name.' }]}>
+        <ImageFieldPicker
+          name="imageUrl"
+          label="Logo"
+          extra="Shown in brand spotlights and on product pages. PNG/JPG, under 2 MB."
+        />
+        <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give it a name.' }]} style={{ marginTop: 12 }}>
           <Input placeholder="e.g. Allen Solly" />
         </Form.Item>
         <Form.Item name="rootCategory" label="Root category (optional)">

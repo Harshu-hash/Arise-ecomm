@@ -1,6 +1,5 @@
 import { Flex, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { statusOptions } from '@ui/constants/statusMaps';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
 import MoneyText from '@ui/components/MoneyText';
@@ -42,7 +41,6 @@ export default function ProductsListPage() {
 
       <FilterBar
         schema={[
-          { key: 'status', label: 'Status', kind: 'multiSelect', options: statusOptions('listing'), width: 200 },
           { key: 'categoryId', label: 'Category', kind: 'entity', entity: 'category', width: 200 },
           { key: 'brandId', label: 'Brand', kind: 'entity', entity: 'brand', width: 180 },
           { key: 'sellerId', label: 'Seller', kind: 'entity', entity: 'seller', width: 200 },
