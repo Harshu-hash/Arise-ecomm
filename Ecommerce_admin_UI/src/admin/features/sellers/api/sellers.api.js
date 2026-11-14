@@ -15,6 +15,9 @@ export const sellersApi = {
   decideApplication: (id, decision, payload) =>
     api.post(`/sellers/${id}/application/${decision}`, payload ?? {}),
   lifecycle: (id, action, payload) => api.post(`/sellers/${id}/lifecycle/${action}`, payload ?? {}),
+  // Manual KYC check: there is no GSTIN/PAN/bank verification provider, so a reviewer
+  // marks each one verified by hand after checking it against the uploaded documents.
+  verify: (id, field, ok) => api.post(`/sellers/${id}/verify`, { field, ok }),
 };
 
 export const sellerOpsApi = {

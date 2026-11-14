@@ -313,12 +313,6 @@ export const sellerAuthHandlers = [
     if (!String(body?.city ?? '').trim()) fieldErrors.city = 'Enter the city.';
     if (!String(body?.state ?? '').trim()) fieldErrors.state = 'Enter the state.';
     if (!String(body?.address ?? '').trim()) fieldErrors.address = 'Enter the full address.';
-    const lat = Number(body?.lat);
-    const lng = Number(body?.lng);
-    const radiusKm = Number(body?.radiusKm);
-    if (!Number.isFinite(lat) || lat < -90 || lat > 90) fieldErrors.lat = 'Enter a valid latitude.';
-    if (!Number.isFinite(lng) || lng < -180 || lng > 180) fieldErrors.lng = 'Enter a valid longitude.';
-    if (!Number.isFinite(radiusKm) || radiusKm < 1 || radiusKm > 100) fieldErrors.radiusKm = 'Enter a service radius from 1 to 100 km.';
     if (!verifiedRegistrationToken(body?.emailVerificationToken, 'email', email)) fieldErrors.email = 'Verify this email again.';
     if (!verifiedRegistrationToken(body?.phoneVerificationToken, 'phone', phone)) fieldErrors.phone = 'Verify this phone again.';
     for (const [field, label] of [['tradeLicense', 'Trade license'], ['gstCertificate', 'GST certificate'], ['idProof', 'ID proof']]) {
@@ -357,7 +351,6 @@ export const sellerAuthHandlers = [
       phone,
       address: String(body?.address ?? '').trim(),
       locality: String(body?.locality ?? '').trim(),
-      location: { lat, lng, radiusKm },
       rating: null,
       liveListings: 0,
       gmv30dPaise: 0,
@@ -379,7 +372,7 @@ export const sellerAuthHandlers = [
       status: 'UNDER_REVIEW',
       step: 3,
       business: { storeName, legalName: storeName, ownerName },
-      location: { address: body.address, locality: body.locality, pincode: body.pincode, city: body.city, state: body.state, lat, lng, radiusKm },
+      location: { address: body.address, locality: body.locality, pincode: body.pincode, city: body.city, state: body.state },
       submittedAt: mockNowIso(),
       createdAt: mockNowIso(),
       updatedAt: mockNowIso(),

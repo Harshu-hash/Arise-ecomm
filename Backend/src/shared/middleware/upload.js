@@ -23,3 +23,24 @@ export function uploadSingle(req, res, next) {
     return next(error);
   });
 }
+
+// Named-fields variant for forms that carry several documents alongside plain fields
+// (e.g. seller registration: trade license + GST certificate + ID proof, pre-authentication).
+export function uploadFields(fieldNames) {
+  const fieldsParser = multer({
+    storage: multer.diskStorage({
+      destination: (_req, _file, done) => mkdir(TMP_DIR, { recursive: true }).then(() => done(null, TMP_DIR), done),
+      filename: (_req, _file, done) => done(null, randomUUID()),
+    }),
+    limits: { fileSize: env.MAX_UPLOAD_BYTES, files: fieldNames.length, fields: 30, parts: 40 },
+  }).fields(fieldNames.map((name) => ({ name, maxCount: 1 })));
+
+  return (req, res, next) => {
+    fieldsParser(req, res, (error) => {
+      if (!error) return next();
+      if (error.code === 'LIMIT_FILE_SIZE') return next(new ValidationError('A file is too large.'));
+      if (error instanceof multer.MulterError) return next(new ValidationError('Invalid upload request.'));
+      return next(error);
+    });
+  };
+}

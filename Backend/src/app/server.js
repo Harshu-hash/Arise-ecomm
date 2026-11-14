@@ -4,6 +4,7 @@ import { connectDatabase, disconnectDatabase } from '../config/database.js';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { connectRedis, disconnectRedis } from '../config/redis.js';
+import { seedRoles } from '../modules/identity/infrastructure/persistence/role.model.js';
 import { closeMailer } from '../infrastructure/external/notification/mailer.js';
 import { closeMetrics } from '../infrastructure/observability/metrics.js';
 import { closeNotificationQueue } from '../infrastructure/queue/notification.queue.js';
@@ -17,6 +18,7 @@ createSocketServer(server);
 async function start() {
   if (!env.DISABLE_INFRASTRUCTURE) {
     await Promise.all([connectDatabase(), connectRedis()]);
+    await seedRoles();
   }
 
   server.listen(env.PORT, env.HOST, () => {

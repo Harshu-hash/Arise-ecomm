@@ -1,5 +1,8 @@
 import { Button, Result, Space, Tag, Typography } from 'antd';
+import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation } from 'react-router-dom';
+import { IS_MOCK } from '@core/config/env';
+import { sellerAuthApi } from '../../auth/api/auth.api';
 
 function savedApplication() {
   try { return JSON.parse(sessionStorage.getItem('sellerApplication') ?? 'null'); }
@@ -9,7 +12,20 @@ function savedApplication() {
 /** Public application outcome page; applicants do not receive a session yet. */
 export default function OnboardingStatusPage() {
   const location = useLocation();
-  const data = location.state ?? savedApplication() ?? { applicationStatus: 'UNDER_REVIEW' };
+  const snapshot = location.state ?? savedApplication() ?? { applicationStatus: 'UNDER_REVIEW' };
+  const applicationId = snapshot.sellerId ?? snapshot.applicationId;
+
+  // Live mode only: re-checks the real backend so reopening or bookmarking this page shows
+  // the actual outcome instead of the frozen snapshot taken right after submission.
+  const live = useQuery({
+    queryKey: ['seller', 'applicationStatus', applicationId],
+    queryFn: () => sellerAuthApi.applicationStatus(applicationId),
+    enabled: !IS_MOCK && Boolean(applicationId),
+    refetchInterval: 15_000,
+    retry: false,
+  });
+
+  const data = { ...snapshot, ...live.data, applicationId: applicationId ?? snapshot.applicationId };
   const status = String(data.applicationStatus ?? 'UNDER_REVIEW').toUpperCase();
   const rejected = status === 'REJECTED';
   const approved = ['APPROVED', 'ACTIVE'].includes(status);

@@ -22,6 +22,7 @@ export const sellerAuthApi = {
     IS_MOCK ? mockRegistrationPayload(payload) : payload,
     IS_MOCK ? undefined : { headers: { 'Content-Type': 'multipart/form-data' } },
   ).then((r) => r.data),
+  applicationStatus: (id) => api.get(`/auth/application-status/${id}`).then((r) => r.data),
   forgotPassword: (email) => api.post('/auth/forgot-password', { email }).then((r) => r.data),
   resetPassword: (payload) => api.post('/auth/reset-password', payload).then((r) => r.data),
   getInvite: (token) => api.get(`/auth/invite/${token}`).then((r) => r.data),

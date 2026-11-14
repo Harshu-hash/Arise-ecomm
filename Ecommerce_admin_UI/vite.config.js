@@ -17,7 +17,7 @@ function sellerSpaFallback() {
   const rewrite = (req, _res, next) => {
     const accept = req.headers?.accept ?? '';
     const pathname = (req.url ?? '').split('?')[0];
-    if (accept.includes('text/html') && pathname.startsWith('/seller')) {
+    if (accept.includes('text/html') && (pathname === '/seller' || pathname.startsWith('/seller/'))) {
       req.url = '/seller.html';
     }
     next();

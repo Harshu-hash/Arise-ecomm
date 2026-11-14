@@ -41,8 +41,12 @@ export default function AcceptInvitePage() {
     setFormError(null);
     try {
       const result = await sellerAuthApi.acceptInvite({ token, name: values.name, password: values.password });
-      setChallenge(result);
-      setAuthStage(result.stage);
+      // A challenge response carries `stage`; a session response never does.
+      if (!result.stage) finish(result);
+      else {
+        setChallenge(result);
+        setAuthStage(result.stage);
+      }
     } catch (e) {
       setFormError(e instanceof ApiError ? e.message : 'Could not accept this invitation.');
     } finally {
