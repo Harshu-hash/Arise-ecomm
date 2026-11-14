@@ -36,8 +36,12 @@ export default function LoginPage() {
     setFormError(null);
     try {
       const result = await sellerAuthApi.login({ emailOrPhone: values.identifier.trim(), password: values.password });
-      setChallenge(result);
-      setStage(result.stage);
+      // A challenge response carries `stage`; a session response never does.
+      if (!result.stage) finish(result);
+      else {
+        setChallenge(result);
+        setStage(result.stage);
+      }
     } catch (e) {
       if (e instanceof ApiError && e.status === 403 && e.details?.applicationStatus) {
         const application = {

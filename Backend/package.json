@@ -8,11 +8,11 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "node --watch src/app/server.js",
-    "start": "node src/app/server.js",
-    "start:worker": "node src/processes/worker.js",
-    "start:outbox": "node src/processes/outbox.js",
-    "start:scheduler": "node src/processes/scheduler.js",
+    "dev": "node init && node --watch src/app/server.js",
+    "start": "node init && node src/app/server.js",
+    "start:worker": "node init && node src/processes/worker.js",
+    "start:outbox": "node init && node src/processes/outbox.js",
+    "start:scheduler": "node init && node src/processes/scheduler.js",
     "check:boundaries": "node scripts/check-module-boundaries.mjs",
     "test": "node --test",
     "verify": "npm run check:boundaries && npm test"
