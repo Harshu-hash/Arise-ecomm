@@ -10,6 +10,7 @@ import { validate } from '../../../shared/http/validate.js';
 import { authenticate } from '../../../shared/middleware/authenticate.js';
 import { createRateLimiter } from '../../../shared/middleware/rateLimit.js';
 import { uploadSingle } from '../../../shared/middleware/upload.js';
+import { verifyFileToken } from '../../../shared/utils/signedUrl.js';
 
 const bodySchema = z.object({ purpose: z.enum(Object.keys(UPLOAD_PURPOSES)) });
 const privateParams = z.object({
@@ -21,10 +22,10 @@ const privateParams = z.object({
 // One upload surface mounted under /api/{customer,seller,admin}/v1/uploads; the purpose decides who may use it.
 export function createUploadRouter() {
   const router = Router();
-  router.use(authenticate);
 
   router.post(
     '/',
+    authenticate,
     createRateLimiter({ name: 'upload', windowMs: 60_000, limit: 30 }),
     uploadSingle,
     validate({ body: bodySchema }),
@@ -52,16 +53,28 @@ export function createUploadRouter() {
     },
   );
 
-  // Private files (KYC, return proofs): only the owner or an admin gets the bytes; anyone else sees a 404.
+  // Private files (KYC, return proofs): only the owner or an admin gets the bytes; anyone
+  // else sees a 404. Two ways in: the usual Bearer token (XHR/fetch), or a short-lived
+  // signed `?token=` for plain <img src>/<a href> tags that cannot carry a header.
   router.get('/private/:folder/:ownerId/:file', validate({ params: privateParams }), (req, res, next) => {
     const { folder, ownerId, file } = req.params;
-    const isOwner = ownerId === (req.auth.sellerId ?? req.auth.userId);
-    if (!isOwner && req.auth.role !== ROLES.ADMIN) return next(new NotFoundError());
-    return res.sendFile(
-      resolveKey(`private/${folder}/${ownerId}/${file}`),
-      { dotfiles: 'deny', headers: { 'Cache-Control': 'private, no-store' } },
-      (error) => error && next(new NotFoundError()),
-    );
+    const key = `private/${folder}/${ownerId}/${file}`;
+    const serve = () =>
+      res.sendFile(
+        resolveKey(key),
+        { dotfiles: 'deny', headers: { 'Cache-Control': 'private, no-store' } },
+        (error) => error && next(new NotFoundError()),
+      );
+
+    if (req.query.token) {
+      return verifyFileToken(key, req.query.token) ? serve() : next(new NotFoundError());
+    }
+    return authenticate(req, res, (error) => {
+      if (error) return next(new NotFoundError());
+      const isOwner = ownerId === (req.auth.sellerId ?? req.auth.userId);
+      if (!isOwner && req.auth.role !== ROLES.ADMIN) return next(new NotFoundError());
+      return serve();
+    });
   });
 
   return router;

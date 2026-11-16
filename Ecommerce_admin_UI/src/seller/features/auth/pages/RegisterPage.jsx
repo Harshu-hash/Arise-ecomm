@@ -1,5 +1,5 @@
-import { CheckCircleFilled, EnvironmentOutlined, FileProtectOutlined, LockOutlined, MailOutlined, PhoneOutlined, ShopOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
-import { Alert, Button, Col, Form, Input, InputNumber, Row, Space, Steps, Typography, Upload } from 'antd';
+import { BankOutlined, CheckCircleFilled, EnvironmentOutlined, FileProtectOutlined, LockOutlined, MailOutlined, PhoneOutlined, ShopOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
+import { Alert, Button, Col, Form, Input, Row, Space, Steps, Typography, Upload } from 'antd';
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
@@ -8,8 +8,8 @@ import { sellerAuthApi } from '../api/auth.api';
 
 const STEP_FIELDS = [
   ['name', 'shopName', 'email', 'phone', 'password', 'confirmPassword'],
-  ['locality', 'pincode', 'city', 'state', 'address', 'lat', 'lng', 'radiusKm'],
-  ['tradeLicense', 'gstCertificate', 'idProof'],
+  ['locality', 'pincode', 'city', 'state', 'address'],
+  ['gstin', 'pan', 'bankAccountHolder', 'bankAccountNumber', 'bankIfsc', 'tradeLicense', 'gstCertificate', 'idProof'],
 ];
 const uploadValue = (event) => (Array.isArray(event) ? event : event?.fileList);
 
@@ -70,11 +70,13 @@ export default function RegisterPage() {
     try {
       const values = await form.validateFields();
       const payload = new FormData();
-      ['name', 'shopName', 'email', 'phone', 'password', 'locality', 'pincode', 'city', 'state', 'address', 'lat', 'lng', 'radiusKm']
-        .forEach((key) => payload.append(key, String(values[key] ?? '').trim()));
+      [
+        'name', 'shopName', 'email', 'phone', 'password', 'locality', 'pincode', 'city', 'state', 'address',
+        'gstin', 'pan', 'bankAccountHolder', 'bankAccountNumber', 'bankIfsc',
+      ].forEach((key) => payload.append(key, String(values[key] ?? '').trim()));
       payload.append('emailVerificationToken', verification.email.verificationToken);
       payload.append('phoneVerificationToken', verification.phone.verificationToken);
-      STEP_FIELDS[2].forEach((key) => {
+      ['tradeLicense', 'gstCertificate', 'idProof'].forEach((key) => {
         const file = values[key]?.[0];
         payload.append(key, file?.originFileObj ?? file);
       });
@@ -101,10 +103,10 @@ export default function RegisterPage() {
     <div>
       <Typography.Title level={3} style={{ margin: 0 }}>Apply to sell on Arise</Typography.Title>
       <Typography.Paragraph type="secondary" style={{ marginTop: 4 }}>Complete all three steps. Your login unlocks after admin approval.</Typography.Paragraph>
-      <Steps size="small" current={step} style={{ margin: '20px 0 24px' }} items={[{ title: 'Account' }, { title: 'Shop location' }, { title: 'Documents' }]} />
+      <Steps size="small" current={step} style={{ margin: '20px 0 24px' }} items={[{ title: 'Account' }, { title: 'Shop location' }, { title: 'Business & documents' }]} />
       {formError && <Alert type="error" showIcon message={formError} closable onClose={() => setFormError(null)} style={{ marginBottom: 16 }} />}
 
-      <Form form={form} layout="vertical" requiredMark={false} disabled={loading} onValuesChange={onValuesChange} initialValues={{ radiusKm: 5 }}>
+      <Form form={form} layout="vertical" requiredMark={false} disabled={loading} onValuesChange={onValuesChange}>
         <div hidden={step !== 0}>
           <Row gutter={12}>
             <Col xs={24} md={12}><Form.Item name="name" label="Owner name" rules={[{ required: true, message: 'Enter the owner name.' }, { pattern: /^[A-Za-z ]+$/, message: 'Use letters and spaces only.' }, { max: 50 }]}><Input autoFocus prefix={<UserOutlined />} placeholder="Full name" /></Form.Item></Col>
@@ -119,21 +121,47 @@ export default function RegisterPage() {
         </div>
 
         <div hidden={step !== 1}>
-          <Alert type="info" showIcon icon={<EnvironmentOutlined />} message="Pin your fulfilment location" description="Enter the coordinates and service radius for your shop. These map directly to the backend location record." style={{ marginBottom: 16 }} />
+          <Alert type="info" showIcon icon={<EnvironmentOutlined />} message="Shop location" description="Enter your shop's address. This maps directly to the backend location record." style={{ marginBottom: 16 }} />
           <Row gutter={12}>
             <Col xs={24} md={12}><Form.Item name="locality" label="Locality / area" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="pincode" label="Pincode" rules={[{ required: true }, { pattern: /^\d{6}$/, message: 'Enter a 6-digit pincode.' }]}><Input maxLength={6} inputMode="numeric" /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="city" label="City" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col xs={24} md={12}><Form.Item name="state" label="State" rules={[{ required: true }]}><Input /></Form.Item></Col>
             <Col span={24}><Form.Item name="address" label="Full address" rules={[{ required: true }]}><Input.TextArea rows={2} /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item name="lat" label="Latitude" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={-90} max={90} precision={6} /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item name="lng" label="Longitude" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={-180} max={180} precision={6} /></Form.Item></Col>
-            <Col xs={24} md={8}><Form.Item name="radiusKm" label="Service radius (km)" rules={[{ required: true }]}><InputNumber style={{ width: '100%' }} min={1} max={100} /></Form.Item></Col>
           </Row>
         </div>
 
         <div hidden={step !== 2}>
-          <Alert type="info" showIcon icon={<FileProtectOutlined />} message="Upload all mandatory documents" description="PDF, JPG or PNG; one file per document. The backend receives multipart uploads." style={{ marginBottom: 16 }} />
+          <Alert type="info" showIcon icon={<BankOutlined />} message="Business & bank details" description="Used to verify GSTIN, PAN and your payout account before approval." style={{ marginBottom: 16 }} />
+          <Row gutter={12}>
+            <Col xs={24} md={12}>
+              <Form.Item name="gstin" label="GSTIN" normalize={(v) => v?.toUpperCase()} rules={[{ required: true }, { pattern: /^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, message: 'Enter a valid 15-character GSTIN.' }]}>
+                <Input maxLength={15} placeholder="22AAAAA0000A1Z5" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="pan" label="PAN" normalize={(v) => v?.toUpperCase()} rules={[{ required: true }, { pattern: /^[A-Z]{5}\d{4}[A-Z]$/, message: 'Enter a valid 10-character PAN.' }]}>
+                <Input maxLength={10} placeholder="AAAAA0000A" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="bankAccountHolder" label="Bank account holder name" rules={[{ required: true, message: 'Enter the account holder name.' }]}>
+                <Input />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="bankAccountNumber" label="Bank account number" rules={[{ required: true }, { pattern: /^\d{9,18}$/, message: 'Enter a valid account number.' }]}>
+                <Input inputMode="numeric" />
+              </Form.Item>
+            </Col>
+            <Col xs={24} md={12}>
+              <Form.Item name="bankIfsc" label="IFSC code" normalize={(v) => v?.toUpperCase()} rules={[{ required: true }, { pattern: /^[A-Z]{4}0[A-Z\d]{6}$/, message: 'Enter a valid 11-character IFSC code.' }]}>
+                <Input maxLength={11} placeholder="HDFC0001234" />
+              </Form.Item>
+            </Col>
+          </Row>
+
+          <Alert type="info" showIcon icon={<FileProtectOutlined />} message="Upload all mandatory documents" description="PDF, JPG or PNG; one file per document. The backend receives multipart uploads." style={{ marginTop: 8, marginBottom: 16 }} />
           <Row gutter={12}><DocumentField name="tradeLicense" label="Trade license" /><DocumentField name="gstCertificate" label="GST certificate" /><DocumentField name="idProof" label="Owner ID proof" /></Row>
         </div>
 
