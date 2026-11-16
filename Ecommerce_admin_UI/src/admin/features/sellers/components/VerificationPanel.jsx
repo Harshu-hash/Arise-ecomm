@@ -1,17 +1,9 @@
-import { CheckCircleFilled, CloseCircleFilled, WarningFilled } from '@ant-design/icons';
-import { Alert, Card, Descriptions, Flex, Space, Tag, Typography } from 'antd';
-import { formatDate } from '@core/utils/date';
+import { CheckCircleFilled, CloseCircleFilled } from '@ant-design/icons';
+import { App, Button, Card, Descriptions, Flex, Popconfirm, Space, Tag, Typography } from 'antd';
+import { useMutation } from '@tanstack/react-query';
+import { queryClient } from '@core/api/queryClient';
 import MaskedValue from '@ui/components/MaskedValue';
-
-function MatchTag({ pct }) {
-  if (pct === null || pct === undefined) return null;
-  const tone = pct >= 95 ? 'green' : pct >= 80 ? 'gold' : 'red';
-  return (
-    <Tag color={tone} style={{ marginInlineEnd: 0 }}>
-      {pct}% name match
-    </Tag>
-  );
-}
+import { sellerKeys, sellersApi } from '../api/sellers.api';
 
 function ResultIcon({ ok }) {
   return ok ? (
@@ -21,65 +13,84 @@ function ResultIcon({ ok }) {
   );
 }
 
+/** The verify/unverify control for one field, backed by `POST /sellers/:id/verify`. */
+function VerifyButton({ sellerId, field, ok }) {
+  const { message } = App.useApp();
+  const mutation = useMutation({
+    mutationFn: (nextOk) => sellersApi.verify(sellerId, field, nextOk),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: sellerKeys.detail(sellerId) });
+      queryClient.invalidateQueries({ queryKey: sellerKeys.all });
+    },
+    onError: (e) => message.error(e.message),
+  });
+
+  if (ok) {
+    return (
+      <Popconfirm title="Unmark as verified?" onConfirm={() => mutation.mutate(false)}>
+        <Button size="small" loading={mutation.isPending}>
+          Unmark verified
+        </Button>
+      </Popconfirm>
+    );
+  }
+  return (
+    <Button size="small" type="primary" loading={mutation.isPending} onClick={() => mutation.mutate(true)}>
+      Mark verified
+    </Button>
+  );
+}
+
 /**
- * What the GSTIN, PAN and penny-drop providers came back with.
+ * Manual KYC check.
  *
- * A name match below 95% is the usual sign of a seller using someone else's
- * registration, so the percentage is shown rather than a bare tick.
+ * Arise has no GSTIN/PAN/bank verification integration, so a reviewer checks
+ * each value against the uploaded documents (and, for the bank account, that
+ * the holder name matches the business) and marks it verified by hand. This
+ * is a judgement call recorded by a person, not an automated result.
  */
 export default function VerificationPanel({ seller, bank }) {
-  const gst = seller.gstinVerification ?? {};
-  const pan = seller.panVerification ?? {};
-  const gstOk = gst.status === 'ACTIVE';
-  const panOk = pan.status === 'VALID';
-  const bankOk = bank?.pennyDropStatus === 'VERIFIED';
-
   return (
     <Flex vertical gap={12}>
-      {!gstOk && (
-        <Alert
-          type="error"
-          showIcon
-          message={`GSTIN is ${String(gst.status ?? 'unverified').toLowerCase()}`}
-          description="An application cannot be approved while the GSTIN is not active."
-        />
-      )}
-
-      <Card size="small" title={<Space><ResultIcon ok={gstOk} />GSTIN</Space>}>
+      <Card
+        size="small"
+        title={<Space><ResultIcon ok={seller.gstinOk} />GSTIN</Space>}
+        extra={<VerifyButton sellerId={seller.id} field="gstin" ok={seller.gstinOk} />}
+      >
         <Descriptions column={1} size="small">
           <Descriptions.Item label="GSTIN">
-            <Typography.Text className="mono">{seller.gstin}</Typography.Text>
+            <Typography.Text className="mono">{seller.gstin ?? '—'}</Typography.Text>
           </Descriptions.Item>
           <Descriptions.Item label="Status">
-            <Tag color={gstOk ? 'green' : 'red'} style={{ marginInlineEnd: 0 }}>{gst.status}</Tag>
+            <Tag color={seller.gstinOk ? 'green' : 'default'} style={{ marginInlineEnd: 0 }}>
+              {seller.gstinOk ? 'Verified' : 'Not verified'}
+            </Tag>
           </Descriptions.Item>
-          <Descriptions.Item label="Legal name">
-            <Space size={8} wrap>
-              {gst.legalName}
-              <MatchTag pct={gst.nameMatchPct} />
-            </Space>
-          </Descriptions.Item>
-          <Descriptions.Item label="Registered">{formatDate(gst.registeredOn)}</Descriptions.Item>
-          <Descriptions.Item label="Principal place">{gst.principalPlace}</Descriptions.Item>
         </Descriptions>
       </Card>
 
-      <Card size="small" title={<Space><ResultIcon ok={panOk} />PAN</Space>}>
+      <Card
+        size="small"
+        title={<Space><ResultIcon ok={seller.panOk} />PAN</Space>}
+        extra={<VerifyButton sellerId={seller.id} field="pan" ok={seller.panOk} />}
+      >
         <Descriptions column={1} size="small">
           <Descriptions.Item label="PAN">
             <MaskedValue value={seller.pan} kind="pan" entityType="seller" entityId={seller.id} />
           </Descriptions.Item>
           <Descriptions.Item label="Status">
-            <Tag color={panOk ? 'green' : 'red'} style={{ marginInlineEnd: 0 }}>{pan.status}</Tag>
-          </Descriptions.Item>
-          <Descriptions.Item label="Name match"><MatchTag pct={pan.nameMatchPct} /></Descriptions.Item>
-          <Descriptions.Item label="Business type">
-            {String(seller.businessType ?? '').replace(/_/g, ' ')}
+            <Tag color={seller.panOk ? 'green' : 'default'} style={{ marginInlineEnd: 0 }}>
+              {seller.panOk ? 'Verified' : 'Not verified'}
+            </Tag>
           </Descriptions.Item>
         </Descriptions>
       </Card>
 
-      <Card size="small" title={<Space><ResultIcon ok={Boolean(bankOk)} />Bank account</Space>}>
+      <Card
+        size="small"
+        title={<Space><ResultIcon ok={Boolean(bank) && seller.bankOk} />Bank account</Space>}
+        extra={bank && <VerifyButton sellerId={seller.id} field="bank" ok={seller.bankOk} />}
+      >
         {bank ? (
           <Descriptions column={1} size="small">
             <Descriptions.Item label="Holder">{bank.accountHolder}</Descriptions.Item>
@@ -95,29 +106,14 @@ export default function VerificationPanel({ seller, bank }) {
             <Descriptions.Item label="IFSC">
               <Typography.Text className="mono">{bank.ifsc}</Typography.Text>
             </Descriptions.Item>
-            <Descriptions.Item label="Bank">{bank.bankName} · {bank.branch}</Descriptions.Item>
-            <Descriptions.Item label="Penny drop">
-              <Space size={8} wrap>
-                <Tag color={bankOk ? 'green' : bank.pennyDropStatus === 'NAME_MISMATCH' ? 'red' : 'gold'} style={{ marginInlineEnd: 0 }}>
-                  {bank.pennyDropStatus.replace(/_/g, ' ')}
-                </Tag>
-                <MatchTag pct={bank.nameMatchPct} />
-              </Space>
+            <Descriptions.Item label="Status">
+              <Tag color={seller.bankOk ? 'green' : 'default'} style={{ marginInlineEnd: 0 }}>
+                {seller.bankOk ? 'Verified' : 'Not verified'}
+              </Tag>
             </Descriptions.Item>
           </Descriptions>
         ) : (
           <Typography.Text type="secondary">No bank account on file yet.</Typography.Text>
-        )}
-
-        {bank && bank.nameMatchPct < 95 && (
-          <Alert
-            type="warning"
-            showIcon
-            icon={<WarningFilled />}
-            style={{ marginTop: 10 }}
-            message="The account name does not closely match the registered business name"
-            description="Confirm the account belongs to this business before approving. Payouts to a mismatched account are hard to recover."
-          />
         )}
       </Card>
     </Flex>
