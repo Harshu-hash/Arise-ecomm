@@ -55,6 +55,10 @@ const schema = z.object({
   EMAIL_PASS: optionalString,
   EMAIL_FROM: z.string().default('Arise <no-reply@arise.local>'),
 
+  // Provider-neutral SMS gateway: POST { to, message } with an optional bearer token.
+  SMS_OTP_URL: z.url().optional(),
+  SMS_OTP_TOKEN: optionalString,
+
   // Razorpay
   RAZORPAY_KEY_ID: optionalString,
   RAZORPAY_KEY_SECRET: optionalString,
@@ -98,6 +102,7 @@ if (isProduction || raw.NODE_ENV === 'staging') {
     'JWT_REFRESH_SECRET',
     'DATA_ENCRYPTION_KEY',
     'EMAIL_HOST',
+    'SMS_OTP_URL',
     'RAZORPAY_KEY_ID',
     'RAZORPAY_KEY_SECRET',
     'RAZORPAY_WEBHOOK_SECRET',

@@ -3,9 +3,8 @@
  * router, so navigation can never fall back to a stub.
  *
  * Simplified menu: a lean, Flipkart/Amazon-style seller panel. Own-fleet
- * logistics, FBA inbound/warehouses, ads, promotions, performance claims,
- * analytics suites, team roles/API/webhooks and the heavy finance surfaces
- * have been removed. Third-party delivery integration will extend Orders later.
+ * logistics, FBA inbound/warehouses, performance claims, team roles/API/webhooks
+ * and the heavy finance surfaces have been removed.
  */
 
 export const NAV_GROUPS = [
@@ -19,7 +18,10 @@ export const NAV_GROUPS = [
     key: 'analytics',
     section: 'Overview',
     icon: 'barChart',
-    items: [{ label: 'Analytics', path: '/analytics' }],
+    items: [
+      { label: 'Analytics', path: '/analytics' },
+      { label: 'Sales Report', path: '/reports/sales' },
+    ],
   },
   {
     key: 'products',
@@ -29,6 +31,7 @@ export const NAV_GROUPS = [
     items: [
       { label: 'My Listings', path: '/listings' },
       { label: 'Add Product', path: '/listings/new' },
+      { label: 'Stock Management', path: '/stock' },
     ],
   },
   {
@@ -36,7 +39,10 @@ export const NAV_GROUPS = [
     section: 'Catalog & Growth',
     label: 'Campaigns',
     icon: 'thunderbolt',
-    items: [{ label: 'Campaigns', path: '/campaigns' }],
+    items: [
+      { label: 'Campaigns', path: '/campaigns' },
+      { label: 'Shop Banner Ads', path: '/banner-ads' },
+    ],
   },
   {
     key: 'orders',
@@ -59,6 +65,16 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    key: 'support',
+    section: 'Orders & Support',
+    label: 'Support',
+    icon: 'customerService',
+    items: [
+      { label: 'My Support Tickets', path: '/support' },
+      { label: 'Customer Complaints', path: '/support/customer-complaints' },
+    ],
+  },
+  {
     key: 'account',
     section: 'System',
     label: 'Account',
@@ -66,7 +82,6 @@ export const NAV_GROUPS = [
     items: [
       { label: 'Business Profile', path: '/settings/profile' },
       { label: 'Bank Account', path: '/settings/bank' },
-      { label: 'Support', path: '/support' },
     ],
   },
 ];

@@ -28,6 +28,18 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `POST` | `/api/customer/v1/auth/start` | none | Starts a customer login, signup, or password-reset OTP challenge for an email or Indian mobile number. |
+| `POST` | `/api/customer/v1/auth/resend-otp` | none | Replaces a live customer OTP challenge after the resend delay. |
+| `POST` | `/api/customer/v1/auth/verify-otp` | none | Verifies a login/signup OTP, creates the customer when needed, and returns access and rotating refresh tokens. |
+| `POST` | `/api/customer/v1/auth/signup` | none | Completes a signup OTP challenge; compatibility alias for clients that separate signup verification. |
+| `POST` | `/api/customer/v1/auth/password/verify-otp` | none | Exchanges a verified password-reset OTP for a short-lived reset token. |
+| `POST` | `/api/customer/v1/auth/password/reset` | reset token | Changes the customer password and revokes existing sessions. |
+| `POST` | `/api/customer/v1/auth/refresh` | refresh token in JSON or cookie | Rotates a customer refresh token and returns the refreshed mobile session. |
+| `GET` | `/api/customer/v1/auth/session` | Bearer JWT | Returns the current customer session profile. |
+| `POST` | `/api/customer/v1/auth/logout` | refresh token in JSON or cookie | Revokes one customer session. |
+| `POST` | `/api/customer/v1/auth/logout-all` | Bearer JWT | Revokes every session belonging to the customer. |
+| `GET` | `/api/customer/v1/app-config` | none | Supplies the minimum app version, maintenance state, store links, and bootstrap feature flags required before customer navigation starts. |
+| `GET` | `/api/customer/v1/home` | none | Returns the customer home feed; currently an empty valid feed so real-backend authentication can run before catalog modules land. |
 
 ## user
 

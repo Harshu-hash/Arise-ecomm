@@ -16,6 +16,7 @@ export const authChallengeSchema = z.object({
   resendAvailableAt: z.string().datetime(),
   purpose: z.enum(['LOGIN', 'SIGNUP', 'PASSWORD_RESET']),
   isNewCustomer: z.boolean().default(false),
+  devHint: z.object({ code: z.string().regex(/^\d{4}$/) }).optional(),
 });
 
 export const sessionSchema = z.object({

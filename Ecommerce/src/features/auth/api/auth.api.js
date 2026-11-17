@@ -77,7 +77,11 @@ export const authApi = baseApi.injectEndpoints({
       providesTags: ['Session'],
     }),
     logout: builder.mutation({
-      query: () => ({ url: AUTH_ENDPOINTS.logout, method: 'POST' }),
+      query: refreshToken => ({
+        url: AUTH_ENDPOINTS.logout,
+        method: 'POST',
+        data: refreshToken ? { refreshToken } : {},
+      }),
       onQueryStarted: clearLocalSession,
     }),
     logoutAll: builder.mutation({

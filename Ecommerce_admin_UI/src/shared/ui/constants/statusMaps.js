@@ -309,6 +309,14 @@ const RAW = {
     PAUSED: ['Paused', T.waiting],
     EXPIRED: ['Expired', T.idle],
   },
+  bannerAd: {
+    PENDING_REVIEW: ['Awaiting review', T.waiting],
+    APPROVED: ['Approved', T.good],
+    SCHEDULED: ['Scheduled', T.waiting],
+    LIVE: ['Live', T.good],
+    COMPLETED: ['Completed', T.idle],
+    REJECTED: ['Rejected & refunded', T.bad],
+  },
   staticPage: {
     DRAFT: ['Draft', T.idle],
     PUBLISHED: ['Published', T.good],

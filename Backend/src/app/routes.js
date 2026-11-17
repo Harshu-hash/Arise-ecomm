@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { env } from '../config/env.js';
 import { createAdminUsersRouter } from '../modules/identity/presentation/adminUsers.routes.js';
 import { createAuthRouter } from '../modules/identity/presentation/auth.routes.js';
+import { createCustomerAuthRouter } from '../modules/identity/presentation/customerAuth.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
@@ -37,6 +38,30 @@ export function createRoutes() {
     req.url = '/health';
     system(req, res, next);
   });
+  root.get('/api/customer/v1/app-config', (_req, res) =>
+    res.json({
+      data: {
+        minimumSupportedVersion: '1.0.0',
+        latestVersion: '1.0.0',
+        maintenance: { enabled: false, message: null },
+        storeUrls: {
+          android: 'market://details?id=com.ariseecommerce',
+          ios: 'https://apps.apple.com/app/arise-marketplace/id0000000000',
+        },
+        featureFlags: { wallet: true, referrals: true, productQuestions: true },
+      },
+    }),
+  );
+  root.get('/api/customer/v1/home', (_req, res) =>
+    res.json({
+      data: {
+        version: '1',
+        generatedAt: new Date().toISOString(),
+        header: { searchPlaceholders: ['Search products'], brandTabs: [], categoryTabs: [] },
+        sections: [],
+      },
+    }),
+  );
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();
@@ -46,17 +71,21 @@ export function createRoutes() {
   root.use('/api/admin/v1', ipAllowlist()); // network restriction first, so it also guards admin uploads
   for (const audience of ['customer', 'seller', 'admin']) {
     const cookiePath = `/api/${audience}/v1/auth`;
-    root.use(cookiePath, createAuthRouter({ allowedRoles: AUDIENCE_ROLES[audience], cookiePath }));
-    root.use(
-      cookiePath,
-      createPasswordRouter({
-        allowedRoles: AUDIENCE_ROLES[audience],
-        // Placeholder until each frontend's real origin is configured per audience.
-        resetUrlBase: `${env.PUBLIC_ORIGIN}/${audience}/reset-password`,
-      }),
-    );
-    if (audience === 'seller') root.use(cookiePath, createRegistrationRouter());
-    if (INVITE_AUDIENCES.includes(audience)) root.use(cookiePath, createInviteRouter({ cookiePath }));
+    if (audience === 'customer') {
+      root.use(cookiePath, createCustomerAuthRouter({ cookiePath }));
+    } else {
+      root.use(cookiePath, createAuthRouter({ allowedRoles: AUDIENCE_ROLES[audience], cookiePath }));
+      root.use(
+        cookiePath,
+        createPasswordRouter({
+          allowedRoles: AUDIENCE_ROLES[audience],
+          // Placeholder until each frontend's real origin is configured per audience.
+          resetUrlBase: `${env.PUBLIC_ORIGIN}/${audience}/reset-password`,
+        }),
+      );
+      if (audience === 'seller') root.use(cookiePath, createRegistrationRouter());
+      if (INVITE_AUDIENCES.includes(audience)) root.use(cookiePath, createInviteRouter({ cookiePath }));
+    }
     root.use(`/api/${audience}/v1/me`, createMeRouter());
     root.use(`/api/${audience}/v1/uploads`, createUploadRouter());
   }

@@ -68,6 +68,7 @@ const OtpVerificationScreen = ({ navigation, route }) => {
   const [digits, setDigits] = useState(Array(OTP_LENGTH).fill(''));
   const [challengeId, setChallengeId] = useState(params.challengeId);
   const [destination, setDestination] = useState(destinationMasked);
+  const [devCode, setDevCode] = useState(params.devCode);
   const [secondsLeft, setSecondsLeft] = useState(() => secondsUntil(params.resendAvailableAt));
   const inputRefs = useRef([]);
   const [verifyOtp, { isLoading, error: verifyError }] = useVerifyOtpMutation();
@@ -148,6 +149,7 @@ const OtpVerificationScreen = ({ navigation, route }) => {
       const challenge = await resendOtp({ challengeId }).unwrap();
       setChallengeId(challenge.challengeId);
       setDestination(challenge.destinationMasked);
+      setDevCode(challenge.devHint?.code);
       haptics.selection();
       setSecondsLeft(secondsUntil(challenge.resendAvailableAt));
       setDigits(Array(OTP_LENGTH).fill(''));
@@ -176,6 +178,7 @@ const OtpVerificationScreen = ({ navigation, route }) => {
           Enter the {OTP_LENGTH}-digit code sent to{' '}
           <Text style={styles.identifier}>{destination || identifier || 'your number'}</Text>
         </Text>
+        {devCode ? <Text style={styles.devCode}>Development code: {devCode}</Text> : null}
 
         <View style={styles.otpRow}>
           {digits.map((digit, index) => (
@@ -259,6 +262,12 @@ const styles = StyleSheet.create({
   identifier: {
     fontWeight: '700',
     color: COLORS.textPrimary,
+  },
+  devCode: {
+    color: COLORS.warning,
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: SPACING.s,
   },
   otpRow: {
     flexDirection: 'row',

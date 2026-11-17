@@ -18,6 +18,7 @@ const OnboardingStatusPage = lazy(
 );
 const DashboardPage = lazy(() => import('@seller/features/dashboard/pages/DashboardPage'));
 const AnalyticsPage = lazy(() => import('@seller/features/analytics/pages/AnalyticsPage'));
+const SalesReportPage = lazy(() => import('@seller/features/reports/pages/SalesReportPage'));
 const MyAccountPage = lazy(() => import('@seller/features/me/pages/MyAccountPage'));
 
 /* Listings (incl. the Add Product flow) */
@@ -27,10 +28,12 @@ const NewProductPage = lazy(() => import('@seller/features/listings/pages/NewPro
 const CatalogSearchPage = lazy(() => import('@seller/features/listings/pages/CatalogSearchPage'));
 const CatalogProductPage = lazy(() => import('@seller/features/listings/pages/CatalogProductPage'));
 const ListingDetailPage = lazy(() => import('@seller/features/listings/pages/ListingDetailPage'));
+const StockManagementPage = lazy(() => import('@seller/features/inventory/pages/StockManagementPage'));
 
 /* Campaigns (promotions the seller joins) */
 const CampaignsPage = lazy(() => import('@seller/features/campaigns/pages/CampaignsPage'));
 const CampaignDetailPage = lazy(() => import('@seller/features/campaigns/pages/CampaignDetailPage'));
+const BannerAdsPage = lazy(() => import('@seller/features/bannerAds/pages/BannerAdsPage'));
 
 /* Orders & returns */
 const OrdersPage = lazy(() => import('@seller/features/orders/pages/OrdersPage'));
@@ -45,6 +48,8 @@ const SettlementsPage = lazy(() => import('@seller/features/finance/pages/Settle
 /* Support & account */
 const SupportPage = lazy(() => import('@seller/features/support/pages/SupportPage'));
 const TicketDetailPage = lazy(() => import('@seller/features/support/pages/TicketDetailPage'));
+const CustomerComplaintsPage = lazy(() => import('@seller/features/support/pages/CustomerComplaintsPage'));
+const CustomerComplaintDetailPage = lazy(() => import('@seller/features/support/pages/CustomerComplaintDetailPage'));
 const ProfilePage = lazy(() => import('@seller/features/settings/pages/ProfilePage'));
 const BankPickupPage = lazy(() => import('@seller/features/settings/pages/BankPickupPage'));
 const NotFoundPage = lazy(() => import('@seller/features/system/pages/NotFoundPage'));
@@ -53,6 +58,7 @@ const NotFoundPage = lazy(() => import('@seller/features/system/pages/NotFoundPa
 const ROUTES = [
   { path: '/', element: <DashboardPage /> },
   { path: '/analytics', element: <AnalyticsPage /> },
+  { path: '/reports/sales', element: <SalesReportPage /> },
   { path: '/account', element: <MyAccountPage /> },
 
   // Products (My Listings + Add Product flow)
@@ -62,10 +68,12 @@ const ROUTES = [
   { path: '/catalog/search', element: <CatalogSearchPage /> },
   { path: '/catalog/products/:id', element: <CatalogProductPage /> },
   { path: '/listings/:id', element: <ListingDetailPage /> },
+  { path: '/stock', element: <StockManagementPage /> },
 
   // Campaigns
   { path: '/campaigns', element: <CampaignsPage /> },
   { path: '/campaigns/:id', element: <CampaignDetailPage /> },
+  { path: '/banner-ads', element: <BannerAdsPage /> },
 
   // Orders & returns
   { path: '/orders', element: <OrdersPage /> },
@@ -79,6 +87,8 @@ const ROUTES = [
 
   // Support & account
   { path: '/support', element: <SupportPage /> },
+  { path: '/support/customer-complaints', element: <CustomerComplaintsPage /> },
+  { path: '/support/customer-complaints/:id', element: <CustomerComplaintDetailPage /> },
   { path: '/support/:id', element: <TicketDetailPage /> },
   { path: '/settings/profile', element: <ProfilePage /> },
   { path: '/settings/bank', element: <BankPickupPage /> },

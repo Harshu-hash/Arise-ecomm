@@ -84,6 +84,7 @@ import {
   seedAdvertiserWallets,
   seedInvalidClicks,
 } from './ads';
+import { seedBannerAdBookings, seedBannerAdPlacements } from './bannerAds';
 import {
   seedAppConfig,
   seedFeatureFlags,
@@ -247,6 +248,8 @@ export function seedAll() {
   seedAdCampaigns();
   seedInvalidClicks();
   seedAdInvoices();
+  seedBannerAdPlacements();
+  seedBannerAdBookings();
 
   // Reports, settings & integrations. Feature flags come after segments,
   // since one seeded flag targets a real segment id.

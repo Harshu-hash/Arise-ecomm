@@ -1290,6 +1290,50 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /banner-ads:
+    get:
+      operationId: getBannerAds
+      x-permission: banner-ads.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+    post:
+      operationId: postBannerAds
+      x-permission: banner-ads.manage
+      x-idempotent: true
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '201': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '422': { $ref: '#/components/responses/Error' }
+  /banner-ads/placements:
+    get:
+      operationId: getBannerAdPlacements
+      x-permission: banner-ads.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /banner-ads/destinations:
+    get:
+      operationId: getBannerAdDestinations
+      x-permission: banner-ads.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+  /auth/application-status/{id}:
+    get:
+      operationId: getAuthApplicationStatus
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '404': { $ref: '#/components/responses/Error' }
   /auth/invite/{token}:
     get:
       operationId: getAuthInviteToken
@@ -1795,6 +1839,60 @@ paths:
     get:
       operationId: getSettingsUsers
       x-permission: settings.user.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/customer-complaints:
+    get:
+      operationId: getSupportCustomerComplaints
+      x-permission: support.ticket.view
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/customer-complaints/{id}:
+    get:
+      operationId: getSupportCustomerComplaint
+      x-permission: support.ticket.view
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/customer-complaints/{id}/messages:
+    post:
+      operationId: postSupportCustomerComplaintMessage
+      x-permission: support.ticket.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
+      responses:
+        '200': { $ref: '#/components/responses/Data' }
+        '400': { $ref: '#/components/responses/Error' }
+        '401': { $ref: '#/components/responses/Error' }
+        '403': { $ref: '#/components/responses/Error' }
+        '404': { $ref: '#/components/responses/Error' }
+        '409': { $ref: '#/components/responses/Error' }
+  /support/customer-complaints/{id}/resolve:
+    post:
+      operationId: postSupportCustomerComplaintResolve
+      x-permission: support.ticket.manage
+      x-idempotent: true
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      requestBody: { $ref: '#/components/requestBodies/Command' }
       responses:
         '200': { $ref: '#/components/responses/Data' }
         '400': { $ref: '#/components/responses/Error' }

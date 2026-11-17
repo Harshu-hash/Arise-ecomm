@@ -11,7 +11,7 @@ const backupCodeSchema = new mongoose.Schema(
 const userSchema = new mongoose.Schema(
   {
     role: { type: String, enum: Object.values(ROLES), required: true, immutable: true },
-    email: { type: String, required: true, lowercase: true, trim: true },
+    email: { type: String, lowercase: true, trim: true },
     // No default: must stay genuinely absent (not null) when unset, or the sparse unique
     // index below would collide on every account without a phone (e.g. admin invites).
     phone: { type: String },
@@ -42,7 +42,10 @@ const userSchema = new mongoose.Schema(
   { collection: 'users', timestamps: true, versionKey: false },
 );
 
-userSchema.index({ email: 1, role: 1 }, { unique: true });
+userSchema.index(
+  { email: 1, role: 1 },
+  { unique: true, partialFilterExpression: { email: { $type: 'string' } }, name: 'email_role_unique_when_present' },
+);
 userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 userSchema.index({ sellerId: 1 });
 

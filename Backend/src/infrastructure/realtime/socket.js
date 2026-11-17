@@ -61,6 +61,7 @@ export function createSocketServer(httpServer) {
   // Mandatory with multiple API replicas so emits reach sockets on every instance.
   if (redis) {
     subscriber = redis.duplicate();
+    subscriber.on('error', (error) => logger.error({ err: error }, 'Redis subscriber error'));
     io.adapter(createAdapter(redis, subscriber));
   }
 

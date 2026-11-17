@@ -46,8 +46,24 @@ export function analyticsView(sellerId, view, params) {
   const series = dates.map((date) => { const day = events.filter((row) => row.date === date); return { date, impressions: sum(day, 'impressions'), productViews: sum(day, 'productViews'), addsToCart: sum(day, 'addsToCart'), checkouts: sum(day, 'checkouts') }; });
   if (view === 'overview') {
     const orderRows = [...orders].map((orderId) => findById('orders', orderId)).filter(Boolean);
+    const salesSeries = Object.values(items.filter((row) => row.status !== 'CANCELLED').reduce((acc, item) => {
+      const date = findById('orders', item.orderId)?.placedAt?.slice(0, 10);
+      if (!date) return acc;
+      acc[date] ??= { date, gmvPaise: 0, units: 0, orderIds: new Set() };
+      acc[date].gmvPaise += item.linePaise ?? 0;
+      acc[date].units += item.qty ?? 1;
+      acc[date].orderIds.add(item.orderId);
+      return acc;
+    }, {})).map(({ orderIds, ...row }) => ({ ...row, orders: orderIds.size })).sort((a, b) => a.date.localeCompare(b.date));
+    const categorySales = Object.values(items.filter((row) => row.status !== 'CANCELLED').reduce((acc, item) => {
+      const product = findById('products', item.productId);
+      const label = findById('categories', product?.categoryId)?.name ?? 'Other';
+      acc[label] ??= { label, value: 0 };
+      acc[label].value += item.linePaise ?? 0;
+      return acc;
+    }, {})).sort((a, b) => b.value - a.value);
     const breakdown = (keyFn) => Object.entries(events.reduce((acc, row) => ({ ...acc, [keyFn(row)]: (acc[keyFn(row)] ?? 0) + row.productViews }), {})).map(([label, value]) => ({ label, value }));
-    return { ...base(view, period), funnel, series, kpis: { gmvPaise, orders: orders.size, units: items.reduce((total, row) => total + (row.qty ?? 1), 0), aspPaise: items.length ? Math.round(gmvPaise / items.length) : 0, discountPaise: orderRows.reduce((total, row) => total + (row.priceDetails?.discountPaise ?? 0), 0), cancellations: items.filter((row) => row.status === 'CANCELLED').length, returns: filter('returns', (row) => itemIds(items).has(row.orderItemId)).length, netEarningsPaise: sum(settlements, 'netPaise') }, breakdowns: { channel: breakdown((row) => row.source), category: breakdown((row) => findById('categories', findById('products', row.productId)?.categoryId)?.name ?? 'Other'), geography: Object.entries(orderRows.reduce((acc, row) => ({ ...acc, [row.address?.state ?? 'Unknown']: (acc[row.address?.state ?? 'Unknown'] ?? 0) + 1 }), {})).map(([label, value]) => ({ label, value })) }, comparison: period.compare ? { gmvPct: -3.4, ordersPct: 2.1, conversionPct: 0.8 } : null };
+    return { ...base(view, period), funnel, series, salesSeries, salesBreakdowns: { category: categorySales }, kpis: { gmvPaise, orders: orders.size, salesOrders: sum(salesSeries, 'orders'), units: items.reduce((total, row) => total + (row.qty ?? 1), 0), unitsSold: sum(salesSeries, 'units'), aspPaise: items.length ? Math.round(gmvPaise / items.length) : 0, discountPaise: orderRows.reduce((total, row) => total + (row.priceDetails?.discountPaise ?? 0), 0), cancellations: items.filter((row) => row.status === 'CANCELLED').length, returns: filter('returns', (row) => itemIds(items).has(row.orderItemId)).length, netEarningsPaise: sum(settlements, 'netPaise') }, breakdowns: { channel: breakdown((row) => row.source), category: breakdown((row) => findById('categories', findById('products', row.productId)?.categoryId)?.name ?? 'Other'), geography: Object.entries(orderRows.reduce((acc, row) => ({ ...acc, [row.address?.state ?? 'Unknown']: (acc[row.address?.state ?? 'Unknown'] ?? 0) + 1 }), {})).map(([label, value]) => ({ label, value })) }, comparison: period.compare ? { gmvPct: -3.4, ordersPct: 2.1, conversionPct: 0.8 } : null };
   }
   if (view === 'products') {
     const offers = filter('offers', (row) => row.sellerId === sellerId);

@@ -16,6 +16,7 @@ import { sellerFoundationHandlers } from './foundation';
 import { sellerCustomerExperienceHandlers } from './customerExperience';
 import { sellerAnalyticsHandlers } from './analytics';
 import { sellerSecurityHandlers } from './security';
+import { sellerBannerAdHandlers } from './bannerAds';
 
 /**
  * All seller-panel request handlers, served at `/api/seller/v1`. They read and
@@ -35,6 +36,7 @@ export const sellerHandlers = [
   ...sellerFulfilmentHandlers,
   ...sellerFinanceHandlers,
   ...sellerGrowthHandlers,
+  ...sellerBannerAdHandlers,
   ...sellerPerformanceHandlers,
   ...sellerCustomerExperienceHandlers,
   ...sellerAnalyticsHandlers,

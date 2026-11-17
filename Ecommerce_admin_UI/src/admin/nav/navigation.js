@@ -41,6 +41,8 @@ export const NAV_GROUPS = [
     icon: 'notification',
     items: [
       { label: 'Campaigns', path: '/campaigns' },
+      { label: 'Shop Banner Ads', path: '/marketing/banner-ads' },
+      { label: 'Push Notifications', path: '/marketing/push-notifications' },
       { label: 'Coupons', path: '/marketing/coupons' },
       { label: 'Offers', path: '/marketing/deals' },
       { label: 'Banners', path: '/cms/banners' },

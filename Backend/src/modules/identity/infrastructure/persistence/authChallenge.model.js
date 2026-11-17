@@ -8,6 +8,7 @@ const authChallengeSchema = new mongoose.Schema(
     audience: { type: String, required: true, immutable: true }, // e.g. LOGIN_2FA, SELLER_REGISTRATION, PASSWORD_RESET
     stage: { type: String, required: true },
     target: { type: String, default: null }, // email/phone being verified, when userId is not yet known
+    name: { type: String, default: null }, // customer signup only
     // Absent for TOTP-backed challenges (LOGIN_2FA): the proof there is the user's own
     // authenticator/backup code, not a server-issued shared secret.
     codeHash: { type: String, default: null },

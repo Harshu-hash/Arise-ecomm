@@ -35,6 +35,7 @@ const LoginScreen = ({ navigation, route }) => {
         destinationMasked: challenge.destinationMasked,
         challengeId: challenge.challengeId,
         resendAvailableAt: challenge.resendAvailableAt,
+        devCode: challenge.devHint?.code,
         mode: 'login',
         returnTo,
       });

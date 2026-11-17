@@ -1,9 +1,9 @@
 import { http as mswHttp } from 'msw';
-import { db, findById, update } from '../db/store';
+import { db, findById, id, insert, update } from '../db/store';
 import { writeAudit } from '../engine/audit';
 import { guard } from '../engine/guard';
 import { listResult, parseListQuery } from '../engine/list';
-import { notFound, ok, okList, validationFailed } from '../engine/respond';
+import { created, notFound, ok, okList, validationFailed } from '../engine/respond';
 import { mockNowIso } from '../engine/settings';
 import { scheduleSave } from '../persistence';
 
@@ -12,6 +12,38 @@ const BASE = '/api/admin/v1';
 /** Notification templates and delivery logs (M16). */
 
 export const notificationHandlers = [
+  mswHttp.get(`${BASE}/push-broadcasts`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'notifications.broadcast.view');
+    if (g.response) return g.response;
+    return ok([...db.pushBroadcasts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
+  }),
+
+  mswHttp.post(`${BASE}/push-broadcasts`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'notifications.broadcast.send');
+    if (g.response) return g.response;
+    const body = await request.json();
+    const errors = {};
+    if (!body.title?.trim()) errors.title = 'Enter a notification title.';
+    if (!body.message?.trim()) errors.message = 'Enter a notification message.';
+    if (!body.audiences?.length) errors.audiences = 'Select at least one audience.';
+    if (!body.platforms?.length) errors.platforms = 'Select at least one platform.';
+    if (Object.keys(errors).length) return validationFailed(errors);
+
+    const now = mockNowIso();
+    const broadcast = insert('pushBroadcasts', {
+      id: id('PUSH', 6),
+      ...body,
+      status: body.scheduleAt ? 'SCHEDULED' : 'SENT',
+      createdAt: now,
+      createdByName: g.user.name,
+      sentAt: body.scheduleAt ? null : now,
+      estimatedRecipients: body.estimatedRecipients ?? 0,
+    });
+    writeAudit({ actor: g.user, action: 'notification.broadcast_send', entityType: 'pushBroadcast', entityId: broadcast.id, entityLabel: broadcast.title });
+    scheduleSave();
+    return created(broadcast);
+  }),
+
   mswHttp.get(`${BASE}/notification-templates`, async ({ request }) => {
     const g = await guard(request, new URL(request.url), 'notifications.template.view');
     if (g.response) return g.response;

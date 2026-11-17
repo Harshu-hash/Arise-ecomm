@@ -6,6 +6,7 @@ import { approvalHandlers } from './approvals';
 import { auditHandlers } from './audit';
 import { authHandlers } from './auth';
 import { bankOfferHandlers } from './bankOffers';
+import { bannerAdHandlers } from './bannerAds';
 import { campaignHandlers } from './campaigns';
 import { catalogImportHandlers } from './catalogImports';
 import { catalogMasterHandlers } from './catalogMasters';
@@ -89,6 +90,7 @@ export const handlers = [
   ...piiHandlers,
   ...adCampaignHandlers,
   ...adsConfigHandlers,
+  ...bannerAdHandlers,
   ...couponHandlers,
   ...segmentHandlers,
   ...reviewHandlers,

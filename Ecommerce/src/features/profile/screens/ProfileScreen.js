@@ -10,6 +10,7 @@ import { useSelector } from 'react-redux';
 import {
   selectCurrentUser,
   selectIsAuthenticated,
+  selectRefreshToken,
   useLogoutAllMutation,
   useLogoutMutation,
 } from '../../auth';
@@ -39,15 +40,16 @@ const ProfileScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const isLoggedIn = useSelector(selectIsAuthenticated);
   const user = useSelector(selectCurrentUser);
+  const refreshToken = useSelector(selectRefreshToken);
   const { data: profile } = useGetProfileQuery(undefined, { skip: !isLoggedIn });
   const identifier =
     profile?.name || user?.displayName || user?.email || user?.phone || 'Arise customer';
   const [logout, { isLoading: isLoggingOut }] = useLogoutMutation();
   const [logoutAll, { isLoading: isLoggingOutAll }] = useLogoutAllMutation();
 
-  const finishLogout = async mutation => {
+  const finishLogout = async (mutation, payload) => {
     try {
-      await mutation().unwrap();
+      await mutation(payload).unwrap();
     } catch {
       // Local credentials and API cache are cleared even if the server is unavailable.
     }
@@ -144,7 +146,7 @@ const ProfileScreen = ({ navigation }) => {
             <AccountListRow
               icon="log-out"
               label={isLoggingOut ? 'Logging out...' : 'Log out'}
-              onPress={isLoggingOut ? undefined : () => finishLogout(logout)}
+              onPress={isLoggingOut ? undefined : () => finishLogout(logout, refreshToken)}
             />
             <AccountListRow
               icon="shield"

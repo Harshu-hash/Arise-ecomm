@@ -42,6 +42,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
         destinationMasked: challenge.destinationMasked,
         challengeId: challenge.challengeId,
         resendAvailableAt: challenge.resendAvailableAt,
+        devCode: challenge.devHint?.code,
         mode: 'reset',
         returnTo,
       });

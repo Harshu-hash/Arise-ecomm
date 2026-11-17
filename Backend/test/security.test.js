@@ -32,9 +32,9 @@ test('global rate limit is per IP and returns the error envelope', async (t) => 
 
 test('auth routes get the stricter bucket', async (t) => {
   const base = await listen(t);
-  const first = await fetch(`${base}/api/customer/v1/auth/login`, { method: 'POST' });
-  await fetch(`${base}/api/customer/v1/auth/login`, { method: 'POST' });
-  const third = await fetch(`${base}/api/customer/v1/auth/login`, { method: 'POST' });
+  const first = await fetch(`${base}/api/customer/v1/auth/start`, { method: 'POST' });
+  await fetch(`${base}/api/customer/v1/auth/start`, { method: 'POST' });
+  const third = await fetch(`${base}/api/customer/v1/auth/start`, { method: 'POST' });
   assert.equal(first.status, 422); // no body: fails login validation, but still counts against the auth bucket
   assert.equal(third.status, 429);
   assert.equal((await third.json()).error.code, 'RATE_LIMITED');

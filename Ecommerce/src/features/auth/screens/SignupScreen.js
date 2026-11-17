@@ -47,6 +47,7 @@ const SignupScreen = ({ navigation, route }) => {
         destinationMasked: challenge.destinationMasked,
         challengeId: challenge.challengeId,
         resendAvailableAt: challenge.resendAvailableAt,
+        devCode: challenge.devHint?.code,
         mode: 'signup',
         returnTo,
       });

@@ -46,6 +46,8 @@ const CouponsListPage = lazy(() => import('@admin/features/marketing/pages/Coupo
 const DealsPage = lazy(() => import('@admin/features/marketing/pages/DealsPage'));
 const HomeLayoutPage = lazy(() => import('@admin/features/cms/pages/HomeLayoutPage'));
 const BannersPage = lazy(() => import('@admin/features/cms/pages/BannersPage'));
+const BannerAdsPage = lazy(() => import('@admin/features/bannerAds/pages/BannerAdsPage'));
+const PushBroadcastPage = lazy(() => import('@admin/features/notifications/pages/PushBroadcastPage'));
 const StaticPagesPage = lazy(() => import('@admin/features/cms/pages/StaticPagesPage'));
 
 /* Finance */
@@ -107,6 +109,8 @@ const ROUTES = [
   { path: '/marketing/coupons', element: <CouponsListPage /> },
   { path: '/marketing/deals', element: <DealsPage /> },
   { path: '/cms/banners', element: <BannersPage /> },
+  { path: '/marketing/banner-ads', element: <BannerAdsPage /> },
+  { path: '/marketing/push-notifications', element: <PushBroadcastPage /> },
   { path: '/cms/home', element: <HomeLayoutPage /> },
   { path: '/cms/pages', element: <StaticPagesPage /> },
 

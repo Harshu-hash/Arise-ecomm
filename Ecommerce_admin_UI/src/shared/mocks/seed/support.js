@@ -135,6 +135,7 @@ export function seedTickets() {
   for (let i = 0; i < 90; i += 1) {
     const customer = customers[i % customers.length];
     const order = db.orders.find((o) => o.customerId === customer.id);
+    const sellerId = db.orderItems.find((item) => item.orderId === order?.id)?.sellerId ?? null;
     const subject = SUBJECTS[i % SUBJECTS.length];
     const status = statuses[i % statuses.length];
     const createdAt = new Date(mockNow() - faker.number.int({ min: 1, max: 20 }) * 86400_000);
@@ -175,6 +176,7 @@ export function seedTickets() {
       customerId: customer.id,
       customerName: customer.name,
       requesterType: 'CUSTOMER',
+      sellerId,
       orderId: order?.id ?? null,
       queueId,
       assigneeId: ['NEW'].includes(status) ? null : agent?.id ?? null,

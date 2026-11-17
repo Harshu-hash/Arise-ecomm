@@ -97,6 +97,70 @@ test('sessions: concurrent refresh with the same token lets only one win', opts,
   assert.equal(results.filter((r) => r.status === 'fulfilled').length, 1);
 });
 
+test('customer auth: OTP signup, login, refresh, password reset and logout', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  await User.init();
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/customer/v1/auth`;
+  const post = (path, body, token) =>
+    fetch(`${base}${path}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', ...(token ? { authorization: `Bearer ${token}` } : {}) },
+      body: JSON.stringify(body),
+    });
+  const start = async (purpose, extra = {}) => {
+    const response = await post('/start', { identifier: 'customer@arise.test', purpose, ...extra });
+    assert.equal(response.status, 200);
+    return (await response.json()).data;
+  };
+
+  const signup = await start('SIGNUP', { name: 'Asha Rao' });
+  assert.equal((await post('/verify-otp', { challengeId: signup.challengeId, otp: '0000' })).status, 422);
+  const signedUp = await post('/verify-otp', { challengeId: signup.challengeId, otp: signup.devHint.code });
+  assert.equal(signedUp.status, 200);
+  const firstSession = (await signedUp.json()).data;
+  assert.equal(firstSession.user.email, 'customer@arise.test');
+  assert.equal(firstSession.user.role, 'CUSTOMER');
+  assert.ok(firstSession.accessToken);
+  assert.ok(firstSession.refreshToken);
+
+  const session = await fetch(`${base}/session`, { headers: { authorization: `Bearer ${firstSession.accessToken}` } });
+  assert.equal(session.status, 200);
+  assert.equal((await session.json()).data.user.name, 'Asha Rao');
+
+  const refreshed = await post('/refresh', { refreshToken: firstSession.refreshToken });
+  assert.equal(refreshed.status, 200);
+  const secondSession = (await refreshed.json()).data;
+  assert.notEqual(secondSession.refreshToken, firstSession.refreshToken);
+
+  assert.equal((await post('/start', { identifier: 'customer@arise.test', purpose: 'SIGNUP', name: 'Duplicate' })).status, 409);
+  const login = await start('LOGIN');
+  const loggedIn = await post('/verify-otp', { challengeId: login.challengeId, otp: login.devHint.code });
+  assert.equal(loggedIn.status, 200);
+
+  const reset = await start('PASSWORD_RESET');
+  const verifiedReset = await post('/password/verify-otp', { challengeId: reset.challengeId, otp: reset.devHint.code });
+  assert.equal(verifiedReset.status, 200);
+  const { resetToken } = (await verifiedReset.json()).data;
+  assert.equal((await post('/password/reset', { resetToken, password: 'NewPassword1' })).status, 200);
+
+  const afterReset = await start('LOGIN');
+  const afterResetLogin = await post('/verify-otp', { challengeId: afterReset.challengeId, otp: afterReset.devHint.code });
+  const activeSession = (await afterResetLogin.json()).data;
+  assert.equal((await post('/logout', { refreshToken: activeSession.refreshToken })).status, 200);
+  assert.equal((await post('/refresh', { refreshToken: activeSession.refreshToken })).status, 401);
+
+  const phoneSignup = await post('/start', { identifier: '9876543210', purpose: 'SIGNUP', name: 'Phone Customer' });
+  const phoneChallenge = (await phoneSignup.json()).data;
+  const phoneSession = await post('/verify-otp', { challengeId: phoneChallenge.challengeId, otp: phoneChallenge.devHint.code });
+  assert.equal(phoneSession.status, 200);
+  assert.equal((await phoneSession.json()).data.user.phone, '9876543210');
+});
+
 test('webhook processor: handled, unhandled, failing and replayed receipts', opts, async () => {
   const { registerWebhookHandler, processReceipt } = await import('../src/infrastructure/webhooks/webhookProcessor.js');
   const { RECEIPT_STATUS, WebhookReceipt } = await import('../src/infrastructure/webhooks/webhookReceipt.model.js');

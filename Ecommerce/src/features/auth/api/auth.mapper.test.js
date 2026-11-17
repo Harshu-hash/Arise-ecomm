@@ -10,9 +10,10 @@ describe('auth DTO mappers', () => {
           expiresAt: '2026-11-02T17:00:00.000Z',
           resendAvailableAt: '2026-11-02T16:59:00.000Z',
           purpose: 'LOGIN',
+          devHint: { code: '1234' },
         },
       }),
-    ).toMatchObject({ challengeId: 'challenge_1', isNewCustomer: false });
+    ).toMatchObject({ challengeId: 'challenge_1', isNewCustomer: false, devHint: { code: '1234' } });
   });
 
   it('adds a stable display name to a valid session', () => {

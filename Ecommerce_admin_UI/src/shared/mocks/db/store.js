@@ -17,7 +17,7 @@
  * accounts that no longer matched the documented sign-in credentials, with no
  * way to recover from inside the app.
  */
-export const SNAPSHOT_VERSION = 23;
+export const SNAPSHOT_VERSION = 25;
 
 /** Every collection the mock backend holds. Later phases fill in more. */
 export const COLLECTIONS = [
@@ -144,6 +144,8 @@ export const COLLECTIONS = [
   'advertiserLedger',
   'adInvoices',
   'invalidClicks',
+  'bannerAdPlacements',
+  'bannerAdBookings',
   'walletAccounts',
   'walletEntries',
   // Marketing (Phase 5)
@@ -173,6 +175,7 @@ export const COLLECTIONS = [
   // Notification templates (Phase 5)
   'notificationTemplates',
   'notificationLogs',
+  'pushBroadcasts',
   // Reports, settings & integrations (Phase 8)
   'reportDefinitions',
   'scheduledReports',
