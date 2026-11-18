@@ -3,6 +3,7 @@ import { api } from '@core/api/axiosInstance';
 export const settingsApi = {
   profile: () => api.get('/settings/profile').then((r) => r.data),
   updateProfile: (payload) => api.patch('/settings/profile', payload).then((r) => r.data),
+  uploadLogo: (file) => { const body = new FormData(); body.append('purpose', 'STORE_LOGO'); body.append('file', file); return api.post('/uploads', body).then((r) => r.data); },
   requestVerifiedChange: (payload) => api.post('/settings/profile/change-requests', payload).then((r) => r.data),
   renewDocument: (documentId, payload) => api.post(`/settings/profile/documents/${documentId}/renew`, payload).then((r) => r.data),
   setVacation: (on) => api.post('/settings/vacation', { on }).then((r) => r.data),

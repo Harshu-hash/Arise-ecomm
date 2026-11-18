@@ -5,6 +5,7 @@ import { UnauthorizedError } from '../errors/AppError.js';
 const base = { algorithm: 'HS256', issuer: env.JWT_ISSUER, audience: env.JWT_AUDIENCE };
 
 function secretFor(kind) {
+  // stepup tokens share the refresh secret; the typ claim keeps them distinct from access tokens.
   const value = kind === 'access' ? env.JWT_ACCESS_SECRET : env.JWT_REFRESH_SECRET;
   if (!value) throw new Error(`JWT_${kind.toUpperCase()}_SECRET is not configured`);
   return value;
@@ -23,6 +24,9 @@ export function signRefreshToken({ sub, sid, jti }) {
   });
 }
 
+// Short-lived proof of a fresh password check, required by sensitive seller changes (e.g. payout bank account).
+export const signStepUpToken = (sub) => jwt.sign({ sub, typ: 'stepup' }, secretFor('stepup'), { ...base, expiresIn: '5m' });
+
 function verify(kind, token) {
   try {
     const claims = jwt.verify(token, secretFor(kind), {
@@ -39,3 +43,4 @@ function verify(kind, token) {
 
 export const verifyAccessToken = (token) => verify('access', token);
 export const verifyRefreshToken = (token) => verify('refresh', token);
+export const verifyStepUpToken = (token) => verify('stepup', token);

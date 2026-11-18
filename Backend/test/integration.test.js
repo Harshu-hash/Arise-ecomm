@@ -661,3 +661,59 @@ test('attributes: admin CRUD, category assignment, seller reads and usage safegu
   assert.equal((await call(`/api/admin/v1/attribute-sets/${set.id}`, { method: 'DELETE' })).status, 200);
   assert.equal((await call(`/api/admin/v1/attributes/${attribute.id}`, { method: 'DELETE' })).status, 200);
 });
+
+test('seller settings: profile update, holiday mode and step-up-protected bank CRUD', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { hashPassword } = await import('../src/shared/utils/crypto.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { Seller } = await import('../src/modules/identity/infrastructure/persistence/seller.model.js');
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/seller/v1/settings`;
+
+  const seller = await Seller.create({ storeName: 'Bank Co', status: 'ACTIVE' });
+  const sellerId = String(seller._id);
+  const owner = await User.create({
+    role: 'SELLER', email: 'owner@bank.test', phone: '9876500010',
+    passwordHash: await hashPassword('Arise@123456'), sellerId, status: 'ACTIVE',
+  });
+  const authFor = (user, role = 'SELLER') => ({
+    authorization: `Bearer ${signAccessToken({ sub: String(user._id), role, sellerId })}`,
+    'content-type': 'application/json',
+  });
+  const call = (method, path, body, headers) =>
+    fetch(`${base}${path}`, { method, headers: headers ?? authFor(owner), body: body && JSON.stringify(body) });
+  const bank = { accountHolder: 'Bank Co', accountNumber: '123456789012', ifsc: 'hdfc0001234', bankName: 'HDFC', branch: 'Pune' };
+
+  assert.equal((await call('PATCH', '/profile', { storeName: 'Renamed Co' })).status, 200);
+  const profile = (await (await call('GET', '/profile')).json()).data.seller;
+  assert.equal(profile.storeName, 'Renamed Co');
+  assert.equal((await call('PATCH', '/profile', { storeName: 'x' })).status, 422);
+
+  assert.equal((await call('POST', '/vacation', { on: true })).status, 200);
+  assert.equal((await (await call('GET', '/profile')).json()).data.seller.vacationMode, true);
+
+  assert.deepEqual((await (await call('GET', '/bank')).json()).data, { account: null });
+  assert.equal((await call('PUT', '/bank/account', bank)).status, 403); // no step-up token
+  assert.equal((await call('POST', '/security/reauth', { password: 'wrong-password' })).status, 403);
+  const { token } = (await (await call('POST', '/security/reauth', { password: 'Arise@123456' })).json()).data;
+  const stepped = { ...authFor(owner), 'x-step-up-token': token };
+
+  const saved = await call('PUT', '/bank/account', bank, stepped);
+  assert.equal(saved.status, 200);
+  const { account } = (await saved.json()).data;
+  assert.equal(account.accountNumber, '••••••••9012');
+  assert.equal(account.pennyDropStatus, 'PENDING');
+  assert.equal((await Seller.findById(sellerId).lean()).bank.ifsc, 'HDFC0001234');
+  assert.equal((await call('PUT', '/bank/account', { ...bank, ifsc: 'bad' }, stepped)).status, 422);
+
+  const staff = await User.create({ role: 'SELLER_STAFF', email: 'staff@bank.test', phone: '9876500011', sellerId, status: 'ACTIVE' });
+  assert.equal((await call('GET', '/bank', undefined, authFor(staff, 'SELLER_STAFF'))).status, 200);
+  assert.equal((await call('PATCH', '/profile', { storeName: 'Hacked' }, authFor(staff, 'SELLER_STAFF'))).status, 403);
+
+  assert.equal((await call('DELETE', '/bank/account', undefined, stepped)).status, 200);
+  assert.deepEqual((await (await call('GET', '/bank')).json()).data, { account: null });
+});

@@ -4,7 +4,7 @@ import { NotFoundError, ValidationError } from '../../../shared/errors/AppError.
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { uploadFields } from '../../../shared/middleware/upload.js';
-import { emailSchema, objectIdSchema, phoneINSchema } from '../../../shared/validators/common.js';
+import { accountNumberSchema, emailSchema, ifscSchema, objectIdSchema, phoneINSchema } from '../../../shared/validators/common.js';
 import { checkExists, registerSeller, sendRegistrationOtp, verifyRegistrationOtp } from '../application/registration.service.js';
 import { Seller } from '../infrastructure/persistence/seller.model.js';
 import { User } from '../infrastructure/persistence/user.model.js';
@@ -28,8 +28,8 @@ const registerSchema = z.object({
   gstin: z.string().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'Enter a valid 15-character GSTIN.'),
   pan: z.string().regex(/^[A-Z]{5}\d{4}[A-Z]$/, 'Enter a valid 10-character PAN.'),
   bankAccountHolder: z.string().trim().min(1),
-  bankAccountNumber: z.string().regex(/^\d{9,18}$/, 'Enter a valid account number.'),
-  bankIfsc: z.string().regex(/^[A-Z]{4}0[A-Z\d]{6}$/, 'Enter a valid 11-character IFSC code.'),
+  bankAccountNumber: accountNumberSchema,
+  bankIfsc: ifscSchema,
   emailVerificationToken: z.string().min(1),
   phoneVerificationToken: z.string().min(1),
 });
