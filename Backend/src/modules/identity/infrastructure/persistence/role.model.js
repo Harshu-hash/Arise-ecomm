@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 import { logger } from '../../../../config/logger.js';
 import { SEEDED_ROLES } from '../../../../shared/rbac/roleTemplates.js';
+import { User } from './user.model.js';
 
 const roleSchema = new mongoose.Schema(
   {
@@ -16,13 +17,14 @@ const roleSchema = new mongoose.Schema(
 
 export const Role = mongoose.models.Role ?? mongoose.model('Role', roleSchema);
 
-// Idempotent: run at boot (and safe to call again any time the catalog changes) so the
-// 15 reference roles always match shared/rbac/roleTemplates.js exactly.
+const SUPER_ADMIN = SEEDED_ROLES.find((role) => role.key === 'super_admin');
+
+// Idempotent. Only Super Admin is seeded (the bootstrap account needs it); every other role is
+// created by admins. Older deployments also got the template roles seeded: those are retired
+// here unless an admin still holds one.
 export async function seedRoles() {
-  await Promise.all(
-    SEEDED_ROLES.map((role) =>
-      Role.updateOne({ key: role.key }, { $set: role }, { upsert: true }),
-    ),
-  );
-  logger.info({ count: SEEDED_ROLES.length }, 'Admin roles seeded');
+  await Role.updateOne({ key: SUPER_ADMIN.key }, { $set: SUPER_ADMIN }, { upsert: true });
+  const held = await User.distinct('roleIds', { role: 'ADMIN' });
+  const { deletedCount } = await Role.deleteMany({ system: true, key: { $ne: SUPER_ADMIN.key }, _id: { $nin: held } });
+  logger.info({ retired: deletedCount }, 'Admin roles seeded');
 }

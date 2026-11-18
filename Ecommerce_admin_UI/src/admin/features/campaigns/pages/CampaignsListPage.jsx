@@ -188,6 +188,7 @@ export default function CampaignsListPage() {
         onClose={() => setCreating(false)}
         onSubmit={(payload) => create.mutate(payload)}
         loading={create.isPending}
+        error={create.error}
       />
     </Flex>
   );

@@ -381,6 +381,7 @@ export const PERMISSION_MODULES = [
     key: 'notifications',
     label: 'Notifications',
     resources: [
+      { key: 'broadcast', label: 'Push broadcasts', actions: [A.view, { action: 'send', label: 'Send or schedule', sensitive: true }] },
       { key: 'template', label: 'Transactional templates', actions: [A.view, A.edit, { action: 'test', label: 'Send test' }] },
       { key: 'log', label: 'Delivery logs', actions: [A.view, A.export, { action: 'resend', label: 'Resend' }] },
     ],

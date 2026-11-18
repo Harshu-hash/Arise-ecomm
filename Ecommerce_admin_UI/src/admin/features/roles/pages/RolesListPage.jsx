@@ -156,7 +156,6 @@ export default function RolesListPage() {
         onConfirm={() => remove.mutate(deleting)}
         loading={remove.isPending}
         danger
-        needsApproval
         title="Delete this role"
         description={deleting?.name}
         impact="This cannot be undone. Roles assigned to any admin cannot be deleted — reassign those admins first."

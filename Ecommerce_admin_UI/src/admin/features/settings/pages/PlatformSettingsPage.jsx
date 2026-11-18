@@ -44,9 +44,13 @@ export default function PlatformSettingsPage() {
     onSuccess: () => {
       query.refetch();
       setConfirming(false);
-      message.info('Sent for approval. The change applies once another admin agrees.');
+      message.success('Saved');
     },
-    onError: (e) => message.error(e instanceof ApiError ? e.message : 'Could not save'),
+    onError: (e) => {
+      // Mock mode still routes sensitive sections through maker-checker (202).
+      if (e instanceof ApiError && e.needsApproval) message.info('Sent for approval. The change applies once another admin agrees.');
+      else message.error(e instanceof ApiError ? e.message : 'Could not save');
+    },
   });
 
   if (query.isLoading) return <FullPageSpinner />;
@@ -60,7 +64,7 @@ export default function PlatformSettingsPage() {
       <PageHeader
         title="Platform settings"
         breadcrumbs={[{ label: 'Administration' }, { label: 'Platform settings' }]}
-        subtitle="Fees, approval thresholds and security changes need a second approver; everything else saves immediately."
+        subtitle="Fees, approval thresholds and security changes need a reason and are audited; everything else saves immediately."
       />
 
       <Flex gap={20} vertical={isMobile} align="flex-start" style={{ marginTop: 16 }}>
@@ -108,13 +112,12 @@ export default function PlatformSettingsPage() {
         onCancel={() => setConfirming(false)}
         onConfirm={(v) => saveSensitive.mutate({ sectionId: active.id, values: draft, reason: v.reason })}
         loading={saveSensitive.isPending}
-        needsApproval
         title={`Change ${active?.label}`}
-        impact="This section affects every order or seller on the platform the moment a second approver agrees."
+        impact="This section affects every order or seller on the platform the moment you save."
         reasonRequired
         reasonLabel="Why is this changing?"
         showNote={false}
-        confirmLabel="Request change"
+        confirmLabel="Save change"
       />
     </>
   );

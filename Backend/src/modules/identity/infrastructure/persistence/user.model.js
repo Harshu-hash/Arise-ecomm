@@ -34,6 +34,9 @@ const userSchema = new mongoose.Schema(
     // Admin-only fine-grained RBAC (roleTemplates/scopes ported from the admin console design).
     permissions: { type: [String], default: undefined },
     scope: { type: mongoose.Schema.Types.Mixed, default: undefined },
+    // Admin-only: the roles this account was granted; `permissions` is their materialised union.
+    roleIds: { type: [String], default: undefined },
+    defaultLanding: { type: String },
     lastLoginAt: { type: Date, default: null },
     // Invite flow: set while status is INVITED, cleared once accepted.
     inviteTokenHash: { type: String, default: null },
@@ -48,5 +51,6 @@ userSchema.index(
 );
 userSchema.index({ phone: 1 }, { unique: true, sparse: true });
 userSchema.index({ sellerId: 1 });
+userSchema.index({ roleIds: 1 }, { sparse: true });
 
 export const User = mongoose.models.User ?? mongoose.model('User', userSchema);

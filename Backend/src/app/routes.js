@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { env } from '../config/env.js';
+import { createBannerRouter } from '../modules/admin/presentation/banner.routes.js';
+import { createCampaignRouter } from '../modules/coupon/presentation/campaign.routes.js';
+import { createSettingsRouter } from '../modules/admin/presentation/settings.routes.js';
 import { createAdminUsersRouter } from '../modules/identity/presentation/adminUsers.routes.js';
 import { createAuthRouter } from '../modules/identity/presentation/auth.routes.js';
 import { createCustomerAuthRouter } from '../modules/identity/presentation/customerAuth.routes.js';
@@ -7,6 +10,7 @@ import { createInviteRouter } from '../modules/identity/presentation/invite.rout
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
 import { createPiiRouter } from '../modules/identity/presentation/pii.routes.js';
+import { createRoleRouter } from '../modules/identity/presentation/roles.routes.js';
 import { createRegistrationRouter } from '../modules/identity/presentation/registration.routes.js';
 import { createSellerApplicationsRouter } from '../modules/identity/presentation/sellerApplications.routes.js';
 import { createSellerSettingsRouter } from '../modules/identity/presentation/sellerSettings.routes.js';
@@ -93,6 +97,10 @@ export function createRoutes() {
     root.use(`/api/${audience}/v1/uploads`, createUploadRouter());
   }
   root.use('/api/admin/v1/admin-users', createAdminUsersRouter());
+  root.use('/api/admin/v1/roles', createRoleRouter());
+  root.use('/api/admin/v1/admin/settings', createSettingsRouter());
+  root.use('/api/admin/v1/banners', createBannerRouter());
+  root.use('/api/admin/v1/campaigns', createCampaignRouter());
   root.use('/api/admin/v1/categories', createCategoryRouter());
   root.use('/api/admin/v1/attributes', createAttributeRouter());
   root.use('/api/admin/v1/attribute-sets', createAttributeSetRouter());

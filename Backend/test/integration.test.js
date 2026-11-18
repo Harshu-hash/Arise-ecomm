@@ -339,8 +339,10 @@ test('admin RBAC: role seeding, permission gating and inviting an admin', opts, 
   const { signAccessToken } = await import('../src/shared/utils/jwt.js');
   const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
   const { Role, seedRoles } = await import('../src/modules/identity/infrastructure/persistence/role.model.js');
+  const { ROLE_TEMPLATES, buildRoleFromTemplate } = await import('../src/shared/rbac/roleTemplates.js');
   await User.init();
   await seedRoles();
+  await Role.create(buildRoleFromTemplate(ROLE_TEMPLATES.find((r) => r.key === 'operations_manager')));
 
   const server = createServer(createApp());
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
@@ -356,28 +358,29 @@ test('admin RBAC: role seeding, permission gating and inviting an admin', opts, 
   });
   const authHeader = (user) => ({ authorization: `Bearer ${signAccessToken({ sub: String(user._id), role: 'ADMIN' })}` });
 
-  const roles = await fetch(`${base}/api/admin/v1/admin-users/roles`, { headers: authHeader(superAdmin) });
+  const roles = await fetch(`${base}/api/admin/v1/roles`, { headers: authHeader(superAdmin) });
   assert.equal(roles.status, 200);
   const roleList = (await roles.json()).data;
-  assert.equal(roleList.length, 15);
+  assert.equal(roleList.length, 2); // Super Admin is the only seeded role
   const superAdminRole = roleList.find((r) => r.key === 'super_admin');
 
   // Operations Manager has no admin.role.view / admin.user.invite — both gated endpoints refuse it.
-  assert.equal((await fetch(`${base}/api/admin/v1/admin-users/roles`, { headers: authHeader(opsManager) })).status, 403);
-  const deniedInvite = await fetch(`${base}/api/admin/v1/admin-users/invite`, {
+  assert.equal((await fetch(`${base}/api/admin/v1/roles`, { headers: authHeader(opsManager) })).status, 403);
+  const deniedInvite = await fetch(`${base}/api/admin/v1/admin-users`, {
     method: 'POST', headers: { ...authHeader(opsManager), 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'X', email: 'x@arise.test', roleIds: [superAdminRole.id] }),
   });
   assert.equal(deniedInvite.status, 403);
 
   // Super Admin can invite; the new admin's permissions are the union of the assigned roles.
-  const invite = await fetch(`${base}/api/admin/v1/admin-users/invite`, {
+  const invite = await fetch(`${base}/api/admin/v1/admin-users`, {
     method: 'POST', headers: { ...authHeader(superAdmin), 'content-type': 'application/json' },
     body: JSON.stringify({ name: 'Priya', email: 'priya@arise.test', roleIds: [superAdminRole.id] }),
   });
   assert.equal(invite.status, 201);
   const created = await User.findOne({ email: 'priya@arise.test' }).lean();
   assert.deepEqual(created.permissions, ['*']);
+  assert.deepEqual(created.roleIds, [superAdminRole.id]);
   assert.equal(created.status, 'INVITED');
 });
 
