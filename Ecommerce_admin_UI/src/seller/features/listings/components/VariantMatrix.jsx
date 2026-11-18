@@ -1,6 +1,7 @@
 /* eslint-disable max-lines */
 import {
   Alert,
+  Card,
   Col,
   Flex,
   Input,
@@ -8,7 +9,6 @@ import {
   Row,
   Select,
   Space,
-  Table,
   Tag,
   Typography,
 } from 'antd';
@@ -45,9 +45,84 @@ function defaultRow(combo, index, skuPrefix) {
   };
 }
 
+/** One labeled field, stacked label-over-control like the rest of this form. */
+function Field({ label, span = 6, children }) {
+  return (
+    <Col xs={24} sm={12} md={span}>
+      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{label}</Typography.Text>
+      <div style={{ marginTop: 4 }}>{children}</div>
+    </Col>
+  );
+}
+
+/** One variant's full set of fields, as a simple form — no table, no horizontal scroll. */
+function VariantCard({ row, onUpdate }) {
+  return (
+    <Card
+      size="small"
+      title={<Tag style={{ marginInlineEnd: 0 }}>{row.label}</Tag>}
+      extra={
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+          {row.sellingPricePaise ? `₹${(row.sellingPricePaise / 100).toLocaleString('en-IN')}` : 'No price yet'} · Stock {row.stock}
+        </Typography.Text>
+      }
+    >
+      <Row gutter={[16, 16]}>
+        <Field label="SKU">
+          <Input value={row.sku} onChange={(e) => onUpdate({ sku: e.target.value })} />
+        </Field>
+        <Field label="Seller SKU">
+          <Input value={row.sellerSku} onChange={(e) => onUpdate({ sellerSku: e.target.value })} />
+        </Field>
+        <Field label="Barcode / EAN">
+          <Input value={row.barcode} onChange={(e) => onUpdate({ barcode: e.target.value })} />
+        </Field>
+        <Field label="Tax code">
+          <Input value={row.taxCode} onChange={(e) => onUpdate({ taxCode: e.target.value })} />
+        </Field>
+
+        <Field label="MRP (₹)">
+          <InputNumber
+            style={{ width: '100%' }}
+            min={1}
+            value={row.mrpPaise ? row.mrpPaise / 100 : null}
+            onChange={(n) => onUpdate({ mrpPaise: n ? Math.round(n * 100) : null })}
+          />
+        </Field>
+        <Field label="Selling price (₹)">
+          <InputNumber
+            style={{ width: '100%' }}
+            min={1}
+            value={row.sellingPricePaise ? row.sellingPricePaise / 100 : null}
+            onChange={(n) => onUpdate({ sellingPricePaise: n ? Math.round(n * 100) : null })}
+          />
+        </Field>
+        <Field label="Stock">
+          <InputNumber style={{ width: '100%' }} min={0} value={row.stock} onChange={(n) => onUpdate({ stock: n ?? 0 })} />
+        </Field>
+        <Field label="Weight (g)">
+          <InputNumber style={{ width: '100%' }} min={1} value={row.weightG} onChange={(n) => onUpdate({ weightG: n ?? 500 })} />
+        </Field>
+
+        <Field label="Dimensions L × W × H (cm)" span={12}>
+          <Space.Compact style={{ width: '100%' }}>
+            <InputNumber style={{ width: '34%' }} min={1} placeholder="L" value={row.dimsCm.l} onChange={(n) => onUpdate({ dimsCm: { ...row.dimsCm, l: n ?? row.dimsCm.l } })} />
+            <InputNumber style={{ width: '33%' }} min={1} placeholder="W" value={row.dimsCm.w} onChange={(n) => onUpdate({ dimsCm: { ...row.dimsCm, w: n ?? row.dimsCm.w } })} />
+            <InputNumber style={{ width: '33%' }} min={1} placeholder="H" value={row.dimsCm.h} onChange={(n) => onUpdate({ dimsCm: { ...row.dimsCm, h: n ?? row.dimsCm.h } })} />
+          </Space.Compact>
+        </Field>
+
+        <Field label="Images" span={24}>
+          <ImageUpload value={row.images} onChange={(images) => onUpdate({ images })} maxCount={4} label={row.label} />
+        </Field>
+      </Row>
+    </Card>
+  );
+}
+
 /**
  * Lets the seller pick which values of each variant-defining attribute
- * (colour, size, …) this listing comes in, then renders one editable row per
+ * (colour, size, …) this listing comes in, then renders one editable card per
  * combination — the matrix the mock handler's `variants[]` payload expects.
  */
 export default function VariantMatrix({ variantAttrs, value = [], onChange, skuPrefix = 'SKU' }) {
@@ -118,171 +193,11 @@ export default function VariantMatrix({ variantAttrs, value = [], onChange, skuP
       </Row>
 
       {value.length > 0 && (
-        <Table
-          size="small"
-          rowKey="key"
-          pagination={false}
-          dataSource={value}
-          scroll={{ x: 'max-content' }}
-          columns={[
-            {
-              title: 'Variant',
-              dataIndex: 'label',
-              fixed: 'left',
-              width: 140,
-              render: (label) => <Tag style={{ marginInlineEnd: 0 }}>{label}</Tag>,
-            },
-            {
-              title: 'SKU',
-              dataIndex: 'sku',
-              width: 150,
-              render: (v, row) => (
-                <Input
-                  size="small"
-                  value={v}
-                  onChange={(e) => updateRow(row.key, { sku: e.target.value })}
-                />
-              ),
-            },
-            {
-              title: 'Seller SKU',
-              dataIndex: 'sellerSku',
-              width: 150,
-              render: (v, row) => (
-                <Input
-                  size="small"
-                  value={v}
-                  onChange={(e) => updateRow(row.key, { sellerSku: e.target.value })}
-                />
-              ),
-            },
-            {
-              title: 'Barcode / EAN',
-              dataIndex: 'barcode',
-              width: 150,
-              render: (v, row) => (
-                <Input
-                  size="small"
-                  value={v}
-                  onChange={(e) => updateRow(row.key, { barcode: e.target.value })}
-                />
-              ),
-            },
-            {
-              title: 'Tax code',
-              dataIndex: 'taxCode',
-              width: 120,
-              render: (v, row) => (
-                <Input
-                  size="small"
-                  value={v}
-                  onChange={(e) => updateRow(row.key, { taxCode: e.target.value })}
-                />
-              ),
-            },
-            {
-              title: 'MRP (₹)',
-              dataIndex: 'mrpPaise',
-              width: 110,
-              render: (v, row) => (
-                <InputNumber
-                  size="small"
-                  style={{ width: '100%' }}
-                  min={1}
-                  value={v ? v / 100 : null}
-                  onChange={(n) => updateRow(row.key, { mrpPaise: n ? Math.round(n * 100) : null })}
-                />
-              ),
-            },
-            {
-              title: 'Price (₹)',
-              dataIndex: 'sellingPricePaise',
-              width: 110,
-              render: (v, row) => (
-                <InputNumber
-                  size="small"
-                  style={{ width: '100%' }}
-                  min={1}
-                  value={v ? v / 100 : null}
-                  onChange={(n) =>
-                    updateRow(row.key, { sellingPricePaise: n ? Math.round(n * 100) : null })
-                  }
-                />
-              ),
-            },
-            {
-              title: 'Stock',
-              dataIndex: 'stock',
-              width: 90,
-              render: (v, row) => (
-                <InputNumber
-                  size="small"
-                  style={{ width: '100%' }}
-                  min={0}
-                  value={v}
-                  onChange={(n) => updateRow(row.key, { stock: n ?? 0 })}
-                />
-              ),
-            },
-            {
-              title: 'Weight (g)',
-              dataIndex: 'weightG',
-              width: 100,
-              render: (v, row) => (
-                <InputNumber
-                  size="small"
-                  style={{ width: '100%' }}
-                  min={1}
-                  value={v}
-                  onChange={(n) => updateRow(row.key, { weightG: n ?? 500 })}
-                />
-              ),
-            },
-            {
-              title: 'Dimensions L×W×H (cm)',
-              dataIndex: 'dimsCm',
-              width: 200,
-              render: (v, row) => (
-                <Space size={4}>
-                  <InputNumber
-                    size="small"
-                    style={{ width: 56 }}
-                    min={1}
-                    value={v.l}
-                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, l: n ?? v.l } })}
-                  />
-                  <InputNumber
-                    size="small"
-                    style={{ width: 56 }}
-                    min={1}
-                    value={v.w}
-                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, w: n ?? v.w } })}
-                  />
-                  <InputNumber
-                    size="small"
-                    style={{ width: 56 }}
-                    min={1}
-                    value={v.h}
-                    onChange={(n) => updateRow(row.key, { dimsCm: { ...v, h: n ?? v.h } })}
-                  />
-                </Space>
-              ),
-            },
-            {
-              title: 'Images',
-              dataIndex: 'images',
-              width: 240,
-              render: (v, row) => (
-                <ImageUpload
-                  value={v}
-                  onChange={(images) => updateRow(row.key, { images })}
-                  maxCount={4}
-                  label={row.label}
-                />
-              ),
-            },
-          ]}
-        />
+        <Flex vertical gap={12}>
+          {value.map((row) => (
+            <VariantCard key={row.key} row={row} onUpdate={(patch) => updateRow(row.key, patch)} />
+          ))}
+        </Flex>
       )}
     </Flex>
   );

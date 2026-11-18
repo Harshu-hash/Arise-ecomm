@@ -15,6 +15,23 @@ export const productCardDtoSchema = z.object({
   deliveryLabel: z.string().min(1),
 });
 
+// A size chart's shape is generic: `columns` are the header labels in order,
+// each `rows` entry is the same length with the size value first — so the
+// screen can render any category's chart (shirts, footwear, …) the same way.
+const sizeChartSchema = z.object({
+  name: z.string().min(1).optional(),
+  unit: z.string().min(1).optional(),
+  columns: z.array(z.string().min(1)).min(1),
+  rows: z.array(z.array(z.string().min(1))).min(1),
+});
+
+// Free-form category attributes (fabric, connectivity, capacity, …) that have
+// no dedicated field on the product, shown as a generic spec list.
+const specificationSchema = z.object({
+  label: z.string().min(1),
+  value: z.string().min(1),
+});
+
 export const productDetailResponseSchema = apiEnvelope(
   productCardDtoSchema.extend({
     images: z.array(z.string().url()).min(1),
@@ -30,5 +47,7 @@ export const productDetailResponseSchema = apiEnvelope(
     manufacturer: z.string().min(1),
     countryOfOrigin: z.string().min(1),
     available: z.boolean(),
+    sizeChart: sizeChartSchema.nullable().optional(),
+    specifications: z.array(specificationSchema).optional(),
   }),
 );

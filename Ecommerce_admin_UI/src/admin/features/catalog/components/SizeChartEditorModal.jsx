@@ -29,6 +29,7 @@ export default function SizeChartEditorModal({ open, editing, categories = [], o
             name: editing.name ?? '',
             unit: editing.unit ?? 'in',
             categoryId: editing.categoryId ?? null,
+            version: editing.version,
             columns: [...(editing.columns ?? ['Size', 'Measurement'])],
             rows: (editing.rows ?? []).map((r) => [...r]),
           }
@@ -64,7 +65,14 @@ export default function SizeChartEditorModal({ open, editing, categories = [], o
     const columns = chart.columns.map((c) => c.trim());
     if (!name) return message.error('Give the size chart a name.');
     if (columns.some((c) => !c)) return message.error('Every column needs a heading.');
-    onSubmit({ name, unit: chart.unit.trim() || 'in', categoryId: chart.categoryId ?? null, columns, rows: chart.rows });
+    onSubmit({
+      name,
+      unit: chart.unit.trim() || 'in',
+      categoryId: chart.categoryId ?? null,
+      columns,
+      rows: chart.rows,
+      ...(editing ? { version: chart.version } : {}),
+    });
   };
 
   return (
@@ -85,7 +93,12 @@ export default function SizeChartEditorModal({ open, editing, categories = [], o
         </div>
         <div style={{ width: 90 }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>Unit</Typography.Text>
-          <Input value={chart.unit} onChange={(e) => setChart((c) => ({ ...c, unit: e.target.value }))} placeholder="in / cm" />
+          <Select
+            value={chart.unit}
+            onChange={(unit) => setChart((c) => ({ ...c, unit }))}
+            options={[{ value: 'in', label: 'in' }, { value: 'cm', label: 'cm' }]}
+            style={{ width: '100%' }}
+          />
         </div>
         <div style={{ flex: '1 1 200px' }}>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>Category (optional)</Typography.Text>

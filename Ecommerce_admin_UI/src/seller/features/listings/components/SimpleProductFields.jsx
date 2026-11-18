@@ -1,4 +1,4 @@
-import { Col, Form, InputNumber, Row, Space } from 'antd';
+import { Col, Form, Input, InputNumber, Row, Space } from 'antd';
 
 /** Pricing/stock/weight/dimension fields used when the category has no variant-defining attributes. */
 export default function SimpleProductFields() {
@@ -58,6 +58,11 @@ export default function SimpleProductFields() {
               <InputNumber style={{ width: '34%' }} min={1} placeholder="H" />
             </Form.Item>
           </Space.Compact>
+        </Form.Item>
+      </Col>
+      <Col xs={24} sm={8}>
+        <Form.Item name="barcode" label="Barcode / EAN" extra="Optional — leave blank if this product has none.">
+          <Input placeholder="e.g. 8901234567890" maxLength={32} />
         </Form.Item>
       </Col>
     </Row>

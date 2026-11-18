@@ -614,6 +614,12 @@ export const sellerListingHandlers = [
       hsnCode: cat.hsnCode,
       gstRate: cat.gstRate,
       countryOfOrigin: body.countryOfOrigin ?? 'India',
+      // The exact fields the customer app's product page renders verbatim.
+      fit: body.fit ?? null,
+      care: body.care ?? null,
+      modelInfo: body.modelInfo ?? null,
+      manufacturer: body.manufacturer ?? null,
+      productCode: body.productCode ?? null,
       sizeChartId: body.sizeChartId ?? null,
       returnPolicy: body.returnPolicy ?? { windowDays: cat.returnWindowDays ?? 7, type: 'RETURN' },
       variantDefiningAttrs: body.variants?.length ? ['colour', 'size'] : [],
@@ -638,7 +644,9 @@ export const sellerListingHandlers = [
         sku:
           vspec.sku ||
           `${(brand?.name ?? 'SKU').toUpperCase().slice(0, 4)}-${product.id}-${vi + 1}`,
-        ean: vspec.ean ?? vspec.barcode ?? null,
+        // A simple (non-variant) product has no per-variant spec, so its
+        // barcode travels on the request body instead.
+        ean: vspec.ean ?? vspec.barcode ?? body.ean ?? body.barcode ?? null,
         attributes: vspec.attributes ?? {},
         label: vspec.label ?? `Variant ${vi + 1}`,
         images: variantImages,

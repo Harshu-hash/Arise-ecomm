@@ -33,5 +33,7 @@ export const mapProductDetail = payload => {
     manufacturer: product.manufacturer,
     countryOfOrigin: product.countryOfOrigin,
     available: product.available,
+    sizeChart: product.sizeChart ?? null,
+    specifications: product.specifications ?? [],
   };
 };

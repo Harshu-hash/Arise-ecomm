@@ -528,7 +528,7 @@ export const catalogMasterHandlers = [
       name: String(body.name).trim(),
       gated: Boolean(body.gated),
       ownerType: body.ownerType ?? 'BRAND_OWNER',
-      status: body.status ?? 'VERIFIED',
+      status: 'VERIFIED',
       rootCategory: body.rootCategory ?? null,
       imageUrl: body.imageUrl ?? null,
       authorisedSellerCount: 0,
@@ -680,8 +680,10 @@ export const catalogMasterHandlers = [
     update('sizeCharts', chart.id, {
       ...(body.name !== undefined ? { name: body.name } : {}),
       ...(body.unit !== undefined ? { unit: body.unit } : {}),
+      ...(body.categoryId !== undefined ? { categoryId: body.categoryId } : {}),
       ...(body.columns !== undefined ? { columns: body.columns } : {}),
       ...(body.rows !== undefined ? { rows: body.rows } : {}),
+      version: chart.version + 1,
       updatedAt: mockNowIso(),
     });
     writeAudit({

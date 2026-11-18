@@ -79,10 +79,38 @@ const productDetailRecommendations = [
 const allProducts = [...PRODUCT_CATALOG, ...additionalProducts, ...productDetailRecommendations];
 const cardDtos = allProducts.map(toCardDto);
 
+// A shirts-style chart for Fashion; everything else sells as one size, so it
+// has no chart at all — proves the screen must not assume a chart exists.
+const FASHION_SIZE_CHART = {
+  name: "Men's Shirts (inches)",
+  unit: 'in',
+  columns: ['Size', 'Chest', 'Length', 'Shoulder'],
+  rows: [
+    ['38', '38', '28.5', '16.5'],
+    ['40', '40', '29', '17'],
+    ['42', '42', '29.5', '17.5'],
+    ['44', '44', '30', '18'],
+    ['46', '46', '30.5', '18.5'],
+  ],
+};
+
+const specsFor = category =>
+  category === 'Fashion'
+    ? [
+        { label: 'Fabric', value: 'Cotton' },
+        { label: 'Pattern', value: 'Solid' },
+        { label: 'Sleeve Length', value: 'Full Sleeve' },
+      ]
+    : [
+        { label: 'Material', value: 'ABS Plastic' },
+        { label: 'Warranty', value: '1 year' },
+      ];
+
 const productDetailEnvelope = productId => {
   const product = allProducts.find(item => item.id === productId);
   if (!product) return null;
   const card = toCardDto(product);
+  const isFashion = product.category === 'Fashion';
   return {
     data: {
       ...card,
@@ -92,16 +120,18 @@ const productDetailEnvelope = productId => {
       ],
       reviewCount: Math.max(1, Math.round(card.ratingCount / 5)),
       color: 'Default',
-      sizes: product.category === 'Fashion' ? ['38', '40', '42', '44', '46'] : ['Standard'],
+      sizes: isFashion ? ['38', '40', '42', '44', '46'] : ['Standard'],
       deliveryAddressLabel: 'Delivery address - Select at checkout',
       description: `${card.name} by ${card.brand}. Product information is supplied by the seller.`,
-      fit: product.category === 'Fashion' ? 'Regular Fit' : 'Standard',
+      fit: isFashion ? 'Regular Fit' : 'Standard',
       modelInfo: 'See the size chart and seller specifications before ordering.',
       care: 'Follow the care instructions provided on the product label.',
       productCode: card.id.toUpperCase(),
       manufacturer: `${card.brand} authorized seller`,
       countryOfOrigin: 'India',
       available: true,
+      sizeChart: isFashion ? FASHION_SIZE_CHART : null,
+      specifications: specsFor(product.category),
     },
   };
 };

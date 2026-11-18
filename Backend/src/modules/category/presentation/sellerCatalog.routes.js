@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { attributeSetDetails } from '../../attribute/public/index.js';
+import { listBrandsForSeller, listSizeChartsForCategory } from '../../catalog/public/index.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { sendData } from '../../../shared/http/respond.js';
@@ -35,15 +36,26 @@ export function createSellerCatalogRouter() {
     }
   });
 
+  router.get('/brands', async (_req, res, next) => {
+    try {
+      return sendData(res, await listBrandsForSeller());
+    } catch (error) {
+      return next(error);
+    }
+  });
+
   router.get('/categories/:id/attributes', validate({ params: idParams }), async (req, res, next) => {
     try {
       const category = await Category.findOne({ _id: req.params.id, level: 3, status: 'ACTIVE' }).lean();
       if (!category) throw new NotFoundError('Category not found.');
-      const { attributes } = await attributeSetDetails(category.attributeSetId, { activeOnly: true });
+      const [{ attributes }, sizeCharts] = await Promise.all([
+        attributeSetDetails(category.attributeSetId, { activeOnly: true }),
+        listSizeChartsForCategory(category._id),
+      ]);
       return sendData(res, {
         category: { id: String(category._id), name: category.name, gated: category.gated },
         attributes,
-        sizeCharts: [],
+        sizeCharts,
       });
     } catch (error) {
       return next(error);

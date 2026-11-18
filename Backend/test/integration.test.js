@@ -470,6 +470,241 @@ test('audit log is append-only and redacts secrets', opts, async () => {
   await assert.rejects(AuditLog.deleteMany({}), /append-only/);
 });
 
+test('admin brands: publishes brands idempotently, lists them and rejects duplicates', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { AuditLog } = await import('../src/infrastructure/audit/audit.model.js');
+  const { IdempotencyRecord } = await import('../src/infrastructure/idempotency/idempotency.model.js');
+  const { Brand } = await import('../src/modules/catalog/infrastructure/persistence/brand.model.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  await Promise.all([User.init(), Category.init(), Brand.init(), AuditLog.init(), IdempotencyRecord.init()]);
+
+  const [admin, viewer] = await User.create([
+    {
+      role: 'ADMIN', email: 'brand-flow@arise.test', status: 'ACTIVE',
+      permissions: ['catalog.brand.view', 'catalog.brand.create', 'catalog.brand.edit', 'catalog.brand.delete'],
+    },
+    {
+      role: 'ADMIN', email: 'brand-viewer@arise.test', status: 'ACTIVE',
+      permissions: ['catalog.brand.view'],
+    },
+  ]);
+  const rootId = new mongoose.Types.ObjectId();
+  await Category.create({
+    _id: rootId,
+    name: 'Integration Brand Fashion',
+    nameKey: 'integration brand fashion',
+    slug: 'integration-brand-fashion',
+    parentId: null,
+    rootId,
+    level: 1,
+    sortOrder: 99,
+  });
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/admin/v1/brands`;
+  const tokenFor = (user) => signAccessToken({ sub: String(user._id), role: 'ADMIN' });
+  const call = (path, { method = 'GET', body, token = tokenFor(admin), key } = {}) => fetch(`${base}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      ...(key ? { 'idempotency-key': key } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const payload = {
+    name: 'Integration Allen Solly',
+    rootCategory: 'Integration Brand Fashion',
+    ownerType: 'BRAND_OWNER',
+    gated: true,
+    imageUrl: 'https://cdn.example.com/brands/allen-solly.png',
+  };
+
+  const createdResponse = await call('/', { method: 'POST', body: payload, key: 'brand-create-0001' });
+  assert.equal(createdResponse.status, 201);
+  const created = (await createdResponse.json()).data;
+  assert.equal(created.status, 'VERIFIED');
+  assert.equal(created.rootCategoryId, String(rootId));
+  assert.equal(created.authorisedSellerCount, 0);
+
+  await Brand.updateOne({ _id: created.id }, { $set: { status: 'PENDING' } });
+  const updatedResponse = await call(`/${created.id}`, {
+    method: 'PATCH',
+    body: { name: 'Integration Puma', gated: false, version: created.version },
+  });
+  assert.equal(updatedResponse.status, 200);
+  const updated = (await updatedResponse.json()).data;
+  assert.equal(updated.name, 'Integration Puma');
+  assert.equal(updated.status, 'VERIFIED');
+  assert.equal(updated.version, 2);
+
+  const stale = await call(`/${created.id}`, {
+    method: 'PATCH', body: { name: 'Stale Puma', version: created.version },
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).error.code, 'VERSION_CONFLICT');
+
+  const replay = await call('/', { method: 'POST', body: payload, key: 'brand-create-0001' });
+  assert.equal(replay.status, 201);
+  assert.equal(replay.headers.get('idempotent-replayed'), 'true');
+  assert.equal(await Brand.countDocuments({}), 1);
+
+  const duplicate = await call('/', {
+    method: 'POST', body: { ...payload, name: ' integration  puma ' }, key: 'brand-create-0002',
+  });
+  assert.equal(duplicate.status, 422);
+  assert.ok((await duplicate.json()).error.fieldErrors.name);
+
+  const forcedStatus = await call('/', {
+    method: 'POST', body: { ...payload, name: 'Status Bypass', status: 'VERIFIED' }, key: 'brand-create-0003',
+  });
+  assert.equal(forcedStatus.status, 422);
+
+  const denied = await call('/', {
+    method: 'POST', body: { name: 'Denied Brand' }, token: tokenFor(viewer), key: 'brand-create-0004',
+  });
+  assert.equal(denied.status, 403);
+
+  const listedResponse = await call('/?q=Puma&status=VERIFIED&gated=false');
+  assert.equal(listedResponse.status, 200);
+  const listed = await listedResponse.json();
+  assert.equal(listed.data[0].id, created.id);
+  assert.equal(listed.meta.total, 1);
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.brand.create', subjectId: created.id }), 1);
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.brand.edit', subjectId: created.id }), 1);
+
+  await Brand.updateOne({ _id: created.id }, { $set: { productCount: 1 } });
+  const inUse = await call(`/${created.id}`, { method: 'DELETE' });
+  assert.equal(inUse.status, 409);
+  assert.equal((await inUse.json()).error.code, 'BRAND_IN_USE');
+
+  await Brand.updateOne({ _id: created.id }, { $set: { productCount: 0 } });
+  const deleted = await call(`/${created.id}`, { method: 'DELETE' });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual((await deleted.json()).data, { ok: true });
+  assert.equal(await Brand.countDocuments({ _id: created.id }), 0);
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.brand.delete', subjectId: created.id }), 1);
+});
+
+test('admin size charts: validates, scopes, publishes to sellers and protects charts in use', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { AuditLog } = await import('../src/infrastructure/audit/audit.model.js');
+  const { IdempotencyRecord } = await import('../src/infrastructure/idempotency/idempotency.model.js');
+  const { SizeChart } = await import('../src/modules/catalog/infrastructure/persistence/sizeChart.model.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  await Promise.all([User.init(), Category.init(), SizeChart.init(), AuditLog.init(), IdempotencyRecord.init()]);
+
+  const [admin, viewer, seller] = await User.create([
+    {
+      role: 'ADMIN', email: 'sizechart-flow@arise.test', status: 'ACTIVE',
+      permissions: ['catalog.sizechart.view', 'catalog.sizechart.create', 'catalog.sizechart.edit', 'catalog.sizechart.delete'],
+    },
+    { role: 'ADMIN', email: 'sizechart-viewer@arise.test', status: 'ACTIVE', permissions: ['catalog.sizechart.view'] },
+    { role: 'SELLER', email: 'sizechart-seller@arise.test', status: 'ACTIVE' },
+  ]);
+  const rootId = new mongoose.Types.ObjectId();
+  const categoryId = new mongoose.Types.ObjectId();
+  await Category.create([
+    {
+      _id: rootId, name: 'Integration Apparel', nameKey: 'integration apparel', slug: 'integration-apparel',
+      parentId: null, rootId, level: 1, sortOrder: 100,
+    },
+    {
+      _id: categoryId, name: 'Integration Shirts', nameKey: 'integration shirts', slug: 'integration-shirts',
+      parentId: rootId, rootId, level: 3, sortOrder: 1,
+    },
+  ]);
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const tokenFor = (user, role = user.role) => signAccessToken({ sub: String(user._id), role });
+  const call = (path, { method = 'GET', body, token = tokenFor(admin), key } = {}) => fetch(`${origin}${path}`, {
+    method,
+    headers: {
+      authorization: `Bearer ${token}`,
+      'content-type': 'application/json',
+      ...(key ? { 'idempotency-key': key } : {}),
+    },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const payload = {
+    name: 'Integration Men Shirts', unit: 'in', categoryId: String(categoryId),
+    columns: ['Size', 'Chest', 'Length'],
+    rows: [['38', '40', '28'], ['40', '42', '29']],
+  };
+
+  const createdResponse = await call('/api/admin/v1/size-charts', {
+    method: 'POST', body: payload, key: 'size-chart-create-0001',
+  });
+  assert.equal(createdResponse.status, 201);
+  const created = (await createdResponse.json()).data;
+  assert.equal(created.categoryName, 'Integration Shirts');
+  assert.equal(created.version, 1);
+
+  const replay = await call('/api/admin/v1/size-charts', {
+    method: 'POST', body: payload, key: 'size-chart-create-0001',
+  });
+  assert.equal(replay.status, 201);
+  assert.equal(replay.headers.get('idempotent-replayed'), 'true');
+
+  const invalid = await call('/api/admin/v1/size-charts', {
+    method: 'POST', body: { ...payload, name: 'Invalid Duplicate Sizes', rows: [['38', '40', '28'], [' 38 ', '42', '29']] },
+    key: 'size-chart-create-0002',
+  });
+  assert.equal(invalid.status, 422);
+  assert.ok((await invalid.json()).error.fieldErrors.rows);
+
+  const listed = await call('/api/admin/v1/size-charts');
+  assert.equal(listed.status, 200);
+  assert.ok((await listed.json()).data.some((chart) => chart.id === created.id));
+
+  const sellerResponse = await call(`/api/seller/v1/catalog/categories/${categoryId}/attributes`, {
+    token: tokenFor(seller),
+  });
+  assert.equal(sellerResponse.status, 200);
+  assert.deepEqual((await sellerResponse.json()).data.sizeCharts, [{ id: created.id, name: created.name }]);
+
+  const updatedResponse = await call(`/api/admin/v1/size-charts/${created.id}`, {
+    method: 'PATCH', body: { unit: 'cm', version: created.version },
+  });
+  assert.equal(updatedResponse.status, 200);
+  const updated = (await updatedResponse.json()).data;
+  assert.equal(updated.unit, 'cm');
+  assert.equal(updated.version, 2);
+
+  const stale = await call(`/api/admin/v1/size-charts/${created.id}`, {
+    method: 'PATCH', body: { name: 'Stale Chart', version: created.version },
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).error.code, 'VERSION_CONFLICT');
+
+  const denied = await call('/api/admin/v1/size-charts', {
+    method: 'POST', body: { ...payload, name: 'Denied Chart' }, token: tokenFor(viewer), key: 'size-chart-create-0003',
+  });
+  assert.equal(denied.status, 403);
+
+  await SizeChart.updateOne({ _id: created.id }, { $set: { productCount: 1 } });
+  const inUse = await call(`/api/admin/v1/size-charts/${created.id}`, { method: 'DELETE' });
+  assert.equal(inUse.status, 409);
+  assert.equal((await inUse.json()).error.code, 'SIZECHART_IN_USE');
+
+  await SizeChart.updateOne({ _id: created.id }, { $set: { productCount: 0 } });
+  const deleted = await call(`/api/admin/v1/size-charts/${created.id}`, { method: 'DELETE' });
+  assert.equal(deleted.status, 200);
+  assert.deepEqual((await deleted.json()).data, { ok: true });
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.sizechart.create', subjectId: created.id }), 1);
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.sizechart.edit', subjectId: created.id }), 1);
+  assert.equal(await AuditLog.countDocuments({ action: 'catalog.sizechart.delete', subjectId: created.id }), 1);
+});
+
 test('admin categories: creates three levels, inherits policies, builds the tree and enforces conflicts', opts, async (t) => {
   const { createApp } = await import('../src/app/app.js');
   const { signAccessToken } = await import('../src/shared/utils/jwt.js');

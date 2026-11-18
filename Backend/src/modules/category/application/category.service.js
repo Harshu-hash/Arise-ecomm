@@ -85,6 +85,50 @@ export async function listCategoryTree(scope) {
   return categoryTree(rows, (row) => serializeCategory(row, rootNames.get(id(row.rootId))));
 }
 
+export async function findRootCategoryByName(name) {
+  const category = await Category.findOne({ level: 1, nameKey: categoryNameKey(name) }, 'name').lean();
+  return category ? { id: String(category._id), name: category.name } : null;
+}
+
+export async function findCategoryForCatalog(categoryId) {
+  const category = await Category.findById(categoryId, 'name rootId').lean();
+  return category ? {
+    id: String(category._id),
+    name: category.name,
+    rootId: String(category.rootId),
+  } : null;
+}
+
+/** A leaf category as a new product/listing needs it: policy snapshot plus its breadcrumb path. */
+export async function getCategoryForListing(categoryId) {
+  const category = await Category.findOne({ _id: categoryId, level: MAX_CATEGORY_LEVEL, status: 'ACTIVE' }).lean();
+  if (!category) return null;
+  const names = [category.name];
+  let parent = category.parentId ? await Category.findById(category.parentId, 'name parentId').lean() : null;
+  while (parent) {
+    names.unshift(parent.name);
+    parent = parent.parentId ? await Category.findById(parent.parentId, 'name parentId').lean() : null;
+  }
+  return {
+    id: id(category._id),
+    name: category.name,
+    path: names.join(' › '),
+    rootId: id(category.rootId),
+    attributeSetId: id(category.attributeSetId),
+    hsnCode: category.hsnCode,
+    gstRate: category.gstRate,
+    returnWindowDays: category.returnWindowDays,
+    returnTypes: category.returnTypes,
+    gated: category.gated,
+  };
+}
+
+/** Keeps `canDelete`/hide-impact checks honest once products start using this category. */
+export async function incrementCategoryProductCount(categoryId, delta) {
+  if (!categoryId || !delta) return;
+  await Category.updateOne({ _id: categoryId }, { $inc: { productCount: delta } });
+}
+
 export async function getCategory(categoryId, scope) {
   const category = await Category.findById(categoryId).lean();
   if (!category) throw new NotFoundError('Category not found.');

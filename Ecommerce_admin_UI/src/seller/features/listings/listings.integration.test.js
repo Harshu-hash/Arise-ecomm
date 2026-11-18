@@ -73,6 +73,51 @@ describe('seller listings API (golden loop)', () => {
     expect(mine.type).toBe('NEW');
   });
 
+  it('stores manufacturer, origin, fit/care/model info and a barcode — the fields the customer app renders', async () => {
+    await signInAsOwner();
+    const leaf = db.categories.find((c) => c.level === 3);
+
+    const created = await listingsApi.create({
+      title: 'Nova Compliance Test Tee',
+      categoryId: leaf.id,
+      mrpPaise: 99900,
+      sellingPricePaise: 49900,
+      stock: 25,
+      manufacturer: 'Nova Apparel India Pvt Ltd, Bengaluru',
+      countryOfOrigin: 'Bangladesh',
+      productCode: 'NV-TS-2026-NVY',
+      fit: 'Regular Fit',
+      care: 'Gentle machine wash',
+      modelInfo: "Model is 5'10\" and wearing size M",
+      barcode: '8901234567890',
+    });
+
+    const product = db.products.find((p) => p.id === created.productId);
+    expect(product.manufacturer).toBe('Nova Apparel India Pvt Ltd, Bengaluru');
+    expect(product.countryOfOrigin).toBe('Bangladesh');
+    expect(product.productCode).toBe('NV-TS-2026-NVY');
+    expect(product.fit).toBe('Regular Fit');
+    expect(product.care).toBe('Gentle machine wash');
+    expect(product.modelInfo).toBe("Model is 5'10\" and wearing size M");
+
+    const variant = db.variants.find((v) => v.productId === created.productId);
+    expect(variant.ean).toBe('8901234567890');
+  });
+
+  it('defaults country of origin to India when not given', async () => {
+    await signInAsOwner();
+    const leaf = db.categories.find((c) => c.level === 3);
+    const created = await listingsApi.create({
+      title: 'Nova Default Origin Tee',
+      categoryId: leaf.id,
+      mrpPaise: 99900,
+      sellingPricePaise: 49900,
+      stock: 5,
+    });
+    const product = db.products.find((p) => p.id === created.productId);
+    expect(product.countryOfOrigin).toBe('India');
+  });
+
   it('rejects a selling price above MRP', async () => {
     await signInAsOwner();
     const leaf = db.categories.find((c) => c.level === 3);

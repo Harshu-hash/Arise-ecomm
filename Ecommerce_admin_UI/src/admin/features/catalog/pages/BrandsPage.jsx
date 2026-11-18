@@ -1,4 +1,4 @@
-import { App, Avatar, Button, Flex, Form, Input, Modal, Select, Space, Switch, Tag, Typography } from 'antd';
+import { App, Avatar, Button, Flex, Form, Input, Modal, Space, Switch, Tag, Typography } from 'antd';
 import { useMutation } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
@@ -22,9 +22,9 @@ export default function BrandsPage() {
   const [deleting, setDeleting] = useState(null);
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
-    queryKey: catalogKeys.brands({ ...state.queryParams, tab: state.tab }),
+    queryKey: catalogKeys.brands(state.queryParams),
     url: '/brands',
-    params: { ...state.queryParams, ...(state.tab ? { status: state.tab } : {}) },
+    params: state.queryParams,
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['catalog'] });
@@ -153,11 +153,6 @@ export default function BrandsPage() {
         error={error}
         onRetry={refetch}
         tableState={state}
-        tabs={[
-          { key: 'all', label: 'All' },
-          { key: 'VERIFIED', label: 'Verified' },
-          { key: 'PENDING', label: 'Pending verification' },
-        ]}
         emptyProps={{ title: 'No brands match' }}
         mobileCard={(row) => (
           <Flex vertical gap={4}>
@@ -222,6 +217,7 @@ function BrandFormModal({ open, editing, onCancel, onSubmit, loading }) {
       destroyOnHidden
     >
       <Form form={form} layout="vertical" requiredMark={false}>
+        <Form.Item name="version" hidden><Input /></Form.Item>
         <ImageFieldPicker
           name="imageUrl"
           label="Logo"
@@ -232,9 +228,6 @@ function BrandFormModal({ open, editing, onCancel, onSubmit, loading }) {
         </Form.Item>
         <Form.Item name="rootCategory" label="Root category (optional)">
           <Input placeholder="e.g. Fashion" />
-        </Form.Item>
-        <Form.Item name="status" label="Status" initialValue="VERIFIED">
-          <Select options={['VERIFIED', 'PENDING', 'BLOCKED'].map((s) => ({ value: s, label: s.toLowerCase() }))} />
         </Form.Item>
         <Space>
           <Form.Item name="gated" label="Gated" valuePropName="checked" extra="Needs seller authorisation to list">

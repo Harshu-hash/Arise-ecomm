@@ -24,8 +24,8 @@ export default function SizeChartsPage() {
   });
 
   const categoriesQuery = useQuery({
-    queryKey: catalogKeys.categories({ pageSize: 200 }),
-    queryFn: () => catalogApi.categories({ pageSize: 200 }),
+    queryKey: catalogKeys.categoryTree,
+    queryFn: () => catalogApi.categoryTree(),
   });
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: catalogKeys.sizeCharts });
@@ -55,7 +55,7 @@ export default function SizeChartsPage() {
   if (error) return <ErrorState error={error} onRetry={refetch} title="Could not load size charts" />;
 
   const charts = data?.data ?? [];
-  const categoryOptions = (categoriesQuery.data?.data ?? []).map((c) => ({ value: c.id, label: c.name }));
+  const categoryOptions = flattenCategories(categoriesQuery.data?.data ?? []);
 
   const openNew = () => { setEditing(null); setModalOpen(true); };
   const openEdit = (chart) => { setEditing(chart); setModalOpen(true); };
@@ -136,4 +136,14 @@ export default function SizeChartsPage() {
       />
     </Flex>
   );
+}
+
+function flattenCategories(categories, parents = []) {
+  return categories.flatMap((category) => {
+    const path = [...parents, category.name];
+    return [
+      { value: category.id, label: path.join(' › ') },
+      ...flattenCategories(category.children ?? [], path),
+    ];
+  });
 }

@@ -12,7 +12,11 @@ import { createSellerApplicationsRouter } from '../modules/identity/presentation
 import { createSellerSettingsRouter } from '../modules/identity/presentation/sellerSettings.routes.js';
 import { createCategoryRouter } from '../modules/category/presentation/category.routes.js';
 import { createSellerCatalogRouter } from '../modules/category/presentation/sellerCatalog.routes.js';
+import { createListingRouter } from '../modules/product/presentation/listing.routes.js';
+import { createMediaRouter } from '../modules/media/presentation/media.routes.js';
 import { createAttributeRouter, createAttributeSetRouter } from '../modules/attribute/presentation/attribute.routes.js';
+import { createBrandRouter } from '../modules/catalog/presentation/brand.routes.js';
+import { createSizeChartRouter } from '../modules/catalog/presentation/sizeChart.routes.js';
 import { createPaymentWebhookRouter } from '../modules/payment/presentation/payment.webhook.routes.js';
 import { createUploadRouter } from '../modules/system/presentation/upload.routes.js';
 import { createSystemRouter } from '../modules/system/presentation/system.routes.js';
@@ -91,15 +95,20 @@ export function createRoutes() {
     }
     root.use(`/api/${audience}/v1/me`, createMeRouter());
     root.use(`/api/${audience}/v1/uploads`, createUploadRouter());
+    // Only seller/admin widgets currently use the media workflow (product images, CMS, ...).
+    if (audience !== 'customer') root.use(`/api/${audience}/v1/media`, createMediaRouter());
   }
   root.use('/api/admin/v1/admin-users', createAdminUsersRouter());
   root.use('/api/admin/v1/categories', createCategoryRouter());
   root.use('/api/admin/v1/attributes', createAttributeRouter());
   root.use('/api/admin/v1/attribute-sets', createAttributeSetRouter());
+  root.use('/api/admin/v1/brands', createBrandRouter());
+  root.use('/api/admin/v1/size-charts', createSizeChartRouter());
   root.use('/api/admin/v1/sellers', createSellerApplicationsRouter());
   root.use('/api/admin/v1/pii', createPiiRouter());
   root.use('/api/seller/v1/settings', createSellerSettingsRouter());
   root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
+  root.use('/api/seller/v1/listings', createListingRouter());
 
   const webhooks = Router();
   webhooks.use('/payments', createPaymentWebhookRouter());

@@ -29,6 +29,10 @@ import { listingKeys, listingsApi } from '../api/listings.api';
 import SimpleProductFields from '../components/SimpleProductFields';
 import VariantMatrix from '../components/VariantMatrix';
 
+// The media widgets hand back full media records ({ id, mediaId, previewUrl, ... });
+// the backend only wants the id it can resolve to a durable file.
+const mediaIds = (list) => (list ?? []).map((item) => item.mediaId ?? item.id).filter(Boolean);
+
 const RETURN_TYPES = [
   { value: 'RETURN', label: 'Returnable' },
   { value: 'REPLACEMENT', label: 'Replacement only' },
@@ -65,6 +69,9 @@ export default function AddProductPage() {
   const attributes = useMemo(() => catAttrs?.attributes ?? [], [catAttrs]);
   const variantAttrs = useMemo(() => attributes.filter((a) => a.variantDefining), [attributes]);
   const plainAttrs = useMemo(() => attributes.filter((a) => !a.variantDefining), [attributes]);
+  // Model info ("model is 6ft, wearing size 40") only makes sense alongside a
+  // fit attribute — shown for apparel-like categories, not grocery or audio.
+  const hasFitAttr = useMemo(() => attributes.some((a) => a.code === 'fit'), [attributes]);
   const sizeCharts = catAttrs?.sizeCharts ?? [];
 
   const onCategoryChange = (value) => {
@@ -90,10 +97,19 @@ export default function AddProductPage() {
         .split('\n')
         .map((s) => s.trim())
         .filter(Boolean),
-      images,
-      videos,
-      complianceDocuments,
+      images: mediaIds(images),
+      videos: mediaIds(videos),
+      complianceDocuments: mediaIds(complianceDocuments),
       attributes: attrValues,
+      // Mirrored to the top level: these are the exact fields the customer
+      // app's product page renders, which read from `product.fit`/`.care`,
+      // not from the attribute bag.
+      fit: attrValues.fit ?? null,
+      care: attrValues.wash_care ?? null,
+      modelInfo: (values.modelInfo ?? '').trim() || null,
+      manufacturer: (values.manufacturer ?? '').trim(),
+      countryOfOrigin: (values.countryOfOrigin ?? '').trim() || 'India',
+      productCode: (values.productCode ?? '').trim() || null,
       sizeChartId: values.sizeChartId ?? null,
       returnPolicy: {
         windowDays: values.returnWindowDays ?? 7,
@@ -130,7 +146,7 @@ export default function AddProductPage() {
           stock,
           weightG,
           dimsCm,
-          images: variantImages,
+          images: mediaIds(variantImages),
         }),
       );
     } else {
@@ -139,6 +155,7 @@ export default function AddProductPage() {
       payload.stock = values.stock ?? 0;
       payload.weightG = values.weightG ?? 500;
       payload.dimsCm = { l: values.dimsL ?? 20, w: values.dimsW ?? 15, h: values.dimsH ?? 5 };
+      payload.barcode = (values.barcode ?? '').trim() || undefined;
     }
     return payload;
   };
@@ -226,6 +243,7 @@ export default function AddProductPage() {
           stock: 0,
           returnWindowDays: 7,
           returnType: 'RETURN',
+          countryOfOrigin: 'India',
         }}
       >
         <Row gutter={16}>
@@ -281,6 +299,43 @@ export default function AddProductPage() {
                   placeholder={'Machine washable\n100% cotton\n1-year warranty'}
                 />
               </Form.Item>
+
+              <Row gutter={16}>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="manufacturer"
+                    label="Manufacturer"
+                    rules={[{ required: true, message: 'Enter the manufacturer name and address.' }]}
+                  >
+                    <Input placeholder="e.g. Nova Apparel India Pvt Ltd, Bengaluru" />
+                  </Form.Item>
+                </Col>
+                <Col xs={24} sm={12}>
+                  <Form.Item
+                    name="countryOfOrigin"
+                    label="Country of origin"
+                    rules={[{ required: true, message: 'Required for the product label.' }]}
+                  >
+                    <Input placeholder="e.g. India" />
+                  </Form.Item>
+                </Col>
+              </Row>
+              <Form.Item
+                name="productCode"
+                label="Product code / MPN"
+                extra="The manufacturer's own model/part number, if it has one. Leave blank to use the auto-generated SKU."
+              >
+                <Input placeholder="e.g. NV-TS-2026-NVY" />
+              </Form.Item>
+              {hasFitAttr && (
+                <Form.Item
+                  name="modelInfo"
+                  label="Model info"
+                  extra="Shown under Size & Fit, e.g. the model's height and the size they're wearing."
+                >
+                  <Input placeholder="e.g. The model is 5ft 10in tall, wearing size M" />
+                </Form.Item>
+              )}
               {sizeCharts.length > 0 && (
                 <Form.Item name="sizeChartId" label="Size chart">
                   <Select
@@ -368,19 +423,16 @@ export default function AddProductPage() {
 
               {!variantAttrs.length && categoryId && <SimpleProductFields />}
             </Card>
-          </Col>
 
-          <Col xs={24} lg={8}>
-            <Card title="Fulfilment & returns" style={{ marginBottom: 16 }}>
-              <Form.Item name="fulfillmentType" label="Fulfilment">
-                <Select
-                  options={[
-                    { value: 'SELLER', label: 'I will ship (Self-ship)' },
-                    { value: 'ARISE', label: 'Fulfilled by Arise (FBA)' },
-                  ]}
-                />
+            <Card title="Fulfilment & returns" style={{ marginTop: 16 }}>
+              <Form.Item name="fulfillmentType" hidden initialValue="SELLER">
+                <Input type="hidden" />
               </Form.Item>
-              <Divider style={{ margin: '8px 0 16px' }} />
+              <Typography.Text type="secondary" style={{ fontSize: 13 }}>
+                Self-ship: you pack this and hand it to the courier. Arise-fulfilled
+                warehousing isn&apos;t available yet.
+              </Typography.Text>
+              <Divider style={{ margin: '12px 0 16px' }} />
               <Form.Item name="returnType" label="Return policy">
                 <Select options={RETURN_TYPES} />
               </Form.Item>
@@ -398,7 +450,9 @@ export default function AddProductPage() {
                 />
               </Form.Item>
             </Card>
+          </Col>
 
+          <Col xs={24} lg={8}>
             <Space direction="vertical" style={{ width: '100%' }}>
               <Button
                 type="primary"

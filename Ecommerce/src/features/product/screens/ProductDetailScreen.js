@@ -152,14 +152,6 @@ const SUGGESTIONS = [
   },
 ];
 
-const SIZE_CHART_ROWS = [
-  { size: '38', chest: '38', length: '28.5', shoulder: '16.5' },
-  { size: '40', chest: '40', length: '29', shoulder: '17' },
-  { size: '42', chest: '42', length: '29.5', shoulder: '17.5' },
-  { size: '44', chest: '44', length: '30', shoulder: '18' },
-  { size: '46', chest: '46', length: '30.5', shoulder: '18.5' },
-];
-
 const BANK_OFFERS = [
   {
     id: 'o1',
@@ -653,9 +645,11 @@ const ProductDetailContent = ({ product, navigation }) => {
           {/* Size */}
           <View style={[styles.padded, styles.sizeHeader]}>
             <Text style={styles.sizeTitle}>Select Size</Text>
-            <TouchableOpacity onPress={openSizeChart}>
-              <Text style={styles.sizeChart}>Size Chart ›</Text>
-            </TouchableOpacity>
+            {product.sizeChart ? (
+              <TouchableOpacity onPress={openSizeChart}>
+                <Text style={styles.sizeChart}>Size Chart ›</Text>
+              </TouchableOpacity>
+            ) : null}
           </View>
           <View style={styles.sizeRow}>
             {product.sizes.map(s => (
@@ -902,6 +896,20 @@ const ProductDetailContent = ({ product, navigation }) => {
             <Icon name="chevron-right" size={20} color={COLORS.textTertiary} />
           </TouchableOpacity>
 
+          {/* Specifications: whatever category attributes the seller filled
+              in (fabric, connectivity, capacity, …) that have no dedicated
+              field of their own — rendered generically, not per-category. */}
+          {product.specifications?.length > 0 && (
+            <Dropdown title="Specifications" style={{ marginTop: SPACING.xxl }}>
+              {product.specifications.map((spec, i) => (
+                <View key={i} style={styles.specRow}>
+                  <Text style={styles.specLabel}>{spec.label}</Text>
+                  <Text style={styles.specValue}>{spec.value}</Text>
+                </View>
+              ))}
+            </Dropdown>
+          )}
+
           {/* More information */}
           <Dropdown title="More Information" style={{ marginTop: SPACING.xxl }}>
             <Text style={styles.infoText}>Product Code: {product.productCode}</Text>
@@ -999,32 +1007,45 @@ const ProductDetailContent = ({ product, navigation }) => {
         </Animated.View>
       </View>
 
+      {/* Rendered from the chart's own columns/rows, so a footwear chart (UK/IN,
+          EU, Foot length) displays correctly, not just the shirts layout this
+          screen used to assume. */}
       <BottomSheetModal visible={sizeChartVisible} onClose={() => setSizeChartVisible(false)}>
-        <View style={styles.sheetContent}>
-          <View style={styles.sheetHandle} />
-          <Text style={styles.sheetTitle}>Size Chart</Text>
-          <Text style={styles.sheetSubtitle}>All measurements are in inches</Text>
+        {product.sizeChart ? (
+          <View style={styles.sheetContent}>
+            <View style={styles.sheetHandle} />
+            <Text style={styles.sheetTitle}>{product.sizeChart.name || 'Size Chart'}</Text>
+            <Text style={styles.sheetSubtitle}>
+              {product.sizeChart.unit
+                ? `All measurements are in ${product.sizeChart.unit}`
+                : 'All measurements as listed by the seller'}
+            </Text>
 
-          <View style={styles.chartTable}>
-            <View style={[styles.chartRow, styles.chartHeaderRow]}>
-              <Text style={[styles.chartCell, styles.chartHeaderCell]}>Size</Text>
-              <Text style={[styles.chartCell, styles.chartHeaderCell]}>Chest</Text>
-              <Text style={[styles.chartCell, styles.chartHeaderCell]}>Length</Text>
-              <Text style={[styles.chartCell, styles.chartHeaderCell]}>Shoulder</Text>
-            </View>
-            {SIZE_CHART_ROWS.filter(row => product.sizes.includes(row.size)).map(row => (
-              <View
-                key={row.size}
-                style={[styles.chartRow, row.size === selectedSize && styles.chartRowActive]}
-              >
-                <Text style={styles.chartCell}>{row.size}</Text>
-                <Text style={styles.chartCell}>{row.chest}"</Text>
-                <Text style={styles.chartCell}>{row.length}"</Text>
-                <Text style={styles.chartCell}>{row.shoulder}"</Text>
+            <View style={styles.chartTable}>
+              <View style={[styles.chartRow, styles.chartHeaderRow]}>
+                {product.sizeChart.columns.map((column, i) => (
+                  <Text key={i} style={[styles.chartCell, styles.chartHeaderCell]}>
+                    {column}
+                  </Text>
+                ))}
               </View>
-            ))}
+              {product.sizeChart.rows
+                .filter(row => product.sizes.includes(row[0]))
+                .map(row => (
+                  <View
+                    key={row[0]}
+                    style={[styles.chartRow, row[0] === selectedSize && styles.chartRowActive]}
+                  >
+                    {row.map((cell, i) => (
+                      <Text key={i} style={styles.chartCell}>
+                        {cell}
+                      </Text>
+                    ))}
+                  </View>
+                ))}
+            </View>
           </View>
-        </View>
+        ) : null}
       </BottomSheetModal>
 
       <BottomSheetModal visible={offersVisible} onClose={() => setOffersVisible(false)}>
@@ -1470,6 +1491,14 @@ const styles = StyleSheet.create({
   infoBlock: { marginBottom: SPACING.l },
   infoTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 2 },
   infoText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 21 },
+  specRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: SPACING.s,
+    gap: SPACING.m,
+  },
+  specLabel: { fontSize: 13, color: COLORS.textSecondary },
+  specValue: { fontSize: 13, color: COLORS.textPrimary, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
 
   badgeRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SPACING.xxl },
   badgeItem: { alignItems: 'center' },
