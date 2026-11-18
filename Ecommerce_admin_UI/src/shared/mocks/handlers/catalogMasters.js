@@ -16,6 +16,7 @@ import { mockNowIso } from '../engine/settings';
 import { scheduleSave } from '../persistence';
 
 const BASE = '/api/admin/v1';
+const HEX_COLOR = /^#[\da-f]{6}$/i;
 
 /** Category scope: a Category Manager only sees their assigned roots. */
 function categoryAllowed(category, user) {
@@ -114,6 +115,11 @@ export const catalogMasterHandlers = [
     const parent = body?.parentId ? findById('categories', body.parentId) : null;
     if (body?.parentId && !parent) fieldErrors.parentId = 'That parent no longer exists.';
     if (parent && parent.level >= 3) fieldErrors.parentId = 'The taxonomy is three levels deep.';
+    if (body?.color != null && (parent || !HEX_COLOR.test(body.color))) {
+      fieldErrors.color = parent
+        ? 'Only top-level categories can have a colour.'
+        : 'Choose a valid colour.';
+    }
 
     const level = parent ? parent.level + 1 : 1;
     const siblings = db.categories.filter((c) => c.parentId === (body?.parentId ?? null));
@@ -130,6 +136,7 @@ export const catalogMasterHandlers = [
       level,
       imageUrl: body.imageUrl ?? null,
       icon: body.icon ?? null,
+      ...(level === 1 ? { color: body.color ?? null } : {}),
       rootName: parent ? parent.rootName : String(body.name).trim(),
       sortOrder: siblings.length + 1,
       status: 'ACTIVE',
@@ -166,6 +173,13 @@ export const catalogMasterHandlers = [
     }
     const body = await request.json();
     if (body.version !== undefined && body.version !== category.version) return versionConflict(category);
+    if (body.color !== undefined && (category.level !== 1 || (body.color !== null && !HEX_COLOR.test(body.color)))) {
+      return validationFailed({
+        color: category.level === 1
+          ? 'Choose a valid colour.'
+          : 'Only top-level categories can have a colour.',
+      });
+    }
 
     // Hiding a category with live listings takes the listings down with it,
     // so it has to be a deliberate choice rather than a side effect.
@@ -186,6 +200,7 @@ export const catalogMasterHandlers = [
     ]) {
       if (body[key] !== undefined) patch[key] = body[key];
     }
+    if (body.color !== undefined) patch.color = body.color;
     update('categories', category.id, patch);
     if ('attributeSetId' in patch) recomputeAttributeUsage();
 
@@ -267,8 +282,15 @@ export const catalogMasterHandlers = [
 
     const before = { ...attribute };
     const patch = {};
-    for (const key of ['name', 'unit', 'filterable', 'variantDefining', 'values', 'type']) {
+    for (const key of ['name', 'unit', 'filterable', 'variantDefining', 'type']) {
       if (body[key] !== undefined) patch[key] = body[key];
+    }
+    if (body.values !== undefined) {
+      patch.values = body.values.map((value) => ({
+        value: typeof value === 'string' ? value : value.value,
+        active: true,
+        synonyms: [],
+      }));
     }
     update('attributes', attribute.id, patch);
     writeAudit({
@@ -348,6 +370,12 @@ export const catalogMasterHandlers = [
   }),
 
   /* ------------------------------------------------------------- attribute sets */
+  mswHttp.get(`${BASE}/attribute-sets`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'catalog.attribute.view');
+    if (g.response) return g.response;
+    return ok(db.attributeSets);
+  }),
+
   mswHttp.post(`${BASE}/attribute-sets`, async ({ request }) => {
     const g = await guard(request, new URL(request.url), 'catalog.attribute.create');
     if (g.response) return g.response;

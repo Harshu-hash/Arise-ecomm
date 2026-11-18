@@ -3,9 +3,9 @@
  * never point at a 404 — every path here has a real route in the router.
  *
  * Simplified menu: a lean, Flipkart/Amazon-style marketplace admin aimed at
- * Indian sellers. Own-fleet logistics, warehouses/FBA, wallet, sponsored ads,
- * RBAC role management and the heavy finance/reports surfaces have been
- * removed. Third-party delivery integration will add to the Orders group later.
+ * Indian sellers. Own-fleet logistics, warehouses/FBA, wallet, sponsored ads
+ * and the heavy finance/reports surfaces have been removed. Third-party
+ * delivery integration will add to the Orders group later.
  */
 
 export const NAV_GROUPS = [
@@ -98,6 +98,12 @@ export const NAV_GROUPS = [
       { label: 'Refunds', path: '/finance/refunds' },
       { label: 'Seller Settlements', path: '/finance/payouts' },
     ],
+  },
+  {
+    key: 'roles',
+    section: 'System',
+    icon: 'safety',
+    items: [{ label: 'Roles & Permissions', path: '/admin/roles' }],
   },
   {
     key: 'settings',

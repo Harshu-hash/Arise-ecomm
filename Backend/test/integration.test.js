@@ -469,3 +469,192 @@ test('audit log is append-only and redacts secrets', opts, async () => {
   await assert.rejects(AuditLog.updateOne({ _id: entry._id }, { $set: { action: 'x' } }), /append-only/);
   await assert.rejects(AuditLog.deleteMany({}), /append-only/);
 });
+
+test('admin categories: creates three levels, inherits policies, builds the tree and enforces conflicts', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  await Promise.all([User.init(), Category.init()]);
+
+  const admin = await User.create({
+    role: 'ADMIN',
+    email: 'category-flow@arise.test',
+    status: 'ACTIVE',
+    permissions: [
+      'catalog.category.view',
+      'catalog.category.create',
+      'catalog.category.edit',
+      'catalog.category.delete',
+    ],
+  });
+  const token = signAccessToken({ sub: String(admin._id), role: 'ADMIN' });
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/admin/v1/categories`;
+  const call = (path, { method = 'GET', body } = {}) => fetch(`${base}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const rootResponse = await call('/', {
+    method: 'POST',
+    body: {
+      name: 'Integration Fashion', color: '#7c3aed', returnWindowDays: 14,
+      returnTypes: ['REFUND'], gated: true, codAllowed: false, gstRate: 5, hsnCode: '6205',
+    },
+  });
+  assert.equal(rootResponse.status, 201);
+  const root = (await rootResponse.json()).data;
+  assert.equal(root.level, 1);
+  assert.equal(root.color, '#7c3aed');
+
+  const levelTwoResponse = await call('/', {
+    method: 'POST', body: { name: 'Integration Men', parentId: root.id },
+  });
+  assert.equal(levelTwoResponse.status, 201);
+  const levelTwo = (await levelTwoResponse.json()).data;
+  assert.equal(levelTwo.level, 2);
+  assert.equal(levelTwo.returnWindowDays, 14);
+  assert.equal(levelTwo.gated, true);
+  assert.equal(levelTwo.codAllowed, false);
+
+  const leafResponse = await call('/', {
+    method: 'POST', body: { name: 'Integration Shirts', parentId: levelTwo.id },
+  });
+  assert.equal(leafResponse.status, 201);
+  const leaf = (await leafResponse.json()).data;
+  assert.equal(leaf.level, 3);
+
+  const tooDeep = await call('/', {
+    method: 'POST', body: { name: 'Integration Too Deep', parentId: leaf.id },
+  });
+  assert.equal(tooDeep.status, 422);
+
+  const duplicate = await call('/', {
+    method: 'POST', body: { name: ' integration shirts ', parentId: levelTwo.id },
+  });
+  assert.equal(duplicate.status, 422);
+
+  const treeResponse = await call('/tree');
+  assert.equal(treeResponse.status, 200);
+  const tree = (await treeResponse.json()).data;
+  const createdRoot = tree.find((category) => category.id === root.id);
+  assert.equal(createdRoot.children[0].children[0].id, leaf.id);
+
+  const updatedResponse = await call(`/${root.id}`, {
+    method: 'PATCH', body: { name: 'Integration Style', color: '#2563eb', version: root.version },
+  });
+  assert.equal(updatedResponse.status, 200);
+  const updated = (await updatedResponse.json()).data;
+  assert.equal(updated.version, 2);
+  assert.equal(updated.slug, 'integration-style');
+
+  const stale = await call(`/${root.id}`, {
+    method: 'PATCH', body: { name: 'Stale name', version: root.version },
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).error.code, 'VERSION_CONFLICT');
+
+  const deleteParent = await call(`/${root.id}`, { method: 'DELETE' });
+  assert.equal(deleteParent.status, 409);
+  assert.equal((await deleteParent.json()).error.code, 'CATEGORY_HAS_CHILDREN');
+});
+
+test('attributes: admin CRUD, category assignment, seller reads and usage safeguards', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  const { Attribute } = await import('../src/modules/attribute/infrastructure/persistence/attribute.model.js');
+  const { AttributeSet } = await import('../src/modules/attribute/infrastructure/persistence/attributeSet.model.js');
+  await Promise.all([User.init(), Category.init(), Attribute.init(), AttributeSet.init()]);
+
+  const admin = await User.create({
+    role: 'ADMIN', email: 'attribute-flow@arise.test', status: 'ACTIVE',
+    permissions: [
+      'catalog.attribute.view', 'catalog.attribute.create', 'catalog.attribute.edit', 'catalog.attribute.delete',
+      'catalog.category.view', 'catalog.category.create', 'catalog.category.edit',
+    ],
+  });
+  const adminToken = signAccessToken({ sub: String(admin._id), role: 'ADMIN' });
+  const sellerToken = signAccessToken({ sub: String(new mongoose.Types.ObjectId()), role: 'SELLER' });
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const call = (path, { method = 'GET', body, token = adminToken } = {}) => fetch(`${origin}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${token}`, 'content-type': 'application/json' },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const attributeResponse = await call('/api/admin/v1/attributes', {
+    method: 'POST',
+    body: {
+      name: 'Integration Colour', code: 'integration_colour', type: 'COLOUR',
+      values: ['Black', 'Blue', 'black'], filterable: true, variantDefining: true,
+    },
+  });
+  assert.equal(attributeResponse.status, 201);
+  const attribute = (await attributeResponse.json()).data;
+  assert.deepEqual(attribute.values.map((value) => value.value), ['Black', 'Blue']);
+
+  const setResponse = await call('/api/admin/v1/attribute-sets', {
+    method: 'POST',
+    body: { name: 'Integration Apparel', rootName: 'Integration Attribute Fashion', attributeIds: [attribute.id] },
+  });
+  assert.equal(setResponse.status, 201);
+  const set = (await setResponse.json()).data;
+
+  const createCategory = async (name, parentId = null, extra = {}) => {
+    const response = await call('/api/admin/v1/categories', { method: 'POST', body: { name, parentId, ...extra } });
+    assert.equal(response.status, 201);
+    return (await response.json()).data;
+  };
+  const root = await createCategory('Integration Attribute Fashion');
+  const middle = await createCategory('Integration Attribute Men', root.id);
+  const leaf = await createCategory('Integration Attribute Shirts', middle.id, { attributeSetId: set.id });
+
+  const detail = await call(`/api/admin/v1/categories/${leaf.id}`);
+  const detailBody = await detail.json();
+  assert.equal(detailBody.meta.attributeSet.id, set.id);
+  assert.equal(detailBody.meta.attributes[0].code, 'integration_colour');
+
+  const sellerAttributes = await call(`/api/seller/v1/catalog/categories/${leaf.id}/attributes`, { token: sellerToken });
+  assert.equal(sellerAttributes.status, 200);
+  assert.deepEqual((await sellerAttributes.json()).data.attributes[0].values.map((value) => value.value), ['Black', 'Blue']);
+
+  const editedResponse = await call(`/api/admin/v1/attributes/${attribute.id}`, {
+    method: 'PATCH', body: { values: ['Black'], version: attribute.version },
+  });
+  assert.equal(editedResponse.status, 200);
+  const edited = (await editedResponse.json()).data;
+  assert.equal(edited.values.find((value) => value.value === 'Blue').active, false);
+
+  const sellerAfterEdit = await call(`/api/seller/v1/catalog/categories/${leaf.id}/attributes`, { token: sellerToken });
+  assert.deepEqual((await sellerAfterEdit.json()).data.attributes[0].values.map((value) => value.value), ['Black']);
+
+  const breakVariants = await call(`/api/admin/v1/attributes/${attribute.id}`, {
+    method: 'PATCH', body: { variantDefining: false, version: edited.version },
+  });
+  assert.equal(breakVariants.status, 409);
+  assert.equal((await breakVariants.json()).error.code, 'ATTRIBUTE_IN_USE');
+
+  const stale = await call(`/api/admin/v1/attributes/${attribute.id}`, {
+    method: 'PATCH', body: { name: 'Stale', version: attribute.version },
+  });
+  assert.equal(stale.status, 409);
+  assert.equal((await stale.json()).error.code, 'VERSION_CONFLICT');
+  assert.equal((await call(`/api/admin/v1/attributes/${attribute.id}`, { method: 'DELETE' })).status, 409);
+  assert.equal((await call(`/api/admin/v1/attribute-sets/${set.id}`, { method: 'DELETE' })).status, 409);
+
+  const detached = await call(`/api/admin/v1/categories/${leaf.id}`, {
+    method: 'PATCH', body: { attributeSetId: null, version: leaf.version },
+  });
+  assert.equal(detached.status, 200);
+  assert.equal((await call(`/api/admin/v1/attribute-sets/${set.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await call(`/api/admin/v1/attributes/${attribute.id}`, { method: 'DELETE' })).status, 200);
+});

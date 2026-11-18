@@ -45,6 +45,12 @@ export const NAV_GROUPS = [
     ],
   },
   {
+    key: 'coupons',
+    section: 'Catalog & Growth',
+    icon: 'tag',
+    items: [{ label: 'Coupons', path: '/coupons' }],
+  },
+  {
     key: 'orders',
     section: 'Orders & Support',
     label: 'Orders',

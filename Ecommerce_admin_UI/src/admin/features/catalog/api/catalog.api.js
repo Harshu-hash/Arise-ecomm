@@ -23,7 +23,7 @@ export const catalogApi = {
   updateAttribute: (id, payload) => api.patch(`/attributes/${id}`, payload),
   deleteAttribute: (id) => api.delete(`/attributes/${id}`),
 
-  attributeSets: () => api.get('/attributes', { pageSize: 1 }).then((res) => res.meta?.sets ?? []),
+  attributeSets: () => api.get('/attribute-sets').then((res) => res.data ?? []),
   createAttributeSet: (payload) => api.post('/attribute-sets', payload),
   updateAttributeSet: (id, payload) => api.patch(`/attribute-sets/${id}`, payload),
   deleteAttributeSet: (id) => api.delete(`/attribute-sets/${id}`),

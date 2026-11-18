@@ -64,6 +64,7 @@ export function seedCategories() {
       parentId,
       level,
       rootName,
+      color: level === 1 ? null : undefined,
       sortOrder: order,
       status: 'ACTIVE',
       returnWindowDays: RETURN_WINDOW[rootName] ?? 10,

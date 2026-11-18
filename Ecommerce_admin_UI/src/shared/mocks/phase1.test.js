@@ -278,6 +278,23 @@ describe('catalog', () => {
     expect(confirmed.status).toBe(200);
   });
 
+  it('stores colours only on top-level categories', async () => {
+    const s = await signIn('catalog@arise.test');
+    const root = db.categories.find((c) => c.level === 1);
+    const child = db.categories.find((c) => c.level === 2);
+
+    const saved = await call(`/categories/${root.id}`, {
+      method: 'PATCH', token: s.accessToken, body: { color: '#7c3aed', version: root.version },
+    });
+    expect(saved.status).toBe(200);
+    expect(saved.json.data.color).toBe('#7c3aed');
+
+    const rejected = await call(`/categories/${child.id}`, {
+      method: 'PATCH', token: s.accessToken, body: { color: '#7c3aed', version: child.version },
+    });
+    expect(rejected.status).toBe(422);
+  });
+
   it('will not delete a category that still has children or products', async () => {
     const s = await signIn('super@arise.test');
     const root = db.categories.find((c) => c.level === 1);

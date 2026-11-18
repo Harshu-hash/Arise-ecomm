@@ -10,6 +10,7 @@ import {
   SettingOutlined,
   ShoppingOutlined,
   StarOutlined,
+  TagOutlined,
   ThunderboltOutlined,
 } from '@ant-design/icons';
 
@@ -23,6 +24,7 @@ export const NAV_ICONS = {
   rise: <RiseOutlined />,
   thunderbolt: <ThunderboltOutlined />,
   star: <StarOutlined />,
+  tag: <TagOutlined />,
   barChart: <BarChartOutlined />,
   customerService: <CustomerServiceOutlined />,
   message: <MessageOutlined />,

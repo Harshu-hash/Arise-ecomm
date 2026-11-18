@@ -34,6 +34,7 @@ const StockManagementPage = lazy(() => import('@seller/features/inventory/pages/
 const CampaignsPage = lazy(() => import('@seller/features/campaigns/pages/CampaignsPage'));
 const CampaignDetailPage = lazy(() => import('@seller/features/campaigns/pages/CampaignDetailPage'));
 const BannerAdsPage = lazy(() => import('@seller/features/bannerAds/pages/BannerAdsPage'));
+const CouponsPage = lazy(() => import('@seller/features/coupons/pages/CouponsPage'));
 
 /* Orders & returns */
 const OrdersPage = lazy(() => import('@seller/features/orders/pages/OrdersPage'));
@@ -74,6 +75,7 @@ const ROUTES = [
   { path: '/campaigns', element: <CampaignsPage /> },
   { path: '/campaigns/:id', element: <CampaignDetailPage /> },
   { path: '/banner-ads', element: <BannerAdsPage /> },
+  { path: '/coupons', element: <CouponsPage /> },
 
   // Orders & returns
   { path: '/orders', element: <OrdersPage /> },

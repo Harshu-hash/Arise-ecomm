@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 
 const TYPES = ['TEXT', 'NUMBER', 'SINGLE_SELECT', 'MULTI_SELECT', 'BOOLEAN', 'COLOUR', 'SIZE', 'DATE'];
 const SELECT_TYPES = new Set(['SINGLE_SELECT', 'MULTI_SELECT', 'COLOUR', 'SIZE']);
+const VARIANT_TYPES = new Set(['SINGLE_SELECT', 'COLOUR', 'SIZE']);
 
 /** Create/edit modal for a single attribute. */
 export default function AttributeFormModal({ open, editing, onCancel, onSubmit, loading }) {
@@ -13,14 +14,18 @@ export default function AttributeFormModal({ open, editing, onCancel, onSubmit, 
     if (open) {
       form.resetFields();
       if (editing) {
-        form.setFieldsValue({ ...editing, values: (editing.values ?? []).map((v) => v.value) });
+        form.setFieldsValue({ ...editing, values: (editing.values ?? []).filter((v) => v.active).map((v) => v.value) });
       }
     }
   }, [open, editing, form]);
 
   const submit = async () => {
     const values = await form.validateFields();
-    onSubmit({ ...values, values: values.values ?? [] });
+    onSubmit({
+      ...values,
+      values: SELECT_TYPES.has(values.type) ? values.values ?? [] : [],
+      variantDefining: VARIANT_TYPES.has(values.type) && Boolean(values.variantDefining),
+    });
   };
 
   return (
@@ -33,7 +38,7 @@ export default function AttributeFormModal({ open, editing, onCancel, onSubmit, 
       okText={editing ? 'Save' : 'Create'}
       destroyOnHidden
     >
-      <Form form={form} layout="vertical" requiredMark={false}>
+      <Form form={form} layout="vertical" requiredMark={false} initialValues={{ filterable: false, variantDefining: false, values: [] }}>
         <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give it a name.' }]}>
           <Input placeholder="e.g. Collar Type" />
         </Form.Item>
@@ -52,7 +57,13 @@ export default function AttributeFormModal({ open, editing, onCancel, onSubmit, 
           />
         </Form.Item>
         {SELECT_TYPES.has(type) && (
-          <Form.Item name="values" label="Values" extra="Press enter after each value.">
+          <Form.Item
+            name="values"
+            label="Values"
+            preserve={false}
+            rules={[{ required: true, type: 'array', min: 1, message: 'Add at least one value.' }]}
+            extra="Press enter after each value."
+          >
             <Select mode="tags" open={false} tokenSeparators={[',']} placeholder="e.g. Red, Blue, Green" />
           </Form.Item>
         )}
@@ -61,7 +72,7 @@ export default function AttributeFormModal({ open, editing, onCancel, onSubmit, 
         </Form.Item>
         <Space>
           <Form.Item name="variantDefining" label="Defines variants" valuePropName="checked">
-            <Switch />
+            <Switch disabled={Boolean(type) && !VARIANT_TYPES.has(type)} />
           </Form.Item>
           <Form.Item name="filterable" label="Filterable in app" valuePropName="checked">
             <Switch />

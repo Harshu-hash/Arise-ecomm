@@ -68,6 +68,7 @@ const SizeChartsPage = lazy(() => import('@admin/features/catalog/pages/SizeChar
 const PlatformSettingsPage = lazy(() => import('@admin/features/settings/pages/PlatformSettingsPage'));
 const AdminUsersListPage = lazy(() => import('@admin/features/adminUsers/pages/AdminUsersListPage'));
 const AdminUserDetailPage = lazy(() => import('@admin/features/adminUsers/pages/AdminUserDetailPage'));
+const RolesListPage = lazy(() => import('@admin/features/roles/pages/RolesListPage'));
 
 const MyAccountPage = lazy(() => import('@admin/features/me/pages/MyAccountPage'));
 const ComponentGalleryPage = lazy(() => import('@admin/features/dev/pages/ComponentGalleryPage'));
@@ -130,6 +131,7 @@ const ROUTES = [
   { path: '/admin/settings', element: <PlatformSettingsPage /> },
   { path: '/admin/users', element: <AdminUsersListPage /> },
   { path: '/admin/users/:id', element: <AdminUserDetailPage /> },
+  { path: '/admin/roles', element: <RolesListPage /> },
 
   { path: '/me', element: <MyAccountPage /> },
   { path: '/change-password', element: <ChangePasswordPage /> },

@@ -10,6 +10,9 @@ import { createPiiRouter } from '../modules/identity/presentation/pii.routes.js'
 import { createRegistrationRouter } from '../modules/identity/presentation/registration.routes.js';
 import { createSellerApplicationsRouter } from '../modules/identity/presentation/sellerApplications.routes.js';
 import { createSellerSettingsRouter } from '../modules/identity/presentation/sellerSettings.routes.js';
+import { createCategoryRouter } from '../modules/category/presentation/category.routes.js';
+import { createSellerCatalogRouter } from '../modules/category/presentation/sellerCatalog.routes.js';
+import { createAttributeRouter, createAttributeSetRouter } from '../modules/attribute/presentation/attribute.routes.js';
 import { createPaymentWebhookRouter } from '../modules/payment/presentation/payment.webhook.routes.js';
 import { createUploadRouter } from '../modules/system/presentation/upload.routes.js';
 import { createSystemRouter } from '../modules/system/presentation/system.routes.js';
@@ -90,9 +93,13 @@ export function createRoutes() {
     root.use(`/api/${audience}/v1/uploads`, createUploadRouter());
   }
   root.use('/api/admin/v1/admin-users', createAdminUsersRouter());
+  root.use('/api/admin/v1/categories', createCategoryRouter());
+  root.use('/api/admin/v1/attributes', createAttributeRouter());
+  root.use('/api/admin/v1/attribute-sets', createAttributeSetRouter());
   root.use('/api/admin/v1/sellers', createSellerApplicationsRouter());
   root.use('/api/admin/v1/pii', createPiiRouter());
   root.use('/api/seller/v1/settings', createSellerSettingsRouter());
+  root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
 
   const webhooks = Router();
   webhooks.use('/payments', createPaymentWebhookRouter());

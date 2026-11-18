@@ -1,11 +1,12 @@
 import {
   ApartmentOutlined,
+  AppstoreOutlined,
   LockOutlined,
   PercentageOutlined,
   PlusOutlined,
   RetweetOutlined,
 } from '@ant-design/icons';
-import { App, Button, Card, Col, Empty, Flex, Form, Input, Modal, Row, Tag, Tree, Typography } from 'antd';
+import { App, Avatar, Button, Card, Col, ColorPicker, Empty, Flex, Form, Input, Modal, Row, Tag, Tree, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -15,6 +16,7 @@ import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
 import { catalogApi, catalogKeys } from '../api/catalog.api';
 import CategoryEditor from '../components/CategoryEditor';
+import { CATEGORY_ICONS } from '../components/categoryIcons';
 
 /**
  * The taxonomy: a three-level tree beside an editor for the selected node.
@@ -71,11 +73,19 @@ export default function CategoriesPage() {
       const children = (c.children ?? []).map(toNode).filter(Boolean);
       const selfMatches = !term || c.name.toLowerCase().includes(term);
       if (!selfMatches && children.length === 0) return null;
+      const CategoryIcon = CATEGORY_ICONS[c.icon] ?? AppstoreOutlined;
 
       return {
         key: c.id,
         title: (
           <Flex align="center" gap={6} style={{ paddingRight: 4 }}>
+            <Avatar
+              shape="square"
+              size={22}
+              src={c.imageUrl || undefined}
+              icon={<CategoryIcon />}
+              style={{ flex: '0 0 auto', backgroundColor: c.color || '#303030' }}
+            />
             <span>{c.name}</span>
             {c.gated && <Tag color="gold" style={{ marginInlineEnd: 0, fontSize: 10 }}>gated</Tag>}
             {c.status !== 'ACTIVE' && <Tag style={{ marginInlineEnd: 0, fontSize: 10 }}>hidden</Tag>}
@@ -188,6 +198,13 @@ export default function CategoriesPage() {
         >
           <Form.Item name="name" label="Name" rules={[{ required: true, message: 'Give it a name.' }]}>
             <Input autoFocus placeholder="e.g. Fashion" />
+          </Form.Item>
+          <Form.Item
+            name="color"
+            label="Colour"
+            getValueFromEvent={(value) => value?.toHexString?.() ?? value}
+          >
+            <ColorPicker allowClear showText format="hex" />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             Creates a level-1 category. Add sub-categories under it later with “Add child”.

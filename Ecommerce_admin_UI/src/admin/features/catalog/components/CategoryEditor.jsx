@@ -185,7 +185,7 @@ export default function CategoryEditor({ categoryId, onSelect }) {
           }))}
         />
 
-        <CategoryAppearanceFields />
+        <CategoryAppearanceFields isTopLevel={category.level === 1} />
 
         {isLeaf && (
           <>

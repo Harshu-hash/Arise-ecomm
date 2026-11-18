@@ -10,6 +10,7 @@ import {
   LayoutOutlined,
   NotificationOutlined,
   RiseOutlined,
+  SafetyOutlined,
   SettingOutlined,
   ShopOutlined,
   ShoppingOutlined,
@@ -38,5 +39,6 @@ export const NAV_ICONS = {
   customerService: <CustomerServiceOutlined />,
   barChart: <BarChartOutlined />,
   bell: <BellOutlined />,
+  safety: <SafetyOutlined />,
   setting: <SettingOutlined />,
 };

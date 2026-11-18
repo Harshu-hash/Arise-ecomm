@@ -38,16 +38,22 @@ export default function AttributesPage() {
     queryFn: () => catalogApi.attributeSets(),
   });
 
+  const attributeLookup = useQuery({
+    queryKey: catalogKeys.attributes({ pageSize: 200, sort: 'name' }),
+    queryFn: () => catalogApi.attributes({ pageSize: 200, sort: 'name' }),
+  });
+
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: ['catalog'] });
     queryClient.invalidateQueries({ queryKey: ['audit'] });
   };
 
   const saveAttribute = useMutation({
-    mutationFn: (values) =>
-      editingAttribute
-        ? catalogApi.updateAttribute(editingAttribute.id, values)
-        : catalogApi.createAttribute(values),
+    mutationFn: (values) => {
+      if (!editingAttribute) return catalogApi.createAttribute(values);
+      const { code: _code, ...patch } = values;
+      return catalogApi.updateAttribute(editingAttribute.id, { ...patch, version: editingAttribute.version });
+    },
     onSuccess: () => {
       invalidate();
       setAttributeModalOpen(false);
@@ -72,7 +78,9 @@ export default function AttributesPage() {
 
   const saveSet = useMutation({
     mutationFn: (values) =>
-      editingSet ? catalogApi.updateAttributeSet(editingSet.id, values) : catalogApi.createAttributeSet(values),
+      editingSet
+        ? catalogApi.updateAttributeSet(editingSet.id, { ...values, version: editingSet.version })
+        : catalogApi.createAttributeSet(values),
     onSuccess: () => {
       invalidate();
       setSetModalOpen(false);
@@ -171,7 +179,7 @@ export default function AttributesPage() {
       <AttributeSetFormModal
         open={setModalOpen}
         editing={editingSet}
-        attributes={rows}
+        attributes={attributeLookup.data?.data ?? []}
         onCancel={() => { setSetModalOpen(false); setEditingSet(null); }}
         onSubmit={(v) => saveSet.mutate(v)}
         loading={saveSet.isPending}

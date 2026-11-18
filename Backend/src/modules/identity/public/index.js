@@ -6,3 +6,5 @@ export {
   revokeSession,
   rotateSession,
 } from '../application/session.service.js';
+
+export { getUserAuthorization } from '../application/userAuthorization.service.js';
