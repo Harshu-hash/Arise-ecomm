@@ -162,7 +162,7 @@ export const productColumns = [
   {
     key: 'contentScore', title: 'Content', dataIndex: 'contentScore', sorter: true, align: 'right', priority: 2, width: 100,
     render: (v) => (
-      <Typography.Text className="tabular" type={v < 70 ? 'warning' : undefined}>{v}%</Typography.Text>
+      v == null ? MUTED_DASH : <Typography.Text className="tabular" type={v < 70 ? 'warning' : undefined}>{v}%</Typography.Text>
     ),
   },
   // Secondary detail — available from the column chooser, hidden by default to

@@ -129,19 +129,10 @@ export default function OfferTable({ offers, productId }) {
           ),
         },
         {
-          title: 'Fulfilment',
-          dataIndex: 'fulfillmentType',
-          render: (v) => (
-            <Tag color={v === 'ARISE' ? 'blue' : undefined} style={{ marginInlineEnd: 0 }}>
-              {v === 'ARISE' ? 'By Arise' : 'Seller'}
-            </Tag>
-          ),
-        },
-        {
           title: 'Dispatch',
           dataIndex: 'dispatchSlaHours',
           align: 'right',
-          render: (v) => <span className="tabular">{v}h</span>,
+          render: (v) => (v == null ? <Typography.Text type="secondary">—</Typography.Text> : <span className="tabular">{v}h</span>),
         },
         { title: 'Status', dataIndex: 'status', render: (v) => <StatusTag domain="listing" code={v} /> },
         {

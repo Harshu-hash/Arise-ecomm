@@ -39,7 +39,9 @@ export default function ProductTabs({ product, variants, offers, attributes, siz
                 <Descriptions.Item label="HSN / GST">
                   {product.hsnCode} · {product.gstRate}%
                 </Descriptions.Item>
-                <Descriptions.Item label="Content score">{product.contentScore}%</Descriptions.Item>
+                {product.contentScore != null && (
+                  <Descriptions.Item label="Content score">{product.contentScore}%</Descriptions.Item>
+                )}
               </Descriptions>
             </Flex>
           ),
@@ -71,6 +73,17 @@ export default function ProductTabs({ product, variants, offers, attributes, siz
               dataSource={variants}
               scroll={{ x: 'max-content' }}
               columns={[
+                {
+                  title: 'Images',
+                  dataIndex: 'images',
+                  render: (images) => (
+                    <Space size={4}>
+                      {(images ?? []).map((src) => (
+                        <Image key={src} src={src} alt="" width={36} height={36} style={{ objectFit: 'cover', borderRadius: 4 }} />
+                      ))}
+                    </Space>
+                  ),
+                },
                 { title: 'Variant', dataIndex: 'label' },
                 {
                   title: 'SKU',
@@ -83,6 +96,11 @@ export default function ProductTabs({ product, variants, offers, attributes, siz
                   render: (v) => <Typography.Text className="mono" style={{ fontSize: 11 }}>{v}</Typography.Text>,
                 },
                 { title: 'Weight', dataIndex: 'weightG', align: 'right', render: (v) => `${v} g` },
+                {
+                  title: 'Dims (cm)',
+                  dataIndex: 'dimsCm',
+                  render: (d) => (d ? `${d.l} × ${d.w} × ${d.h}` : <Typography.Text type="secondary">—</Typography.Text>),
+                },
                 {
                   title: 'Offers',
                   align: 'right',

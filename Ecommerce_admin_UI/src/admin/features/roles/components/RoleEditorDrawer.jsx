@@ -20,7 +20,7 @@ const TEMPLATE_OPTIONS = ROLE_TEMPLATES.map((t) => ({ value: t.key, label: t.nam
  * Create a new role, or edit a custom one. System roles open read-only — the
  * server rejects editing them, so the form mirrors that and offers Clone
  * instead (handled by the list page). Saving a role is a privilege change, so
- * the API turns it into a maker-checker request rather than applying it live.
+ * the change is audited and applies to every holder at once.
  */
 export default function RoleEditorDrawer({ open, role, onClose }) {
   const { message } = App.useApp();
@@ -101,7 +101,7 @@ export default function RoleEditorDrawer({ open, role, onClose }) {
       extra={
         !readOnly && (
           <Button type="primary" loading={save.isPending} onClick={() => form.submit()}>
-            {isEdit ? 'Save and send for approval' : 'Create and send for approval'}
+            {isEdit ? 'Save role' : 'Create role'}
           </Button>
         )
       }
@@ -121,8 +121,8 @@ export default function RoleEditorDrawer({ open, role, onClose }) {
             type="warning"
             showIcon
             style={{ marginBottom: 16 }}
-            message="Creating or changing a role needs a second approver"
-            description="Your changes are saved as a request and apply only once another admin approves them."
+            message="Role changes apply immediately"
+            description="Every admin who holds this role gets the new access as soon as you save."
           />
         )}
 

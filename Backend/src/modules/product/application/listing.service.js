@@ -1,5 +1,5 @@
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
-import { NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { attributeSetDetails } from '../../attribute/public/index.js';
 import {
   findBrandForListing,
@@ -8,7 +8,7 @@ import {
   incrementSizeChartUsage,
 } from '../../catalog/public/index.js';
 import { getCategoryForListing, incrementCategoryProductCount } from '../../category/public/index.js';
-import { resolveMediaKeys } from '../../media/public/index.js';
+import { resolveMediaKeys, urlForKey } from '../../media/public/index.js';
 import {
   buildVariantSpecs,
   generateSku,
@@ -26,6 +26,16 @@ const id = (value) => (value ? String(value) : null);
 const DUPLICATE_KEY = 11000;
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+/** What the seller sees while admin QC has (or had) an opinion on their listing — why, and since when. */
+function buildSubmission(status, reviewReason, updatedAt) {
+  if (!['QC_PENDING', 'NEEDS_CHANGES'].includes(status)) return null;
+  return {
+    status,
+    issues: reviewReason ? [reviewReason] : [],
+    ageHours: Math.max(0, Math.round((Date.now() - new Date(updatedAt).getTime()) / 3_600_000)),
+  };
+}
+
 /** One listing row from the seller's point of view: their offer joined with its product/variant. */
 export function serializeListing(offer, product, variant) {
   return {
@@ -33,7 +43,7 @@ export function serializeListing(offer, product, variant) {
     productId: id(product._id),
     variantId: id(variant._id),
     productTitle: product.title,
-    productImage: product.images?.[0] ?? null,
+    productImage: urlForKey(product.images?.[0], 'PRODUCT_IMAGE'),
     brandName: product.brandName,
     categoryPath: product.categoryPath,
     variantLabel: variant.label,
@@ -48,11 +58,9 @@ export function serializeListing(offer, product, variant) {
     fulfillmentType: offer.fulfillmentType,
     buyBoxWinner: offer.buyBoxWinner,
     ariseAssured: offer.ariseAssured,
-    // The admin QC-review queue is a separate module; a freshly created listing
-    // honestly has no submission record yet rather than a fabricated one.
-    submissionId: null,
-    submissionStatus: product.status === 'QC_PENDING' ? 'PENDING' : null,
-    needsChanges: false,
+    reviewReason: product.reviewReason ?? null,
+    submission: buildSubmission(product.status, product.reviewReason, product.updatedAt),
+    needsChanges: product.status === 'NEEDS_CHANGES',
     createdAt: product.createdAt,
     updatedAt: product.updatedAt,
   };
@@ -84,9 +92,9 @@ export function serializeListingRow(offer) {
     fulfillmentType: offer.fulfillmentType,
     buyBoxWinner: offer.buyBoxWinner,
     ariseAssured: offer.ariseAssured,
-    submissionId: null,
-    submissionStatus: offer.productStatus === 'QC_PENDING' ? 'PENDING' : null,
-    needsChanges: false,
+    reviewReason: offer.reviewReason ?? null,
+    submission: buildSubmission(offer.productStatus, offer.reviewReason, offer.updatedAt),
+    needsChanges: offer.productStatus === 'NEEDS_CHANGES',
     createdAt: offer.createdAt,
     updatedAt: offer.updatedAt,
   };
@@ -231,7 +239,7 @@ export async function createListing(body, { sellerId, actor }) {
         fulfillmentType: body.fulfillmentType === 'ARISE' ? 'ARISE' : 'SELLER',
         status: isDraft ? 'DRAFT' : 'QC_PENDING',
         productTitle: product.title,
-        productImage: product.images?.[0] ?? null,
+        productImage: urlForKey(product.images?.[0], 'PRODUCT_IMAGE'),
         brandName: product.brandName,
         categoryPath: product.categoryPath,
         variantLabel: variant.label,
@@ -277,6 +285,35 @@ export async function getListingForSeller(offerId, sellerId) {
   ]);
   if (!product || !variant) throw new NotFoundError('That listing does not exist on your account.');
   return serializeListing(offer, product, variant);
+}
+
+/** Seller fixes what admin flagged and sends a NEEDS_CHANGES listing back into the QC queue. */
+export async function resubmitListing(offerId, { sellerId, actor }) {
+  const offer = await Offer.findOne({ _id: offerId, sellerId }).lean();
+  if (!offer) throw new NotFoundError('That listing does not exist on your account.');
+  const product = await Product.findById(offer.productId);
+  if (!product) throw new NotFoundError('That listing does not exist on your account.');
+  if (product.status !== 'NEEDS_CHANGES') {
+    throw new ConflictError('NOT_RESUBMITTABLE', 'Only a listing QC asked for changes on can be resubmitted.');
+  }
+
+  const before = { status: product.status };
+  product.status = 'QC_PENDING';
+  product.reviewReason = null;
+  await product.save();
+  await Offer.updateMany({ productId: product._id }, { $set: { status: 'QC_PENDING', productStatus: 'QC_PENDING', reviewReason: null } });
+
+  await recordAudit({
+    action: 'listing.resubmit',
+    subjectType: 'product',
+    subjectId: product._id,
+    before,
+    after: { status: 'QC_PENDING' },
+    actor,
+  });
+
+  const variant = await Variant.findById(offer.variantId).lean();
+  return serializeListing({ ...offer, status: 'QC_PENDING', productStatus: 'QC_PENDING', reviewReason: null }, product.toObject(), variant);
 }
 
 export async function listMyListings(sellerId, query) {

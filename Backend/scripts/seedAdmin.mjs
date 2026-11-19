@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { env } from '../src/config/env.js';
 import { hashPassword } from '../src/shared/utils/crypto.js';
 import { User } from '../src/modules/identity/infrastructure/persistence/user.model.js';
-import { seedRoles } from '../src/modules/identity/infrastructure/persistence/role.model.js';
+import { Role, seedRoles } from '../src/modules/identity/infrastructure/persistence/role.model.js';
 
 const email = (process.argv[2] ?? 'admin@arise.test').toLowerCase();
 const password = process.argv[3] ?? randomBytes(9).toString('base64url');
@@ -18,6 +18,7 @@ async function main() {
   // unique index (a stored null still collides). Unset it so the field is genuinely absent.
   await User.updateMany({ phone: null }, { $unset: { phone: '' } });
 
+  const roleIds = [String((await Role.findOne({ key: 'super_admin' }, '_id').lean())._id)];
   const passwordHash = await hashPassword(password);
   let user = await User.findOne({ role: 'ADMIN', email });
   const existed = Boolean(user);
@@ -25,11 +26,12 @@ async function main() {
     user.passwordHash = passwordHash;
     user.status = 'ACTIVE';
     user.permissions = ['*'];
+    user.roleIds = roleIds;
     user.mustChangePassword = false;
     await user.save();
   } else {
     user = await User.create({
-      role: 'ADMIN', email, name: 'Super Admin', passwordHash, status: 'ACTIVE', permissions: ['*'],
+      role: 'ADMIN', email, name: 'Super Admin', passwordHash, status: 'ACTIVE', permissions: ['*'], roleIds,
     });
   }
 

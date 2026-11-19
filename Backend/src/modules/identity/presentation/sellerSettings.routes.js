@@ -1,12 +1,30 @@
 import { Router } from 'express';
+import { z } from 'zod';
 import { env } from '../../../config/env.js';
 import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { ROLES } from '../../../shared/constants/roles.js';
 import { sendData } from '../../../shared/http/respond.js';
-import { authenticate } from '../../../shared/middleware/authenticate.js';
+import { validate } from '../../../shared/http/validate.js';
+import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
+import { createRateLimiter } from '../../../shared/middleware/rateLimit.js';
+import { requireStepUp } from '../../../shared/middleware/stepUp.js';
 import { sellerScope } from '../../../shared/policies/ownership.js';
 import { decryptField } from '../../../shared/utils/crypto.js';
 import { signFileToken } from '../../../shared/utils/signedUrl.js';
+import { accountNumberSchema, ifscSchema } from '../../../shared/validators/common.js';
+import { clearBank, getBank, logoUrlOf, issueStepUpToken, setBank, setVacationMode, updateProfile } from '../application/sellerSettings.service.js';
 import { Seller } from '../infrastructure/persistence/seller.model.js';
+
+const profileBody = z.object({ storeName: z.string().trim().min(2).max(120), logoKey: z.string().max(300).nullable().optional() });
+const vacationBody = z.object({ on: z.boolean() });
+const reauthBody = z.object({ password: z.string().min(1).max(256) });
+const bankBody = z.object({
+  accountHolder: z.string().trim().min(1).max(100),
+  accountNumber: accountNumberSchema,
+  ifsc: ifscSchema,
+  bankName: z.string().trim().min(1).max(100),
+  branch: z.string().trim().max(100).default(''),
+});
 
 const decryptOrNull = (value) => (value ? decryptField(value) : null);
 
@@ -63,10 +81,9 @@ export function createSellerSettingsRouter() {
           tier: seller.tier ?? 'BRONZE',
           city: seller.location?.city,
           state: seller.location?.state,
-          // No holiday-mode or store-logo-upload feature exists yet.
-          vacationMode: false,
-          logoMediaId: null,
-          logoUrl: null,
+          vacationMode: seller.vacationMode ?? false,
+          logoKey: seller.logoKey ?? null,
+          logoUrl: logoUrlOf(seller.logoKey),
         },
         documents,
         changeRequests: [], // no verified-identity-change workflow exists yet
@@ -75,6 +92,32 @@ export function createSellerSettingsRouter() {
       return next(error);
     }
   });
+
+  // Writes are owner-only: SELLER_STAFF may read the profile but not change identity or payout details.
+  const ownerOnly = authorize(ROLES.SELLER);
+  const run = (handler, status) => async (req, res, next) => {
+    try {
+      return sendData(res, await handler(req), { status });
+    } catch (error) {
+      return next(error);
+    }
+  };
+  const actorOf = (req) => ({ userId: req.auth.userId, role: req.auth.role, sellerId: req.auth.sellerId });
+
+  router.patch('/profile', ownerOnly, validate({ body: profileBody }), run((req) => updateProfile(sellerScope(req), req.body, actorOf(req))));
+  router.post('/vacation', ownerOnly, validate({ body: vacationBody }), run((req) => setVacationMode(sellerScope(req), req.body.on, actorOf(req))));
+
+  router.post(
+    '/security/reauth',
+    createRateLimiter({ name: 'seller-reauth', windowMs: 60_000, limit: 5 }),
+    validate({ body: reauthBody }),
+    run((req) => issueStepUpToken(req.auth.userId, req.body.password)),
+  );
+
+  // Payout account: one per seller, so PUT/DELETE on a singleton; changes need a fresh password check.
+  router.get('/bank', run((req) => getBank(sellerScope(req))));
+  router.put('/bank/account', ownerOnly, requireStepUp, validate({ body: bankBody }), run((req) => setBank(sellerScope(req), req.body, actorOf(req))));
+  router.delete('/bank/account', ownerOnly, requireStepUp, run((req) => clearBank(sellerScope(req), actorOf(req))));
 
   return router;
 }

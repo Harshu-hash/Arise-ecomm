@@ -14,6 +14,14 @@ export const cmsApi = {
   brandTabs: () => api.get('/cms/brand-tabs'),
   updateBrandTab: (id, payload) => api.patch(`/cms/brand-tabs/${id}`, payload),
 
+  // Stores an image through the CMS_MEDIA upload purpose and resolves to its public URL.
+  uploadImage: (file) => {
+    const body = new FormData();
+    body.append('purpose', 'CMS_MEDIA');
+    body.append('file', file);
+    return api.post('/uploads', body).then((res) => res.data.url);
+  },
+
   banners: (params) => api.get('/banners', params),
   createBanner: (payload) => api.post('/banners', payload),
   updateBanner: (id, payload) => api.patch(`/banners/${id}`, payload),

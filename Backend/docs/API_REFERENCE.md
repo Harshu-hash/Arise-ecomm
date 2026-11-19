@@ -40,6 +40,20 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/customer/v1/auth/logout-all` | Bearer JWT | Revokes every session belonging to the customer. |
 | `GET` | `/api/customer/v1/app-config` | none | Supplies the minimum app version, maintenance state, store links, and bootstrap feature flags required before customer navigation starts. |
 | `GET` | `/api/customer/v1/home` | none | Returns the customer home feed; currently an empty valid feed so real-backend authentication can run before catalog modules land. |
+| `GET` | `/api/admin/v1/roles` | Bearer JWT + `admin.role.view` | Paginated role list (`q`, `system`, `hasUsers`, `sort`, `page`, `pageSize`) with admin and permission counts. |
+| `GET` | `/api/admin/v1/roles/:id` | Bearer JWT + `admin.role.view` | One role plus the admins that hold it and the actions allowed on it. |
+| `POST` | `/api/admin/v1/roles` | Bearer JWT + `admin.role.create` | Creates a custom role from catalog permissions (implied `view` keys are added). Audited. |
+| `POST` | `/api/admin/v1/roles/:id/clone` | Bearer JWT + `admin.role.create` | Creates an editable copy of any role (Super Admin's wildcard is expanded to explicit keys). |
+| `PATCH` | `/api/admin/v1/roles/:id` | Bearer JWT + `admin.role.edit` | Edits a custom role under optimistic `version`; system roles are refused; holders' permissions are re-synced. Audited. |
+| `DELETE` | `/api/admin/v1/roles/:id` | Bearer JWT + `admin.role.delete` | Deletes a custom role not held by any admin (`ROLE_IN_USE` otherwise). Audited. |
+| `GET` | `/api/admin/v1/admin-users` | Bearer JWT + `admin.user.view` | Paginated admin list (`q`, `status`, `roleId`, `twoFactorEnrolled`, date ranges, `sort`) with status facets. |
+| `GET` | `/api/admin/v1/admin-users/:id` | Bearer JWT + `admin.user.view` | One admin with active sessions and the lifecycle actions the caller may take. |
+| `POST` | `/api/admin/v1/admin-users` | Bearer JWT + `admin.user.invite` | Invites an admin with one or more roles and an optional data scope; permissions are the union of the roles. Audited. |
+| `PATCH` | `/api/admin/v1/admin-users/:id` | Bearer JWT + `admin.user.edit` | Edits name, roles, scope or landing page under optimistic `version`; cannot change own roles or demote the last Super Admin. Audited. |
+| `POST` | `/api/admin/v1/admin-users/:id/deactivate` | Bearer JWT + `admin.user.deactivate` | Deactivates an active admin (reason required) and revokes all their sessions; not self, not the last Super Admin. |
+| `POST` | `/api/admin/v1/admin-users/:id/reactivate` | Bearer JWT + `admin.user.edit` | Reactivates a deactivated admin and forces a password change. |
+| `POST` | `/api/admin/v1/admin-users/:id/resend-invite` | Bearer JWT + `admin.user.invite` | Issues a fresh invite link for a still-pending admin. |
+| `POST` | `/api/admin/v1/admin-users/:id/revoke-sessions` | Bearer JWT + `admin.user.revoke_session` | Signs an admin out of one session (`sessionId`) or all devices. |
 
 ## user
 
@@ -86,6 +100,13 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/admin/v1/campaigns` | Bearer JWT + `marketing.campaign.view` | Paginated promotional campaigns (`q`, `type`, `status`, `sort`) with entry counters and status facets. |
+| `POST` | `/api/admin/v1/campaigns` | Bearer JWT + `marketing.campaign.create` | Creates a campaign as a DRAFT (schedule validated). Audited. |
+| `GET` | `/api/admin/v1/campaigns/:id` | Bearer JWT + `marketing.campaign.view` | One campaign with its entry counters. |
+| `PATCH` | `/api/admin/v1/campaigns/:id` | Bearer JWT + `marketing.campaign.edit` | Edits a campaign that is not ended or cancelled. Audited. |
+| `POST` | `/api/admin/v1/campaigns/:id/status` | Bearer JWT + `marketing.campaign.edit (`.cancel` for CANCELLED)` | Moves a campaign along the state machine DRAFT→OPEN→SCHEDULED→ACTIVE⇄PAUSED→ENDED; illegal moves return `ILLEGAL_TRANSITION`. |
+| `GET` | `/api/admin/v1/campaigns/:id/submissions` | Bearer JWT + `marketing.campaign.view` | Paginated seller product entries for a campaign (`q`, `status`, `sort`) with status facets. |
+| `POST` | `/api/admin/v1/campaigns/:id/submissions/decision` | Bearer JWT + `marketing.campaign.edit` | Approves, rejects or requests changes on one or many PENDING entries; approval needs the campaign minimum discount. Returns `{ updated, skipped }`. |
 
 ## review
 
@@ -101,6 +122,12 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/admin/v1/admin/settings` | Bearer JWT + `admin.settings.view` | All ten platform settings sections (stored values over defaults) with version and last editor. |
+| `PATCH` | `/api/admin/v1/admin/settings/:sectionId` | Bearer JWT + `admin.settings.edit` | Validates and saves one section; `fees`, `approvalThresholds` and `security` require a `reason`. Audited. |
+| `GET` | `/api/admin/v1/banners` | Bearer JWT + `cms.banner.view` | Paginated banners (`q`, `kind`, `status`, `sort`) with status/kind facets; status is derived from the schedule. |
+| `POST` | `/api/admin/v1/banners` | Bearer JWT + `cms.banner.create` | Creates a banner; images must be URLs returned by the `CMS_MEDIA` upload. Audited. |
+| `PATCH` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.edit` | Edits a banner (name, images, alt text, placements, schedule). Audited. |
+| `DELETE` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.delete` | Removes a banner immediately. Audited. |
 
 ## search
 

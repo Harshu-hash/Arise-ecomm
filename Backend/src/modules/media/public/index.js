@@ -1,1 +1,1 @@
-export { resolveMediaKeys } from '../application/media.service.js';
+export { resolveMediaKeys, urlForKey } from '../application/media.service.js';

@@ -7,7 +7,7 @@ import { authenticate, authorize } from '../../../shared/middleware/authenticate
 import { idempotent } from '../../../shared/middleware/idempotency.js';
 import { sellerScope } from '../../../shared/policies/ownership.js';
 import { objectIdSchema, paiseSchema } from '../../../shared/validators/common.js';
-import { createListing, getListingForSeller, listMyListings } from '../application/listing.service.js';
+import { createListing, getListingForSeller, listMyListings, resubmitListing } from '../application/listing.service.js';
 
 // Every image/video/document field is a media ID from the media workflow
 // (POST /media/uploads -> ... -> complete), resolved to its storage key server-side —
@@ -111,6 +111,15 @@ export function createListingRouter() {
     try {
       const sellerId = sellerScope(req);
       return sendData(res, await getListingForSeller(req.params.id, sellerId));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.post('/:id/resubmit', validate({ params: idParams }), async (req, res, next) => {
+    try {
+      const sellerId = sellerScope(req);
+      return sendCommand(res, await resubmitListing(req.params.id, { sellerId, actor: req.auth }));
     } catch (error) {
       return next(error);
     }

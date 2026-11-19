@@ -1,0 +1,3 @@
+export const BANNER_KINDS = ['HERO', 'TILE'];
+export const BANNER_PLACEMENTS = ['HOME_HERO', 'HOME_AD_TILES', 'OFFERS_PAGE'];
+export const BANNER_STATUS = Object.freeze({ SCHEDULED: 'SCHEDULED', LIVE: 'LIVE', EXPIRED: 'EXPIRED' });

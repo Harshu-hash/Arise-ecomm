@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 // Catalog product is distinct from a seller's offer/listing on it (ARCHITECTURE.md §4):
 // this document is the shared catalog entity; price/stock/fulfilment live on Offer.
 //
-// Status is intentionally narrow: only what the create flow in this module produces.
-// LIVE/NEEDS_CHANGES/REJECTED/ARCHIVED belong to the admin QC-review module when it lands.
+// BLOCKED/ARCHIVED/INACTIVE/OUT_OF_STOCK (post-live lifecycle moderation) are not produced
+// by anything in this module yet and are deliberately left off the enum.
 const productSchema = new mongoose.Schema(
   {
     title: { type: String, required: true, trim: true, maxlength: 200 },
@@ -14,7 +14,9 @@ const productSchema = new mongoose.Schema(
     categoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true },
     categoryPath: { type: String, trim: true, maxlength: 300, default: null },
     rootCategoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Category', required: true, index: true },
-    status: { type: String, enum: ['DRAFT', 'QC_PENDING'], default: 'QC_PENDING', index: true },
+    status: { type: String, enum: ['DRAFT', 'QC_PENDING', 'LIVE', 'NEEDS_CHANGES', 'REJECTED'], default: 'QC_PENDING', index: true },
+    // Set only for NEEDS_CHANGES/REJECTED — why the admin sent it back.
+    reviewReason: { type: String, trim: true, maxlength: 1000, default: null },
     description: { type: String, trim: true, maxlength: 2000, default: '' },
     highlights: { type: [String], default: [] },
     // Plain (non-variant-defining) category attribute values, e.g. { fabric: 'Cotton' }.

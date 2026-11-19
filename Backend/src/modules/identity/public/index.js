@@ -8,3 +8,5 @@ export {
 } from '../application/session.service.js';
 
 export { getUserAuthorization } from '../application/userAuthorization.service.js';
+
+export { getSellerOwnerEmail, getSellerSummaries, getUserSummaries } from '../application/sellerLookup.service.js';

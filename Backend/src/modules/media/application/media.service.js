@@ -9,15 +9,18 @@ import { Media } from '../infrastructure/persistence/media.model.js';
 
 const id = (value) => (value ? String(value) : null);
 
-function previewUrlFor(row) {
-  if (!row.key) return null;
-  const rule = MEDIA_KINDS[row.kind];
-  if (rule && isPublic(rule)) return publicUrl(row.key);
+/** A stored key's servable URL — public and permanent, or private and signed, by its kind's own rule. */
+export function urlForKey(key, kind) {
+  if (!key) return null;
+  const rule = MEDIA_KINDS[kind];
+  if (rule && isPublic(rule)) return publicUrl(key);
   // The private download route (system/upload.routes.js) is identical and ownerId-gated
   // under every audience prefix, so any one of them resolves the same file.
-  const [, folder, ownerId, file] = row.key.split('/');
-  return `${env.PUBLIC_ORIGIN}/api/seller/v1/uploads/private/${folder}/${ownerId}/${file}?token=${signFileToken(row.key)}`;
+  const [, folder, ownerId, file] = key.split('/');
+  return `${env.PUBLIC_ORIGIN}/api/seller/v1/uploads/private/${folder}/${ownerId}/${file}?token=${signFileToken(key)}`;
 }
+
+const previewUrlFor = (row) => urlForKey(row.key, row.kind);
 
 export function serializeMedia(row) {
   return {

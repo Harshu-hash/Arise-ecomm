@@ -16,6 +16,9 @@ import { catalogApi, catalogKeys } from '../api/catalog.api';
 import ProductTabs from '../components/ProductTabs';
 
 const ACTIONS = {
+  APPROVE: ['approve', 'Approve', false],
+  NEEDS_CHANGES: ['request-changes', 'Request changes', false],
+  REJECT: ['reject', 'Reject', false],
   ACTIVATE: ['activate', 'Activate', false],
   DEACTIVATE: ['deactivate', 'Deactivate', false],
   BLOCK: ['block', 'Block', true],
@@ -103,7 +106,7 @@ export default function ProductDetailPage() {
             {Object.entries(ACTIONS)
               .filter(([key]) => allowedActions.includes(key))
               .map(([key, [, text]]) => (
-                <Button key={key} danger={['BLOCK', 'ARCHIVE'].includes(key)} onClick={() => setAction(key)}>
+                <Button key={key} danger={['REJECT', 'BLOCK', 'ARCHIVE'].includes(key)} onClick={() => setAction(key)}>
                   {text}
                 </Button>
               ))}
@@ -121,7 +124,11 @@ export default function ProductDetailPage() {
           showIcon
           message={`A ${submission.type.toLowerCase()} is waiting in the QC queue`}
           description="Changes are not visible to customers until that submission is approved."
-          action={<Button size="small" onClick={() => navigate('/catalog/qc')}>Open QC queue</Button>}
+          action={
+            <Button size="small" onClick={() => navigate('/catalog/products?tab=QC_PENDING')}>
+              Open QC queue
+            </Button>
+          }
         />
       )}
       {offers.some((o) => o.priceAboveMrp) && (
@@ -148,19 +155,25 @@ export default function ProductDetailPage() {
         onCancel={() => setAction(null)}
         onConfirm={(values) => run.mutate({ verb, values })}
         loading={run.isPending}
-        danger={['BLOCK', 'ARCHIVE'].includes(action)}
+        danger={['REJECT', 'BLOCK', 'ARCHIVE'].includes(action)}
         needsApproval={needsApproval}
         title={`${label} "${product.title}"?`}
         impact={
-          action === 'BLOCK'
-            ? `All ${offers.length} seller offers on this product stop being buyable.`
-            : action === 'DEACTIVATE'
-              ? 'The product is hidden from customers but keeps its content and offers.'
-              : action === 'ARCHIVE'
-                ? 'Archiving is final — the product cannot be brought back.'
-                : 'Offers with stock become buyable again.'
+          action === 'APPROVE'
+            ? 'The product and its offers go live and become visible to customers.'
+            : action === 'NEEDS_CHANGES'
+              ? 'The seller sees your note and can edit and resubmit the listing.'
+              : action === 'REJECT'
+                ? 'The listing is rejected. The seller sees your reason and must create a new listing to try again.'
+                : action === 'BLOCK'
+                  ? `All ${offers.length} seller offers on this product stop being buyable.`
+                  : action === 'DEACTIVATE'
+                    ? 'The product is hidden from customers but keeps its content and offers.'
+                    : action === 'ARCHIVE'
+                      ? 'Archiving is final — the product cannot be brought back.'
+                      : 'Offers with stock become buyable again.'
         }
-        reasonRequired={['BLOCK', 'UNBLOCK', 'DEACTIVATE'].includes(action)}
+        reasonRequired={['NEEDS_CHANGES', 'REJECT', 'BLOCK', 'UNBLOCK', 'DEACTIVATE'].includes(action)}
         confirmLabel={needsApproval ? 'Send for approval' : label}
       />
     </Flex>

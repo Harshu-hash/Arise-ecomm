@@ -71,6 +71,13 @@ export async function findSizeChartForListing(sizeChartId, categoryId) {
   return chart ? id(chart._id) : null;
 }
 
+/** The grid itself, for read-only display (admin product review) — no scope/ownership check. */
+export async function getSizeChartForDisplay(sizeChartId) {
+  if (!sizeChartId) return null;
+  const chart = await SizeChart.findById(sizeChartId, 'unit columns rows').lean();
+  return chart ? { unit: chart.unit, columns: chart.columns, rows: chart.rows } : null;
+}
+
 /** Keeps `SIZECHART_IN_USE` delete/move checks honest once products reference this chart. */
 export async function incrementSizeChartUsage(sizeChartId, delta) {
   if (!sizeChartId || !delta) return;

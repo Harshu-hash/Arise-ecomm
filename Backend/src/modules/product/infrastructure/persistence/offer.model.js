@@ -16,7 +16,7 @@ const offerSchema = new mongoose.Schema(
     taxCode: { type: String, trim: true, maxlength: 20, default: null },
     stock: { type: Number, min: 0, default: 0 },
     fulfillmentType: { type: String, enum: ['SELLER', 'ARISE'], default: 'SELLER' },
-    status: { type: String, enum: ['DRAFT', 'QC_PENDING'], default: 'QC_PENDING' },
+    status: { type: String, enum: ['DRAFT', 'QC_PENDING', 'LIVE', 'NEEDS_CHANGES', 'REJECTED', 'INACTIVE'], default: 'QC_PENDING' },
     buyBoxWinner: { type: Boolean, default: false },
     ariseAssured: { type: Boolean, default: false },
     // Snapshot from the product/variant at creation time, so the seller's own listings
@@ -30,6 +30,7 @@ const offerSchema = new mongoose.Schema(
     variantLabel: { type: String, default: null },
     sku: { type: String, default: null },
     productStatus: { type: String, default: null },
+    reviewReason: { type: String, trim: true, maxlength: 1000, default: null },
     version: { type: Number, min: 1, default: 1 },
   },
   { collection: 'offers', timestamps: true, versionKey: false },

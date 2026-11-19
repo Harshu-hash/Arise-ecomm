@@ -10,6 +10,7 @@ const SELLER_SIDE = [ROLES.SELLER, ROLES.SELLER_STAFF];
 // Files land in <visibility>/<folder>/<ownerId>/<uuid>.<ext>, where ownerId comes from the JWT, not the request.
 export const UPLOAD_PURPOSES = Object.freeze({
   PRODUCT_MEDIA: { folder: 'products', roles: [...SELLER_SIDE, ROLES.ADMIN], kinds: [IMAGE, VIDEO], visibility: VISIBILITY.PUBLIC },
+  STORE_LOGO: { folder: 'logos', roles: [ROLES.SELLER], kinds: [IMAGE], visibility: VISIBILITY.PUBLIC },
   // Compliance/regulatory certificates (BIS, FSSAI, ...) attached to a listing: not for public display.
   PRODUCT_COMPLIANCE: { folder: 'product-compliance', roles: [...SELLER_SIDE, ROLES.ADMIN], kinds: [IMAGE, DOCUMENT], visibility: VISIBILITY.PRIVATE },
   SELLER_KYC: { folder: 'kyc', roles: SELLER_SIDE, kinds: [IMAGE, DOCUMENT], visibility: VISIBILITY.PRIVATE },

@@ -3,6 +3,7 @@ import test from 'node:test';
 import {
   buildVariantSpecs,
   generateSku,
+  nextStatusForDecision,
   validatePricing,
   validateProductAttributeValues,
   validateVariantAttributeValues,
@@ -77,6 +78,13 @@ test('product attribute values are trimmed, type-checked, and rejected if unknow
   assert.ok(validateProductAttributeValues({ fabric: 'Wool' }, plainDefs).errors.attributes); // not in option list
   assert.ok(validateProductAttributeValues({ battery_life: 'lots' }, plainDefs).errors.attributes); // not a number
   assert.ok(validateProductAttributeValues({ unknown: 'x' }, plainDefs).errors.attributes); // not a category attribute
+});
+
+test('nextStatusForDecision maps each admin action to its target status, and rejects unknown actions', () => {
+  assert.equal(nextStatusForDecision('approve'), 'LIVE');
+  assert.equal(nextStatusForDecision('reject'), 'REJECTED');
+  assert.equal(nextStatusForDecision('request-changes'), 'NEEDS_CHANGES');
+  assert.equal(nextStatusForDecision('archive'), null);
 });
 
 test('generateSku prefers a custom SKU, otherwise derives one from brand and product id', () => {

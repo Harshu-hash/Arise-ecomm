@@ -7,9 +7,20 @@ import { CAMPAIGN_TYPES, CUSTOMER_SECTIONS } from '../api/campaigns.api';
  * Create or edit a campaign shell. The admin sets the window, where it shows in
  * the customer app and the discount floor sellers must beat to be approved.
  */
-export default function CampaignFormModal({ open, onClose, onSubmit, loading, initial }) {
+// Server field names that differ from this form's fields.
+const SERVER_FIELD = { startsAt: 'window', endsAt: 'window' };
+
+export default function CampaignFormModal({ open, onClose, onSubmit, loading, initial, error }) {
   const [form] = Form.useForm();
   const editing = Boolean(initial);
+
+  // Show the server's per-field errors under the matching inputs.
+  useEffect(() => {
+    if (!open || !error?.fieldErrors) return;
+    form.setFields(
+      Object.entries(error.fieldErrors).map(([name, errors]) => ({ name: SERVER_FIELD[name] ?? name, errors: [].concat(errors) })),
+    );
+  }, [error, open, form]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +73,7 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
           submissionDeadline: dayjs().add(12, 'hour'),
         }}
       >
-        <Form.Item name="name" label="Campaign name" rules={[{ required: true, message: 'Give the campaign a name.' }]}>
+        <Form.Item name="name" label="Campaign name" rules={[{ required: true, whitespace: true, message: 'Give the campaign a name.' }, { max: 80, message: 'Keep it under 80 characters.' }]}>
           <Input placeholder="e.g. Big Billion Days 2026" maxLength={80} />
         </Form.Item>
 
@@ -85,14 +96,40 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
           <Select options={CUSTOMER_SECTIONS} />
         </Form.Item>
 
-        <Form.Item name="window" label="Runs" rules={[{ required: true, message: 'Pick the live window.' }]}>
-          <DatePicker.RangePicker showTime style={{ width: '100%' }} />
+        <Form.Item
+          name="window"
+          label="Runs"
+          rules={[
+            { required: true, message: 'Pick the live window.' },
+            // A new campaign (or a changed start) cannot begin in the past; a running campaign keeps its start.
+            {
+              validator: (_r, v) => {
+                const startChanged = !initial || !v?.[0]?.isSame(initial.startsAt, 'minute');
+                return startChanged && v?.[0]?.isBefore(dayjs().subtract(1, 'minute'))
+                  ? Promise.reject(new Error('The start is in the past.'))
+                  : Promise.resolve();
+              },
+            },
+            // A new campaign that has already ended would never run.
+            { validator: (_r, v) => (!editing && v?.[1]?.isBefore(dayjs()) ? Promise.reject(new Error('The end is in the past.')) : Promise.resolve()) },
+          ]}
+        >
+          <DatePicker.RangePicker showTime style={{ width: '100%' }} disabledDate={(d) => !editing && d.isBefore(dayjs(), 'day')} />
         </Form.Item>
 
         <Form.Item
           name="submissionDeadline"
           label="Seller entry deadline"
           extra="Sellers can nominate products until this time."
+          dependencies={['window']}
+          rules={[
+            ({ getFieldValue }) => ({
+              validator: (_r, v) => {
+                const end = getFieldValue('window')?.[1];
+                return v && end && !v.isBefore(end) ? Promise.reject(new Error('Must be before the campaign ends.')) : Promise.resolve();
+              },
+            }),
+          ]}
         >
           <DatePicker showTime style={{ width: '100%' }} />
         </Form.Item>
@@ -100,10 +137,13 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
         <Form.Item
           name="minDiscountPct"
           label="Minimum discount"
-          rules={[{ required: true }]}
+          rules={[
+            { required: true, message: 'Set the minimum discount.' },
+            { type: 'integer', min: 1, max: 95, message: 'Use a whole number from 1 to 95.' },
+          ]}
           extra="Entries below this are auto-flagged and will fail approval."
         >
-          <InputNumber min={1} max={95} addonAfter="%" style={{ width: '100%' }} />
+          <InputNumber min={1} max={95} precision={0} addonAfter="%" style={{ width: '100%' }} />
         </Form.Item>
       </Form>
     </Modal>

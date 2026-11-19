@@ -1,5 +1,6 @@
 export {
   findSizeChartForListing,
+  getSizeChartForDisplay,
   incrementSizeChartUsage,
   listSizeChartsForCategory,
 } from '../application/sizeChart.service.js';

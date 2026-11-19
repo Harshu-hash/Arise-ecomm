@@ -1,7 +1,7 @@
 import { WarningFilled } from '@ant-design/icons';
 import { Checkbox, Collapse, Flex, Input, Space, Tag, Tooltip, Typography } from 'antd';
 import { useMemo, useState } from 'react';
-import { ALL_PERMISSIONS, PERMISSION_MODULES, moduleActionColumns } from '@core/rbac/catalog';
+import { ALL_PERMISSIONS } from '@core/rbac/catalog';
 import { toggleKeys } from './permissionSelection';
 
 /**
@@ -15,10 +15,32 @@ import { toggleKeys } from './permissionSelection';
  * one the server will accept unchanged.
  */
 
-const PERMS_BY_MODULE = PERMISSION_MODULES.reduce((acc, mod) => {
-  acc[mod.key] = ALL_PERMISSIONS.filter((p) => p.moduleKey === mod.key);
-  return acc;
-}, {});
+// Sections mirror the admin sidebar (src/admin/nav/navigation.js); each lists the
+// `module.resource` catalog entries behind that menu's pages. Permission keys are
+// unchanged, so catalog entries not listed here stay valid, just not editable here.
+const SECTIONS = [
+  { key: 'overview', label: 'Dashboard & Analytics', res: ['dashboard.dashboard', 'dashboard.finance_widgets', 'dashboard.action_center', 'reports.sales', 'reports.operations', 'reports.finance'] },
+  { key: 'catalog', label: 'Catalog', res: ['catalog.product', 'catalog.category', 'catalog.brand', 'catalog.attribute', 'catalog.sizechart'] },
+  { key: 'marketing', label: 'Marketing', res: ['marketing.campaign', 'ads.campaign', 'notifications.broadcast', 'marketing.coupon', 'marketing.deal', 'cms.banner', 'cms.home', 'cms.page'] },
+  { key: 'orders', label: 'Orders', res: ['orders.order', 'orders.item', 'orders.return', 'logistics.shipment'] },
+  { key: 'support', label: 'Support', res: ['support.ticket', 'reviews.review', 'reviews.qa'] },
+  { key: 'sellers', label: 'Sellers', res: ['sellers.seller', 'sellers.application', 'sellers.kyc'] },
+  { key: 'customers', label: 'Customers', res: ['customers.customer'] },
+  { key: 'finance', label: 'Finance', res: ['finance.payment', 'finance.refund', 'finance.payout'] },
+  { key: 'roles', label: 'Roles & Permissions', res: ['admin.role'] },
+  { key: 'settings', label: 'Settings & Staff', res: ['admin.settings', 'admin.user'] },
+];
+
+const MODULES = SECTIONS.map((s) => {
+  const rows = s.res.map((id) => ({
+    id,
+    perms: ALL_PERMISSIONS.filter((p) => `${p.moduleKey}.${p.resourceKey}` === id),
+  }));
+  const perms = rows.flatMap((r) => r.perms);
+  const columns = [];
+  for (const p of perms) if (!columns.some((c) => c.action === p.action)) columns.push({ action: p.action, label: p.actionLabel });
+  return { ...s, rows, perms, columns };
+});
 
 export default function PermissionMatrix({ value, onChange, disabled = false }) {
   const [q, setQ] = useState('');
@@ -34,15 +56,13 @@ export default function PermissionMatrix({ value, onChange, disabled = false }) 
   const matches = (mod) =>
     !needle ||
     mod.label.toLowerCase().includes(needle) ||
-    PERMS_BY_MODULE[mod.key].some(
+    mod.perms.some(
       (p) => p.resourceLabel.toLowerCase().includes(needle) || p.actionLabel.toLowerCase().includes(needle),
     );
 
-  const grantedIn = (moduleKey) => PERMS_BY_MODULE[moduleKey].filter((p) => selected.has(p.key)).length;
-
-  const items = PERMISSION_MODULES.filter(matches).map((mod) => {
-    const perms = PERMS_BY_MODULE[mod.key];
-    const granted = grantedIn(mod.key);
+  const items = MODULES.filter(matches).map((mod) => {
+    const perms = mod.perms;
+    const granted = perms.filter((p) => selected.has(p.key)).length;
     return {
       key: mod.key,
       label: (
@@ -83,7 +103,7 @@ export default function PermissionMatrix({ value, onChange, disabled = false }) 
 }
 
 function ModuleGrid({ mod, selected, onToggle, disabled }) {
-  const columns = moduleActionColumns(mod.key);
+  const columns = mod.columns;
   return (
     <div style={{ overflowX: 'auto' }}>
       <table className="perm-grid" style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
@@ -96,15 +116,11 @@ function ModuleGrid({ mod, selected, onToggle, disabled }) {
           </tr>
         </thead>
         <tbody>
-          {mod.resources.map((res) => {
-            const byAction = new Map(
-              ALL_PERMISSIONS.filter((p) => p.moduleKey === mod.key && p.resourceKey === res.key).map(
-                (p) => [p.action, p],
-              ),
-            );
+          {mod.rows.map((res) => {
+            const byAction = new Map(res.perms.map((p) => [p.action, p]));
             return (
-              <tr key={res.key}>
-                <td style={cell()}>{res.label}</td>
+              <tr key={res.id}>
+                <td style={cell()}>{res.perms[0]?.resourceLabel ?? res.id}</td>
                 {columns.map((c) => {
                   const perm = byAction.get(c.action);
                   return (

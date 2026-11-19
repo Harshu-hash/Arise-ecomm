@@ -40,8 +40,12 @@ const sellerSchema = new mongoose.Schema(
       accountHolder: { type: String, default: null },
       accountNumber: { type: String, default: null },
       ifsc: { type: String, default: null },
+      bankName: { type: String, default: null },
+      branch: { type: String, default: null },
     },
     bankOk: { type: Boolean, default: false },
+    logoKey: { type: String, default: null }, // public upload key (UPLOAD_PURPOSES.STORE_LOGO)
+    vacationMode: { type: Boolean, default: false }, // holiday mode toggled by the seller
     // Per-document admin decision (approve/reject + why), one entry per DOCUMENT_TYPE.
     documentDecisions: {
       tradeLicense: {

@@ -77,7 +77,7 @@ export default function CampaignDetailPage() {
 
   const decide = useMutation({
     mutationFn: ({ submissionId, decision, reason }) =>
-      campaignsApi.decideSubmission(submissionId, decision, reason),
+      campaignsApi.decideSubmissions(id, [submissionId], decision, reason),
     onSuccess: (_d, vars) => {
       invalidate();
       setReviewing(null);
@@ -91,10 +91,11 @@ export default function CampaignDetailPage() {
   });
 
   const bulkApprove = useMutation({
-    mutationFn: async (ids) => {
-      for (const subId of ids) await campaignsApi.decideSubmission(subId, 'approve');
+    mutationFn: (ids) => campaignsApi.decideSubmissions(id, ids, 'approve'),
+    onSuccess: ({ data }) => {
+      invalidate();
+      message.success(`${data.updated} entries approved${data.skipped ? `, ${data.skipped} skipped (not pending or below the minimum discount)` : ''}`);
     },
-    onSuccess: (_d, ids) => { invalidate(); message.success(`${ids.length} entries approved`); },
     onError: (e) => message.error(e.message),
   });
 
@@ -275,6 +276,7 @@ export default function CampaignDetailPage() {
         onClose={() => setEditing(false)}
         onSubmit={(payload) => update.mutate(payload)}
         loading={update.isPending}
+        error={update.error}
       />
     </Flex>
   );

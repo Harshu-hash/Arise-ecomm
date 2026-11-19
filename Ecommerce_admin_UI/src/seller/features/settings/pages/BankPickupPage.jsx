@@ -26,7 +26,7 @@ export default function BankPickupPage() {
   const account = query.data.account;
   return <Flex vertical gap={16}>
     <PageHeader title="Bank account" breadcrumbs={[{ label: 'Settings' }, { label: 'Bank account' }]} subtitle="Where your verified marketplace payouts are deposited." />
-    <Card title="Payout account" extra={<Button onClick={() => { form.setFieldsValue(account ?? {}); setOpen(true); }}>{account ? 'Update' : 'Add'}</Button>}>
+    <Card title="Payout account" extra={<Button onClick={() => { form.setFieldsValue({ ...account, accountNumber: undefined }); setOpen(true); }}>{account ? 'Update' : 'Add'}</Button>}>
       {account ? <>
         {account.pennyDropStatus === 'NAME_MISMATCH' && <Alert type="error" showIcon style={{ marginBottom: 12 }} message="Name mismatch" description="The account holder name does not match KYC. Payouts are paused until this is fixed." />}
         <Descriptions column={1} size="small" items={[

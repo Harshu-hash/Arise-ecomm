@@ -110,6 +110,11 @@ export function validateProductAttributeValues(submitted, attributeDefs) {
   return { errors: {}, clean };
 }
 
+/** What an admin decision does to a QC_PENDING product's (and its offers') status, or null if the action is unknown. */
+export function nextStatusForDecision(action) {
+  return { approve: 'LIVE', reject: 'REJECTED', 'request-changes': 'NEEDS_CHANGES' }[action] ?? null;
+}
+
 /** `SKU-<productId>-<n>`, unless the seller supplied their own (still trimmed/upper-cased). */
 export function generateSku({ custom, brandName, productId, index }) {
   if (custom) return custom.toUpperCase();
