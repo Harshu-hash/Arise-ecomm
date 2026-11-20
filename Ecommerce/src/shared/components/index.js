@@ -13,6 +13,7 @@ export { default as MiniInfoChip } from './MiniInfoChip';
 export { default as AccountListRow } from './AccountListRow';
 export { default as TopBrandTabs } from './TopBrandTabs';
 export { default as CategoryTabStrip } from './CategoryTabStrip';
+export { default as CategoryIcon } from './CategoryIcon';
 export { default as SegmentedPillTabs } from './SegmentedPillTabs';
 export { default as EmptyCartIllustration } from './EmptyCartIllustration';
 export { default as EmptyWishlistIllustration } from './EmptyWishlistIllustration';
@@ -21,3 +22,4 @@ export { default as AnimatedSearchPlaceholder } from './AnimatedSearchPlaceholde
 export { default as DribbleFlipImage } from './DribbleFlipImage';
 export { default as BottomSheetModal } from './BottomSheetModal';
 export { default as Toast } from './Toast';
+export { default as DiscountBadge } from './DiscountBadge';

@@ -33,12 +33,13 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     paddingHorizontal: SPACING.l,
+    flexWrap: 'wrap',
     paddingVertical: SPACING.l,
     backgroundColor: COLORS.white,
     gap: SPACING.s,
   },
   tile: {
-    flex: 1,
+    width: '31.5%', // three columns; fewer tiles keep this size, not stretch
   },
   imageBox: {
     borderRadius: RADIUS.s,

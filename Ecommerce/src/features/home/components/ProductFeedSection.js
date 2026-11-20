@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { PriceBlock } from '../../../shared/components';
+import { DiscountBadge, PriceBlock } from '../../../shared/components';
 
 const BADGE_STYLES = {
   'Lowest price': { bg: '#5B3DF5', text: COLORS.white },
@@ -22,6 +22,7 @@ const ProductFeedCard = ({ product, onPress }) => {
     >
       <View style={[styles.imageBox, { aspectRatio: aspectRatio || 1 }]}>
         <Image source={{ uri: image }} style={styles.image} resizeMode="cover" />
+        <DiscountBadge price={price} mrp={mrp} style={styles.discountBadge} />
         {badgeStyle ? (
           <View style={[styles.badge, { backgroundColor: badgeStyle.bg }]}>
             <Text style={[styles.badgeText, { color: badgeStyle.text }]}>{badge}</Text>
@@ -119,6 +120,7 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: RADIUS.xs,
   },
+  discountBadge: { left: SPACING.s, bottom: SPACING.s },
   badgeText: {
     fontSize: 11,
     fontWeight: '700',

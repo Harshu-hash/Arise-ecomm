@@ -15,11 +15,14 @@ export const rooms = Object.freeze({
   user: (userId) => `user:${userId}`,
   seller: (sellerId) => `seller:${sellerId}`,
   admin: 'admin',
+  public: 'public', // every connected app, signed in or not: catalog-wide "refetch" hints only
 });
 
 // Rooms are derived from the verified JWT only; clients can never ask to join a room.
-function roomsFor({ sub, role, sellerId }) {
-  const joined = [rooms.user(sub)];
+function roomsFor(claims) {
+  if (!claims) return [rooms.public];
+  const { sub, role, sellerId } = claims;
+  const joined = [rooms.public, rooms.user(sub)];
   if ((role === ROLES.SELLER || role === ROLES.SELLER_STAFF) && sellerId) joined.push(rooms.seller(sellerId));
   if (role === ROLES.ADMIN) joined.push(rooms.admin);
   return joined;
@@ -68,7 +71,9 @@ export function createSocketServer(httpServer) {
   io.use(connectionRateLimit);
   io.use((socket, next) => {
     try {
-      socket.data.claims = verifyAccessToken(socket.handshake.auth?.token);
+      // No token at all = an anonymous shopper (public room only); a token that is present must be valid.
+      const token = socket.handshake.auth?.token;
+      socket.data.claims = token ? verifyAccessToken(token) : null;
       next();
     } catch {
       next(new Error('UNAUTHORIZED'));

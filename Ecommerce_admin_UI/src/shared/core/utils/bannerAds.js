@@ -23,3 +23,9 @@ export function bannerAdDisplayStatus(booking, today = new Date().toISOString().
   if (today > booking.endsOn) return 'COMPLETED';
   return 'LIVE';
 }
+
+/** Bookings that still hold a slot: paid and awaiting review, or approved. Rejected ones free it. */
+export const HOLDS_SLOT = ['PENDING_REVIEW', 'APPROVED'];
+
+export const rangesOverlap = (a, b) => a.startsOn <= b.endsOn && a.endsOn >= b.startsOn;
+export const isDayBooked = (day, ranges) => ranges.some((range) => day >= range.startsOn && day <= range.endsOn);

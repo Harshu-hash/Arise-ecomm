@@ -1,35 +1,84 @@
 import { http as mswHttp } from 'msw';
-import { bannerAdDisplayStatus } from '@core/utils/bannerAds';
-import { db, findById, update } from '../db/store';
+import { HOLDS_SLOT, bannerAdDisplayStatus } from '@core/utils/bannerAds';
+import { db, findById, id, insert, remove, update } from '../db/store';
 import { guard } from '../engine/guard';
 import { listResult, parseListQuery } from '../engine/list';
 import { scheduleSave } from '../persistence';
-import { conflict, notFound, ok, okList, validationFailed } from '../engine/respond';
+import { conflict, created, noContent, notFound, ok, okList, validationFailed } from '../engine/respond';
 import { mockNowIso } from '../engine/settings';
 
 const BASE = '/api/admin/v1';
 const row = (booking) => ({ ...booking, status: bannerAdDisplayStatus(booking) });
+const today = () => new Date().toISOString().slice(0, 10);
+const holding = (placementId) => db.bannerAdBookings.filter((b) => b.placementId === placementId && HOLDS_SLOT.includes(b.status));
+const withUsage = (placement) => ({
+  ...placement,
+  totalBookings: db.bannerAdBookings.filter((b) => b.placementId === placement.id).length,
+  upcomingBookings: holding(placement.id).filter((b) => b.endsOn >= today()).length,
+});
+
+const SIZE_FIELDS = { mobileWidth: 'Banner width', mobileHeight: 'Banner height' };
+
+/** Checks a whole slot definition; returns field errors (empty when valid). */
+function slotErrors(slot) {
+  const errors = {};
+  if (!slot.name?.trim()) errors.name = 'Give the slot a name.';
+  else if (db.bannerAdPlacements.some((other) => other.id !== slot.id && other.name.toLowerCase() === slot.name.trim().toLowerCase())) errors.name = 'Another slot already uses this name.';
+  if (!Number.isInteger(slot.dailyRatePaise) || slot.dailyRatePaise <= 0) errors.dailyRatePaise = 'Enter a daily price greater than zero.';
+  for (const [key, label] of Object.entries(SIZE_FIELDS)) {
+    if (!Number.isInteger(slot[key]) || slot[key] < 100 || slot[key] > 4000) errors[key] = `${label} must be 100–4000 px.`;
+  }
+  return errors;
+}
+const pickSlot = (body) => ({
+  name: body.name, description: body.description ?? '', dailyRatePaise: Number(body.dailyRatePaise),
+  mobileWidth: Number(body.mobileWidth), mobileHeight: Number(body.mobileHeight), enabled: body.enabled !== false,
+  categoryId: body.categoryId ?? null, categoryName: body.categoryId ? (db.categories.find((c) => c.id === body.categoryId)?.name ?? null) : null,
+});
 
 export const bannerAdHandlers = [
   mswHttp.get(`${BASE}/banner-ads/placements`, async ({ request }) => {
     const g = await guard(request, new URL(request.url), ['ads.placement.view', 'ads.review.view']);
     if (g.response) return g.response;
-    return ok(db.bannerAdPlacements);
+    return ok(db.bannerAdPlacements.map(withUsage));
+  }),
+
+  mswHttp.post(`${BASE}/banner-ads/placements`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'ads.placement.edit');
+    if (g.response) return g.response;
+    const slot = pickSlot(await request.json());
+    const errors = slotErrors(slot);
+    if (Object.keys(errors).length) return validationFailed(errors);
+    const placement = insert('bannerAdPlacements', { id: id('BAP', 3), ...slot, name: slot.name.trim(), updatedAt: mockNowIso(), version: 1 });
+    scheduleSave();
+    return created(withUsage(placement));
   }),
 
   mswHttp.patch(`${BASE}/banner-ads/placements/:id`, async ({ request, params }) => {
     const g = await guard(request, new URL(request.url), 'ads.placement.edit');
     if (g.response) return g.response;
     const placement = findById('bannerAdPlacements', params.id);
-    if (!placement) return notFound('That banner placement no longer exists.');
-    const body = await request.json();
-    const dailyRatePaise = Number(body.dailyRatePaise);
-    if (!Number.isInteger(dailyRatePaise) || dailyRatePaise <= 0) {
-      return validationFailed({ dailyRatePaise: 'Enter a daily price greater than zero.' });
-    }
-    update('bannerAdPlacements', placement.id, { dailyRatePaise, enabled: body.enabled !== false, updatedAt: mockNowIso() });
+    if (!placement) return notFound('That banner slot no longer exists.');
+    // A price or size change applies to new bookings only; existing ones keep their snapshot.
+    const slot = { ...placement, ...pickSlot({ ...placement, ...(await request.json()) }) };
+    const errors = slotErrors(slot);
+    if (Object.keys(errors).length) return validationFailed(errors);
+    update('bannerAdPlacements', placement.id, { ...slot, name: slot.name.trim(), updatedAt: mockNowIso(), version: (placement.version ?? 1) + 1 });
     scheduleSave();
-    return ok(findById('bannerAdPlacements', placement.id));
+    return ok(withUsage(findById('bannerAdPlacements', placement.id)));
+  }),
+
+  mswHttp.delete(`${BASE}/banner-ads/placements/:id`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'ads.placement.edit');
+    if (g.response) return g.response;
+    const placement = findById('bannerAdPlacements', params.id);
+    if (!placement) return notFound('That banner slot no longer exists.');
+    if (db.bannerAdBookings.some((b) => b.placementId === placement.id)) {
+      return conflict('This slot has bookings, so it cannot be deleted. Turn off "Available for booking" instead.', 'SLOT_HAS_BOOKINGS');
+    }
+    remove('bannerAdPlacements', placement.id);
+    scheduleSave();
+    return noContent();
   }),
 
   mswHttp.get(`${BASE}/banner-ads/requests`, async ({ request }) => {

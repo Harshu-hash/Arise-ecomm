@@ -14,11 +14,15 @@ const campaignSchema = new mongoose.Schema(
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     submissionDeadline: { type: Date, default: null },
+    // Set by an admin: this campaign is THE flash sale on the customer home screen. At most one campaign holds it.
+    homeFlashSale: { type: Boolean, default: false },
     createdBy: { type: String, required: true, immutable: true },
   },
   { collection: 'promoCampaigns', timestamps: true, versionKey: false },
 );
 
 campaignSchema.index({ status: 1, createdAt: -1 });
+// The database itself guarantees a single home flash sale, even if two admins set one at the same moment.
+campaignSchema.index({ homeFlashSale: 1 }, { unique: true, partialFilterExpression: { homeFlashSale: true }, name: 'one_home_flash_sale' });
 
 export const Campaign = mongoose.models.Campaign ?? mongoose.model('Campaign', campaignSchema);

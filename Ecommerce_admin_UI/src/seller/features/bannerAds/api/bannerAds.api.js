@@ -5,6 +5,8 @@ export const bannerAdsApi = {
   placements: () => api.get('/banner-ads/placements'),
   destinations: () => api.get('/banner-ads/destinations'),
   createAndPay: (payload) => api.post('/banner-ads', payload, withIdempotency(['banner-ad', payload.campaignName, payload.placementId, payload.startsOn, payload.endsOn].join(':'))),
+  paymentOrder: (id) => api.get(`/banner-ads/${id}/payment-order`),
+  confirmPayment: (id, payload) => api.post(`/banner-ads/${id}/pay`, payload),
 };
 
 export const bannerAdsKeys = {

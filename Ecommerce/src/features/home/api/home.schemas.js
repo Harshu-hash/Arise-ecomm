@@ -24,6 +24,7 @@ const headerSchema = z.object({
       id: z.string().min(1),
       label: z.string().min(1),
       icon: z.string().min(1),
+      imageUrl: z.string().url().nullable().optional(),
       gradient: gradientSchema,
     }),
   ),
@@ -86,7 +87,7 @@ export const adTileSchema = z.object({
 
 export const productCardSchema = z.object({
   id: z.string().min(1),
-  brand: z.string().min(1),
+  brand: z.string(),
   name: z.string().min(1),
   imageUrl: z.string().url(),
   pricePaise: z.number().int().nonnegative(),

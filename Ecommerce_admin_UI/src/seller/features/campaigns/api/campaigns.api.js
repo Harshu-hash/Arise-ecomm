@@ -1,11 +1,11 @@
+import { api } from '@core/api/axiosInstance';
+import { IS_MOCK } from '@core/config/env';
+
 /**
- * Promotional Campaigns — seller side (UI-only mock).
+ * Promotional Campaigns — seller side.
  *
- * No backend yet: in-memory data mimics the API so the seller can browse the
- * campaigns the admin is running, nominate their own listings into one, and
- * watch each entry move from PENDING → APPROVED (live for customers) or get
- * sent back. Replace these with real `api.*` calls later; the `{ data, meta }`
- * shape already matches the rest of the panel.
+ * Live mode talks to /api/seller/v1/campaigns: the campaigns the admin runs, the seller's own live
+ * products to enter, and each entry's review status. Mock mode keeps the in-memory demo below.
  */
 
 const now = Date.now();
@@ -132,7 +132,7 @@ const countFor = (campaignId) => SUBMISSIONS.filter((s) => s.campaignId === camp
 const liveFor = (campaignId) =>
   SUBMISSIONS.filter((s) => s.campaignId === campaignId && s.status === 'APPROVED').length;
 
-export const sellerCampaignsApi = {
+const mockCampaignsApi = {
   async list(params = {}) {
     await wait();
     let rows = CAMPAIGNS.map((c) => ({
@@ -210,6 +210,17 @@ export const sellerCampaignsApi = {
     return { data: { ok: true } };
   },
 };
+
+const liveCampaignsApi = {
+  list: (params) => api.get('/campaigns', params),
+  get: (id) => api.get(`/campaigns/${id}`),
+  mySubmissions: (id, params) => api.get(`/campaigns/${id}/submissions`, params),
+  eligibleListings: (id) => api.get(`/campaigns/${id}/eligible-listings`),
+  submitProducts: (id, entries) => api.post(`/campaigns/${id}/submissions`, { entries }),
+  withdraw: (submissionId) => api.post(`/campaigns/submissions/${submissionId}/withdraw`, {}),
+};
+
+export const sellerCampaignsApi = IS_MOCK ? mockCampaignsApi : liveCampaignsApi;
 
 export const sellerCampaignKeys = {
   list: (p) => ['seller', 'campaigns', 'list', p],

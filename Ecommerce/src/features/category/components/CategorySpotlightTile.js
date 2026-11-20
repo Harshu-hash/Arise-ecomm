@@ -1,5 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
+import CategoryIcon from '../../../shared/components/CategoryIcon';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
@@ -15,7 +16,11 @@ const BADGE_COLORS = {
 const CategorySpotlightTile = ({ item, onPress }) => (
   <TouchableOpacity activeOpacity={0.85} onPress={onPress} style={styles.tile}>
     <View style={styles.imageBox}>
-      <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+      {item.image ? (
+        <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+      ) : (
+        <CategoryIcon name={item.icon} size={26} color={COLORS.primary} />
+      )}
       {item.badge ? (
         item.badgeVariant === 'title' ? (
           <View style={styles.titleOverlay}>

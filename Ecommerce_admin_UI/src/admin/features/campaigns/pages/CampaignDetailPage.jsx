@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- detail view keeps the approval queue and its columns in one screen */
 import { ArrowLeftOutlined, CheckOutlined } from '@ant-design/icons';
 import { App, Button, Col, Flex, Row, Space, Tag, Typography } from 'antd';
+import { ThunderboltOutlined } from '@ant-design/icons';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -27,6 +28,9 @@ const SUB_TABS = [
   { key: 'REJECTED', label: 'Rejected' },
 ];
 
+// Only campaigns that can still run can be the home flash sale.
+const FLASH_ELIGIBLE = ['OPEN', 'SCHEDULED', 'ACTIVE', 'PAUSED'];
+
 /** Status transitions the admin can trigger from the header. */
 const NEXT_STATUS = {
   DRAFT: [{ to: 'OPEN', label: 'Open for seller entries' }],
@@ -39,7 +43,7 @@ const NEXT_STATUS = {
 export default function CampaignDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { message } = App.useApp();
+  const { message, modal } = App.useApp();
   const state = useUrlTableState({ defaultSort: '-submittedAt', defaultTab: 'PENDING' });
   const [editing, setEditing] = useState(false);
   const [reviewing, setReviewing] = useState(null);
@@ -68,6 +72,27 @@ export default function CampaignDetailPage() {
     onSuccess: () => { invalidate(); message.success('Campaign updated'); },
     onError: (e) => message.error(e.message),
   });
+
+  const flashSale = useMutation({
+    mutationFn: (enabled) => campaignsApi.setHomeFlashSale(id, enabled),
+    onSuccess: ({ data }) => {
+      invalidate();
+      queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns', 'list'] });
+      message.success(data.homeFlashSale
+        ? `Now the home flash sale${data.replacedCampaign ? ` (replaces ${data.replacedCampaign})` : ''}`
+        : 'Removed from the home screen');
+    },
+    onError: (e) => message.error(e.message),
+  });
+  // Choosing a flash sale takes the slot from whichever campaign has it, so ask first.
+  const toggleFlashSale = () => (campaign.homeFlashSale
+    ? flashSale.mutate(false)
+    : modal.confirm({
+      title: 'Show this campaign as the home flash sale?',
+      content: 'Customers will see its name on the flash sale banner on the home screen and its approved products on the flash sale page. Any campaign currently set as the flash sale is replaced.',
+      okText: 'Set as flash sale',
+      onOk: () => flashSale.mutateAsync(true).catch(() => undefined),
+    }));
 
   const update = useMutation({
     mutationFn: (payload) => campaignsApi.updateCampaign(id, payload),
@@ -164,7 +189,7 @@ export default function CampaignDetailPage() {
         title={campaign.name}
         onBack={<Button icon={<ArrowLeftOutlined />} type="text" onClick={() => navigate('/campaigns')} aria-label="Back" />}
         breadcrumbs={[{ label: 'Marketing' }, { label: 'Campaigns', to: '/campaigns' }, { label: campaign.name }]}
-        tags={<StatusTag domain="promoCampaign" code={campaign.status} />}
+        tags={<Space size={4}><StatusTag domain="promoCampaign" code={campaign.status} />{campaign.homeFlashSale && <Tag color="red" icon={<ThunderboltOutlined />}>Home flash sale</Tag>}</Space>}
         subtitle={campaign.tagline || undefined}
         meta={[
           <Typography.Text key="type" type="secondary">{campaignHelpers.typeLabel(campaign.type)}</Typography.Text>,
@@ -173,6 +198,18 @@ export default function CampaignDetailPage() {
         ]}
         actions={
           <Space wrap>
+            {FLASH_ELIGIBLE.includes(campaign.status) && (
+              <Button
+                icon={<ThunderboltOutlined />}
+                type={campaign.homeFlashSale ? 'default' : 'primary'}
+                ghost={!campaign.homeFlashSale}
+                danger={campaign.homeFlashSale}
+                loading={flashSale.isPending}
+                onClick={toggleFlashSale}
+              >
+                {campaign.homeFlashSale ? 'Remove from home flash sale' : 'Set as home flash sale'}
+              </Button>
+            )}
             <Button onClick={() => setEditing(true)}>Edit</Button>
             {transitions.map((t) => (
               <Button

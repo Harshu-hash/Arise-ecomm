@@ -13,6 +13,8 @@ const bannerSchema = new mongoose.Schema(
     },
     altText: { type: String, required: true },
     placements: { type: [{ type: String, enum: BANNER_PLACEMENTS }], required: true },
+    // Categories whose page shows this banner; only meaningful with the CATEGORY_HERO placement.
+    categoryIds: { type: [mongoose.Schema.Types.ObjectId], default: [] },
     priority: { type: Number, required: true }, // lower shows first
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },

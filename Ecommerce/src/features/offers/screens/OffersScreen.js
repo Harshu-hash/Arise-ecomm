@@ -58,6 +58,9 @@ const OffersScreen = ({ navigation }) => {
           <Text style={styles.heroTitle}>ARISE DEALS</Text>
           <Text style={styles.heroSubtitle}>Server-verified prices and eligibility</Text>
         </View>
+        {data?.items?.length ? null : (
+          <Text style={styles.emptyText}>No deals are live right now. Check back soon.</Text>
+        )}
         {(data?.items || []).map(section => (
           <OfferThemeSection
             key={section.id}
@@ -76,6 +79,7 @@ const OffersScreen = ({ navigation }) => {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: COLORS.background },
+  emptyText: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 14, marginTop: 60 },
   header: { backgroundColor: COLORS.offerRed, paddingBottom: SPACING.m },
   search: {
     height: 44,

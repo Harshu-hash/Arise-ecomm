@@ -213,3 +213,9 @@ export async function deleteBrand(brandId, { scope, actor }) {
   });
   return { ok: true };
 }
+
+/** Name and logo for a batch of brand IDs, for other modules to decorate rows (e.g. the home brand spotlight). */
+export async function getBrandImages(brandIds) {
+  const rows = await Brand.find({ _id: { $in: brandIds } }, 'name imageUrl').lean();
+  return new Map(rows.map((row) => [String(row._id), { name: row.name, imageUrl: row.imageUrl ?? null }]));
+}

@@ -1,6 +1,6 @@
 import React, { useRef, useEffect, useState } from 'react';
-import { ScrollView, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
-import Ionicons from 'react-native-vector-icons/Ionicons';
+import { Image, ScrollView, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
+import CategoryIcon from './CategoryIcon';
 import { COLORS } from '../../constants/colors';
 import { SPACING } from '../../constants/spacing';
 
@@ -126,8 +126,10 @@ const CategoryTabStrip = ({
                 isActive && styles.iconBoxActive,
                 isIconAnimated && { opacity: iconOpacity, transform: [{ scale: iconScale }] },
               ]}>
-              {tab.icon && (
-                <Ionicons
+              {tab.imageUrl ? (
+                <Image source={{ uri: tab.imageUrl }} style={styles.tabImage} resizeMode="cover" />
+              ) : tab.icon && (
+                <CategoryIcon
                   name={tab.icon}
                   size={22}
                   color={COLORS.textPrimary}
@@ -188,6 +190,7 @@ const styles = StyleSheet.create({
     marginBottom: -6,
   },
   iconBoxActive: {},
+  tabImage: { width: 36, height: 36, borderRadius: 18 },
   label: {
     fontSize: 10.5,
     fontWeight: '500',

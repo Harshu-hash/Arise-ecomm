@@ -176,10 +176,12 @@ const CategoryScreen = ({ route, navigation }) => {
                       key={item.id}
                       item={item}
                       onPress={() =>
-                        navigation?.navigate('SearchResults', {
-                          categoryId: content.id,
-                          query: item.label,
-                        })
+                        navigation?.navigate(
+                          'SearchResults',
+                          item.target?.id
+                            ? { categoryId: item.target.id }
+                            : { categoryId: content.id, query: item.label },
+                        )
                       }
                     />
                   ))}

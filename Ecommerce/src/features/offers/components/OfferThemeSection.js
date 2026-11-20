@@ -107,11 +107,12 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: SPACING.s,
     marginTop: SPACING.s,
   },
   card: {
-    flex: 1,
+    width: '31.5%', // three columns; fewer items keep this size, extras wrap to a new row
   },
   imageBox: {
     width: '100%',

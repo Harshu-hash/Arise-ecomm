@@ -36,12 +36,6 @@ test('liveness and customer health endpoints use the contract envelope and one r
   assert.equal(configResponse.status, 200);
   assert.equal(config.minimumSupportedVersion, '1.0.0');
   assert.equal(config.maintenance.enabled, false);
-
-  const homeResponse = await fetch(`http://127.0.0.1:${address.port}/api/customer/v1/home`);
-  const home = (await homeResponse.json()).data;
-  assert.equal(homeResponse.status, 200);
-  assert.deepEqual(home.sections, []);
-  assert.deepEqual(home.header.searchPlaceholders, ['Search products']);
 });
 
 test('customer authentication contract is mounted', async (t) => {

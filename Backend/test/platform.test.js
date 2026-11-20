@@ -105,7 +105,7 @@ test('uploads: type sniffing, ownership, privacy and traversal', async (t) => {
   assert.equal(ok.status, 201);
   const { data } = await ok.json();
   assert.match(data.key, /^public\/products\/s1\/[0-9a-f-]{36}\.png$/);
-  const served = await fetch(data.url.replace('http://localhost:4000', base));
+  const served = await fetch(data.url.replace(/^https?:\/\/[^/]+/, base));
   assert.equal(served.status, 200);
   assert.equal(served.headers.get('cross-origin-resource-policy'), 'cross-origin');
 

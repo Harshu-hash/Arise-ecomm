@@ -1,3 +1,4 @@
+import { AppState } from 'react-native';
 import { configureStore } from '@reduxjs/toolkit';
 import { setupListeners } from '@reduxjs/toolkit/query';
 import { baseApi, configureApiInterceptors } from '@core/api';
@@ -28,7 +29,17 @@ configureApiInterceptors({
   },
 });
 
-setupListeners(store.dispatch);
+// React Native has no window focus events: map app foreground/background onto RTK Query's focus handling,
+// so returning to the app refetches what is on screen (catches time-based changes, e.g. a sale that just started).
+setupListeners(store.dispatch, (dispatch, { onFocus, onFocusLost }) => {
+  let previous = AppState.currentState;
+  const subscription = AppState.addEventListener('change', next => {
+    if (next === 'active' && previous !== 'active') dispatch(onFocus());
+    if (next !== 'active' && previous === 'active') dispatch(onFocusLost());
+    previous = next;
+  });
+  return () => subscription.remove();
+});
 
 export const dispatch = store.dispatch;
 export const getState = store.getState;

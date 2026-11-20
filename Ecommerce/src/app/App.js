@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Provider as ReduxProvider } from 'react-redux';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -16,8 +16,11 @@ import { store } from '@store';
 import { SessionBootstrap } from './bootstrap';
 import ErrorBoundary from './errorBoundary';
 import { NetworkStatusProvider, OfflineBanner } from '@core/network';
+import { startCatalogUpdates } from '@core/realtime/catalogUpdates';
 
 const App = () => {
+  // Admin/seller changes (approved products, flash sale, banners, ...) appear without restarting the app.
+  useEffect(() => startCatalogUpdates(store.dispatch), []);
   return (
     <ReduxProvider store={store}>
       <ErrorBoundary>

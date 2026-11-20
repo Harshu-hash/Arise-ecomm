@@ -5,7 +5,8 @@ import { mapAppConfigResponse, mapHomeResponse } from './home.mapper';
 export const homeApi = baseApi.injectEndpoints({
   endpoints: builder => ({
     getHome: builder.query({
-      query: () => ({ url: HOME_ENDPOINTS.feed }),
+      // Arg: a category tab id for that tab's page; undefined is the main "For You" feed.
+      query: categoryId => ({ url: HOME_ENDPOINTS.feed, params: categoryId ? { categoryId } : undefined }),
       transformResponse: mapHomeResponse,
       providesTags: [{ type: 'Home', id: 'FEED' }],
       keepUnusedDataFor: 120,

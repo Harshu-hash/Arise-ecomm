@@ -70,6 +70,8 @@ export const mapHomeResponse = payload => {
       image: item.imageUrl,
     })),
     showFlashSale: Boolean(section(HOME_SECTION_TYPES.flashSale)),
+    // Title/subtitle of the admin's flash-sale campaign; absent for older responses, where the banner keeps its default text.
+    flashSale: section(HOME_SECTION_TYPES.flashSale)?.metadata ?? null,
     suggestedProducts: parseItems(
       section(HOME_SECTION_TYPES.suggestedProducts),
       productCardSchema,
