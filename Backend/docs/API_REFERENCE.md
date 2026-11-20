@@ -58,6 +58,10 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/admin/v1/admin-users/:id/reactivate` | Bearer JWT + `admin.user.edit` | Reactivates a deactivated admin and forces a password change. |
 | `POST` | `/api/admin/v1/admin-users/:id/resend-invite` | Bearer JWT + `admin.user.invite` | Issues a fresh invite link for a still-pending admin. |
 | `POST` | `/api/admin/v1/admin-users/:id/revoke-sessions` | Bearer JWT + `admin.user.revoke_session` | Signs an admin out of one session (`sessionId`) or all devices. |
+| `GET` | `/api/admin/v1/customers` | Bearer JWT + `customers.customer.view` | Paginated customers (`q`, `status`=ACTIVE/BLOCKED/DELETED, `joinedAt[gte|lte]`, `sort`) with status facets. |
+| `GET` | `/api/admin/v1/customers/:id` | Bearer JWT + `customers.customer.view` | One customer; order/wallet/risk figures are zero placeholders until those modules exist. |
+| `POST` | `/api/admin/v1/customers/:id/block` | Bearer JWT + `customers.customer.block` | Suspends an active customer and signs them out everywhere. Audited. |
+| `POST` | `/api/admin/v1/customers/:id/unblock` | Bearer JWT + `customers.customer.block` | Reactivates a blocked customer. Audited. |
 
 ## user
 

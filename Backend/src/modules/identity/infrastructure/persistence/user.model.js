@@ -37,6 +37,9 @@ const userSchema = new mongoose.Schema(
     // Admin-only: the roles this account was granted; `permissions` is their materialised union.
     roleIds: { type: [String], default: undefined },
     defaultLanding: { type: String },
+    // Admin-only alert preferences (My account page).
+    notifyInPanel: { type: Boolean, default: true },
+    notifyEmail: { type: Boolean, default: true },
     lastLoginAt: { type: Date, default: null },
     // Invite flow: set while status is INVITED, cleared once accepted.
     inviteTokenHash: { type: String, default: null },

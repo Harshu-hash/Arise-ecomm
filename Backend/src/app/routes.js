@@ -14,6 +14,7 @@ import { createInviteRouter } from '../modules/identity/presentation/invite.rout
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
 import { createPiiRouter } from '../modules/identity/presentation/pii.routes.js';
+import { createAdminCustomersRouter } from '../modules/identity/presentation/adminCustomers.routes.js';
 import { createRoleRouter } from '../modules/identity/presentation/roles.routes.js';
 import { createRegistrationRouter } from '../modules/identity/presentation/registration.routes.js';
 import { createSellerApplicationsRouter } from '../modules/identity/presentation/sellerApplications.routes.js';
@@ -188,6 +189,7 @@ export function createRoutes() {
   }
   root.use('/api/admin/v1/admin-users', createAdminUsersRouter());
   root.use('/api/admin/v1/roles', createRoleRouter());
+  root.use('/api/admin/v1/customers', createAdminCustomersRouter());
   root.use('/api/admin/v1/admin/settings', createSettingsRouter());
   root.use('/api/admin/v1/banners', createBannerRouter());
   root.use('/api/admin/v1/banner-ads', createBannerAdAdminRouter());

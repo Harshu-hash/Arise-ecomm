@@ -78,6 +78,7 @@ test('admin API routes all require authentication', async (t) => {
     ['POST', `/admin-users/${id}/deactivate`], ['POST', `/admin-users/${id}/reactivate`],
     ['POST', `/admin-users/${id}/resend-invite`], ['POST', `/admin-users/${id}/revoke-sessions`],
     ['GET', '/admin/settings'], ['PATCH', '/admin/settings/general'],
+    ['GET', '/customers'], ['GET', `/customers/${id}`], ['POST', `/customers/${id}/block`], ['POST', `/customers/${id}/unblock`],
     ['GET', '/banners'], ['POST', '/banners'], ['PATCH', `/banners/${id}`], ['DELETE', `/banners/${id}`],
     ['GET', '/campaigns'], ['POST', '/campaigns'], ['GET', `/campaigns/${id}`], ['PATCH', `/campaigns/${id}`],
     ['POST', `/campaigns/${id}/status`], ['GET', `/campaigns/${id}/submissions`], ['POST', `/campaigns/${id}/submissions/decision`],

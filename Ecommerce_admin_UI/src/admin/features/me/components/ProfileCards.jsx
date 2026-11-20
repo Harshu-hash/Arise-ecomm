@@ -84,7 +84,7 @@ export function NotificationsCard({ user, onChange, saving }) {
   );
 }
 
-export function SecurityCard({ user, onChangePassword, onRegenerateCodes, regenerating }) {
+export function SecurityCard({ onChangePassword }) {
   return (
     <Card
       size="small"
@@ -95,7 +95,7 @@ export function SecurityCard({ user, onChangePassword, onRegenerateCodes, regene
         </Space>
       }
     >
-      <Flex justify="space-between" align="center" gap={12} wrap style={{ marginBottom: 14 }}>
+      <Flex justify="space-between" align="center" gap={12} wrap>
         <div>
           <Typography.Text style={{ fontSize: 13 }}>Password</Typography.Text>
           <div>
@@ -106,31 +106,6 @@ export function SecurityCard({ user, onChangePassword, onRegenerateCodes, regene
         </div>
         <Button icon={<KeyOutlined />} onClick={onChangePassword}>
           Change password
-        </Button>
-      </Flex>
-
-      <Flex justify="space-between" align="center" gap={12} wrap>
-        <div>
-          <Typography.Text style={{ fontSize: 13 }}>
-            Two-step verification{' '}
-            {user?.twoFactorEnrolled ? (
-              <Tag color="green" style={{ marginLeft: 4 }}>
-                On
-              </Tag>
-            ) : (
-              <Tag color="gold" style={{ marginLeft: 4 }}>
-                Not set up
-              </Tag>
-            )}
-          </Typography.Text>
-          <div>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              Generating new backup codes invalidates your old ones.
-            </Typography.Text>
-          </div>
-        </div>
-        <Button loading={regenerating} onClick={onRegenerateCodes}>
-          New backup codes
         </Button>
       </Flex>
     </Card>
