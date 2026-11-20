@@ -38,22 +38,22 @@ export const SEARCH_PLACEHOLDERS = [
 ];
 
 export const CATEGORY_TABS = [
-  { id: 'foryou', label: 'For You', icon: 'bag-handle-outline', gradient: ['#FFCB9D', '#FFFFFF'] },
-  { id: 'fashion', label: 'Fashion', icon: 'shirt-outline', gradient: ['#FFB6C1', '#FFFFFF'] },
+  { id: 'foryou', label: 'For You', icon: 'shopping-bag', gradient: ['#FFCB9D', '#FFFFFF'] },
+  { id: 'fashion', label: 'Fashion', icon: 'tag', gradient: ['#FFB6C1', '#FFFFFF'] },
   {
     id: 'mobiles',
     label: 'Mobiles',
-    icon: 'phone-portrait-outline',
+    icon: 'smartphone',
     gradient: ['#A7C7FF', '#FFFFFF'],
   },
   {
     id: 'electronics',
     label: 'Electronics',
-    icon: 'laptop-outline',
+    icon: 'monitor',
     gradient: ['#C3B8FF', '#FFFFFF'],
   },
-  { id: 'beauty', label: 'Beauty', icon: 'sparkles-outline', gradient: ['#FFD1E8', '#FFFFFF'] },
-  { id: 'home', label: 'Home', icon: 'home-outline', gradient: ['#B8F0D1', '#FFFFFF'] },
+  { id: 'beauty', label: 'Beauty', icon: 'star', gradient: ['#FFD1E8', '#FFFFFF'] },
+  { id: 'home', label: 'Home', icon: 'home', gradient: ['#B8F0D1', '#FFFFFF'] },
 ];
 
 export const SAVED_ADDRESSES = [

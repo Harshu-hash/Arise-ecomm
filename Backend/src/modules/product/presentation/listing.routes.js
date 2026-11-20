@@ -7,7 +7,7 @@ import { authenticate, authorize } from '../../../shared/middleware/authenticate
 import { idempotent } from '../../../shared/middleware/idempotency.js';
 import { sellerScope } from '../../../shared/policies/ownership.js';
 import { objectIdSchema, paiseSchema } from '../../../shared/validators/common.js';
-import { createListing, getListingForSeller, listMyListings, resubmitListing } from '../application/listing.service.js';
+import { createListing, getListingForSeller, listMyListings, resubmitListing, updateListing } from '../application/listing.service.js';
 
 // Every image/video/document field is a media ID from the media workflow
 // (POST /media/uploads -> ... -> complete), resolved to its storage key server-side —
@@ -68,6 +68,37 @@ const createListingSchema = z.object({
   barcode: z.string().trim().max(32).optional(),
 }).strict();
 
+const updateListingSchema = z.object({
+  title: z.string().trim().min(1).max(200).optional(),
+  brandId: objectIdSchema.nullable().optional(),
+  description: z.string().trim().max(2000).optional(),
+  highlights: z.array(z.string().trim().max(200)).max(20).optional(),
+  // Entries are either a stored key already on the product or a new media ID.
+  images: z.array(z.string().min(1).max(300)).max(8).optional(),
+  attributes: z.record(z.string(), z.union([z.string(), z.number()])).optional(),
+  modelInfo: z.string().trim().max(200).nullable().optional(),
+  manufacturer: z.string().trim().max(200).optional(),
+  countryOfOrigin: z.string().trim().max(100).optional(),
+  productCode: z.string().trim().max(64).nullable().optional(),
+  sizeChartId: objectIdSchema.nullable().optional(),
+  returnPolicy: z.object({
+    windowDays: z.number().int().min(0).max(60).optional(),
+    type: z.enum(['RETURN', 'REPLACEMENT', 'NONE']).optional(),
+  }).strict().optional(),
+  variants: z.array(z.object({
+    offerId: objectIdSchema,
+    sellerSku: z.string().trim().max(64).optional(),
+    ean: z.string().trim().max(32).optional(),
+    taxCode: z.string().trim().max(20).optional(),
+    mrpPaise: paiseSchema.optional(),
+    sellingPricePaise: paiseSchema.optional(),
+    stock: z.number().int().min(0).optional(),
+    weightG: z.number().int().positive().optional(),
+    dimsCm: dimsSchema.optional(),
+    images: z.array(z.string().min(1).max(300)).max(8).optional(),
+  }).strict()).max(200).optional(),
+}).strict();
+
 const idParams = z.object({ id: objectIdSchema });
 const listQuery = z.object({
   page: z.coerce.number().int().min(1).optional().default(1),
@@ -111,6 +142,15 @@ export function createListingRouter() {
     try {
       const sellerId = sellerScope(req);
       return sendData(res, await getListingForSeller(req.params.id, sellerId));
+    } catch (error) {
+      return next(error);
+    }
+  });
+
+  router.patch('/:id', validate({ params: idParams, body: updateListingSchema }), async (req, res, next) => {
+    try {
+      const sellerId = sellerScope(req);
+      return sendData(res, await updateListing(req.params.id, req.body, { sellerId, actor: req.auth }));
     } catch (error) {
       return next(error);
     }

@@ -39,7 +39,11 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/customer/v1/auth/logout` | refresh token in JSON or cookie | Revokes one customer session. |
 | `POST` | `/api/customer/v1/auth/logout-all` | Bearer JWT | Revokes every session belonging to the customer. |
 | `GET` | `/api/customer/v1/app-config` | none | Supplies the minimum app version, maintenance state, store links, and bootstrap feature flags required before customer navigation starts. |
-| `GET` | `/api/customer/v1/home` | none | Returns the customer home feed; currently an empty valid feed so real-backend authentication can run before catalog modules land. |
+| `GET` | `/api/customer/v1/home` | optional customer Bearer | Home feed. `header.categoryTabs` are the ACTIVE top-level categories. `?categoryId=` serves that tab's page (hero banners, paid carousel `PROMO_CAROUSEL`, products). The main For You page also returns `RECENTLY_VIEWED` ("Still looking for these?", only when a signed-in customer has opened products), `SUGGESTED_PRODUCTS` (their viewed categories first, best discounts next) and `BRAND_SPOTLIGHT` (top 3 brands by live products, with their best discount). Pages are cached for 15s per category; the recently-viewed list is per customer and not cached. |
+| `GET` | `/api/customer/v1/search` | none | Approved products (admin-LIVE, with a LIVE offer, an image and a visible category). Query: `q`, `categoryId` (whole subtree), `brandId`, `categories`, `brands` (comma lists), `priceRangeId`, `minRating`, `sort`, `cursor` (offset), `limit` (≤24). Returns cards, `total`, `nextCursor`, facets and sort options. Price is the cheapest in-stock live offer. |
+| `GET` | `/api/customer/v1/products/:id` | none | Approved product detail: images, sizes/colour from variant attributes, specs, size chart, availability. 404 for anything not LIVE or in a hidden category. Ratings/reviews are empty until a reviews module exists. |
+| `GET` | `/api/customer/v1/categories/tree` | none | ACTIVE top-level categories (`id`, `name`, `imageUrl`, `icon`) for the "All Categories" sidebar. |
+| `GET` | `/api/customer/v1/categories/:id` | none | Category pane: hero banner (its image) and sections — level-2 groups with their level-3 tiles. 404 when missing or hidden (a hidden parent hides its subtree). |
 | `GET` | `/api/admin/v1/roles` | Bearer JWT + `admin.role.view` | Paginated role list (`q`, `system`, `hasUsers`, `sort`, `page`, `pageSize`) with admin and permission counts. |
 | `GET` | `/api/admin/v1/roles/:id` | Bearer JWT + `admin.role.view` | One role plus the admins that hold it and the actions allowed on it. |
 | `POST` | `/api/admin/v1/roles` | Bearer JWT + `admin.role.create` | Creates a custom role from catalog permissions (implied `view` keys are added). Audited. |
@@ -128,6 +132,48 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/admin/v1/banners` | Bearer JWT + `cms.banner.create` | Creates a banner; images must be URLs returned by the `CMS_MEDIA` upload. Audited. |
 | `PATCH` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.edit` | Edits a banner (name, images, alt text, placements, schedule). Audited. |
 | `DELETE` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.delete` | Removes a banner immediately. Audited. |
+
+## bannerAd
+
+Paid shop-banner slots. Admins define named slots with a daily price; sellers rent a slot for a date range (days x daily price + 18% GST). Dates are held per day in `banner_slot_days` (unique per slot and day), so two sellers can never hold the same day. An unpaid booking keeps its dates for 15 minutes, then they free up.
+
+Booking lifecycle: `PENDING_PAYMENT` -> (Razorpay payment confirmed) `PENDING_REVIEW` -> `APPROVED` or `REJECTED` (full refund, dates freed). Unpaid holds become `EXPIRED`. Approved bookings are shown as `SCHEDULED` / `LIVE` / `COMPLETED` by their dates.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/admin/v1/banner-ads/placements` | Bearer JWT + `ads.placement.view` | Lists slots with total and upcoming booking counts. |
+| `POST` | `/api/admin/v1/banner-ads/placements` | Bearer JWT + `ads.placement.edit` | Creates a slot (name unique ignoring case, `categoryId` = the customer-app page: a header category, or `null` for For You, `dailyRatePaise`, banner pixel size (mobile), `enabled`). Audited. |
+| `PATCH` | `/api/admin/v1/banner-ads/placements/:id` | Bearer JWT + `ads.placement.edit` | Edits a slot; a new price or size applies to future bookings only. Audited. |
+| `DELETE` | `/api/admin/v1/banner-ads/placements/:id` | Bearer JWT + `ads.placement.edit` | Deletes a slot; `409 SLOT_HAS_BOOKINGS` once anything paid exists. Audited. |
+| `GET` | `/api/admin/v1/banner-ads/requests` | Bearer JWT + `ads.review.view` | Review queue: paid bookings. `?status=`, `?q=`, `?sort=submittedAt\|totalPaise\|startsOn`. |
+| `POST` | `/api/admin/v1/banner-ads/requests/:id/decide` | Bearer JWT + `ads.review.decide` | `{ decision: APPROVED\|REJECTED, reason }`. Rejecting refunds the payment through Razorpay (retry by rejecting again if the refund failed). `409 ALREADY_DECIDED`. Audited. |
+| `GET` | `/api/seller/v1/banner-ads/placements` | Bearer JWT (seller) | Open slots with their anonymous `bookedRanges` for the calendar. |
+| `GET` | `/api/seller/v1/banner-ads/destinations` | Bearer JWT (seller) | The seller's shop and live products a banner can open. |
+| `GET` | `/api/seller/v1/banner-ads` | Bearer JWT (seller) | The seller's own bookings. |
+| `GET` | `/api/seller/v1/banner-ads/:id` | Bearer JWT (seller) | One own booking. |
+| `POST` | `/api/seller/v1/banner-ads` | Bearer JWT (seller) + `Idempotency-Key` | Holds the dates and opens a Razorpay order: `{ booking, payment: { providerOrderId, keyId, amountPaise } }`. The creative is mobile-only: `BANNER_AD_MOBILE` media that must match the slot's exact pixel size. `409 SLOT_BOOKED` when any day is taken. |
+| `GET` | `/api/seller/v1/banner-ads/:id/payment-order` | Bearer JWT (seller) | The Razorpay order of a booking still `PENDING_PAYMENT`, to re-open checkout; `409 NOT_PAYABLE` once the hold lapsed. |
+| `POST` | `/api/seller/v1/banner-ads/:id/pay` | Bearer JWT (seller) | Razorpay checkout result `{ providerPaymentId, signature }`; a valid signature moves the booking to review. The `payment.captured` webhook does the same if the seller never returns. |
+
+## campaigns (seller entries and customer display)
+
+Admins create campaigns (`/api/admin/v1/campaigns`, above) and move them DRAFT -> OPEN -> SCHEDULED -> ACTIVE. Sellers enter their admin-approved (LIVE) products while the campaign is OPEN and before its deadline, with a deal price (at or below their selling price, at least `minDiscountPct` off MRP) and a committed stock. The admin approves or rejects each entry. Customers see only APPROVED entries of a campaign that is OPEN, SCHEDULED or ACTIVE and inside its dates (paused, ended, cancelled and draft ones never show), at the deal price, and only while the product itself is still customer-visible.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/seller/v1/campaigns` | Bearer JWT (seller) | Campaigns open to join or running, plus past ones this seller entered. `?tab=all\|open\|joined`, `?q=`, `?type=`. Each row has `myProducts` / `myLiveProducts`. |
+| `GET` | `/api/seller/v1/campaigns/:id` | Bearer JWT (seller) | One campaign. |
+| `GET` | `/api/seller/v1/campaigns/:id/submissions` | Bearer JWT (seller) | This seller's entries with their status and the reviewer's note (`feedback`). |
+| `GET` | `/api/seller/v1/campaigns/:id/eligible-listings` | Bearer JWT (seller) | The seller's live products not already pending or approved in this campaign, with MRP, selling price and stock. |
+| `POST` | `/api/seller/v1/campaigns/:id/submissions` | Bearer JWT (seller) | `{ entries: [{ listingId (product id), dealPricePaise, stockCommitted }] }`. All-or-nothing; a rejected, withdrawn or changes-requested entry can be entered again. `409 ENTRIES_CLOSED` after the deadline or once the campaign leaves OPEN. |
+| `POST` | `/api/seller/v1/campaigns/submissions/:id/withdraw` | Bearer JWT (seller) | Withdraws a pending, approved or changes-requested entry; it leaves the customer app at once. |
+| `POST` | `/api/admin/v1/campaigns/:id/home-flash-sale` | Bearer JWT + `marketing.campaign.edit` | `{ enabled }`: makes this campaign the home-screen flash sale, replacing the previous one (only one at a time; the response names the `replacedCampaign`). Open, scheduled, live or paused campaigns only. Ending or cancelling a campaign clears it. Audited. |
+| `GET` | `/api/customer/v1/flash-sales/current` | none | The campaign the admin set as the home flash sale, while it is running on its dates, with its approved products; `404` when none. |
+| `GET` | `/api/customer/v1/promotions` | none | Every live campaign (whatever its placement) as a promotion with product tiles: the Deals tab. |
+| `GET` | `/api/customer/v1/promotions/:id` | none | One live campaign (any placement) with `relatedProducts` at the deal price. |
+| `GET` | `/api/customer/v1/promotions/:id/products` | none | The campaign's approved products, paged (`cursor`, `limit`). |
+
+`/api/customer/v1/home` also returns `FLASH_SALE` (when the admin-chosen flash sale is live; `metadata` has its title and subtitle) and `TOP_VALUE_DEALS` (one card per live `TOP_VALUE_DEALS` campaign) on the For You page.
 
 ## search
 

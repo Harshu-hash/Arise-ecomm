@@ -157,3 +157,9 @@ export async function resolveMediaKeys(mediaIds, { ownerId, kinds }) {
   }
   return { keys, missing };
 }
+
+/** Like resolveMediaKeys, but also returns what the caller must check (size, name). Same ownership/kind rules. */
+export async function resolveMediaAssets(mediaIds, { ownerId, kinds }) {
+  const rows = await Media.find({ _id: { $in: mediaIds }, ownerId, status: 'READY', kind: { $in: kinds } }, 'key width height fileName').lean();
+  return new Map(rows.map((row) => [String(row._id), { key: row.key, width: row.width, height: row.height, fileName: row.fileName }]));
+}

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Arise marketplace \u2014 platform admin panel (frontend only)",
+  "description": "Arise marketplace — platform admin panel (frontend only)",
   "scripts": {
     "dev": "node init && vite --mode mock",
     "dev:live": "node init && vite --mode live",
@@ -34,6 +34,7 @@
     "react-dom": "18.3.1",
     "react-router-dom": "6.28.1",
     "recharts": "2.15.0",
+    "socket.io-client": "^4.8.4",
     "xlsx": "0.18.5",
     "zod": "3.24.1",
     "zustand": "5.0.2"

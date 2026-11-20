@@ -1,3 +1,4 @@
+import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { bannerStatus, isValidWindow, statusFilter } from '../domain/services/bannerRules.js';
@@ -13,6 +14,7 @@ export function serializeBanner(row, now = new Date()) {
     images: row.images,
     altText: row.altText,
     placements: row.placements,
+    categoryIds: (row.categoryIds ?? []).map(String),
     priority: row.priority,
     status: bannerStatus(row, now),
     startsAt: row.startsAt,
@@ -72,7 +74,15 @@ export async function listBanners({ page, pageSize, q, kind, status, sortField, 
   };
 }
 
+// A category-page banner with no category would never show anywhere.
+function assertCategoriesChosen({ placements, categoryIds }) {
+  if (placements.includes('CATEGORY_HERO') && !categoryIds.length) {
+    throw new ValidationError('Choose a category.', { categoryIds: ['Choose at least one category for a category page banner.'] });
+  }
+}
+
 export async function createBanner(input, actor) {
+  assertCategoriesChosen(input);
   if (!isValidWindow(input.startsAt, input.endsAt)) throw windowError();
   if (input.startsAt < new Date(Date.now() - DAY_MS)) throw startError();
   if (input.endsAt <= new Date()) {
@@ -87,6 +97,10 @@ export async function createBanner(input, actor) {
 export async function updateBanner(id, patch, actor) {
   const before = await Banner.findById(id).lean();
   if (!before) throw new NotFoundError('That banner no longer exists.');
+  assertCategoriesChosen({
+    placements: patch.placements ?? before.placements,
+    categoryIds: patch.categoryIds ?? before.categoryIds ?? [],
+  });
   if (!isValidWindow(patch.startsAt ?? before.startsAt, patch.endsAt ?? before.endsAt)) throw windowError();
   // Only a changed start is checked: an already-running banner keeps its past start.
   if (patch.startsAt && patch.startsAt.getTime() !== before.startsAt.getTime() && patch.startsAt < new Date(Date.now() - DAY_MS)) throw startError();
@@ -103,4 +117,17 @@ export async function deleteBanner(id, actor) {
   if (!removed) throw new NotFoundError('That banner no longer exists.');
   await recordAudit({ action: 'cms.banner.delete', subjectType: 'banner', subjectId: id, before: serializeBanner(removed), actor });
   return { id };
+}
+
+/** Customer app: banners running now for a placement (and, for CATEGORY_HERO, one category), best priority first. */
+export async function listLiveBanners(placement, { categoryId = null, now = new Date() } = {}) {
+  const rows = await Banner.find({
+    placements: placement,
+    ...(categoryId ? { categoryIds: categoryId } : {}),
+    startsAt: { $lte: now },
+    endsAt: { $gte: now },
+  })
+    .sort({ priority: 1, _id: 1 })
+    .lean();
+  return rows.map((row) => ({ id: String(row._id), imageUrl: deviceUrl(row.images.mobile_16_9), altText: row.altText }));
 }

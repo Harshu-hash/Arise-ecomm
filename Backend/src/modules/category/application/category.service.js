@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
+import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import {
   attributeSetDetails,
@@ -340,4 +341,92 @@ export async function deleteCategory(categoryId, { scope, actor }) {
     actor,
   });
   return { ok: true };
+}
+
+// ---- Customer app read model: ACTIVE categories only; a hidden parent hides its whole subtree. ----
+
+const DEFAULT_TAB_COLOR = '#FFCB9D';
+
+
+async function activeTree() {
+  return categoryTree(await Category.find({ status: 'ACTIVE' }).lean(), (row) => row);
+}
+
+function findNode(nodes, categoryId) {
+  for (const node of nodes) {
+    const found = id(node._id) === categoryId ? node : findNode(node.children, categoryId);
+    if (found) return found;
+  }
+  return null;
+}
+
+const customerTile = (node) => ({
+  id: id(node._id),
+  label: node.name,
+  imageUrl: deviceUrl(node.imageUrl),
+  icon: node.icon ?? null,
+  target: { type: 'CATEGORY', id: id(node._id) },
+});
+
+/** Left sidebar of the app's "All Categories" screen: top-level categories. */
+export async function listCustomerCategories() {
+  return (await activeTree()).map((node) => ({
+    id: id(node._id),
+    name: node.name,
+    imageUrl: deviceUrl(node.imageUrl),
+    icon: node.icon ?? null,
+  }));
+}
+
+/** Category strip in the home header; the admin-chosen colour tints the header gradient. */
+export async function listHomeCategoryTabs() {
+  return (await activeTree()).map((node) => ({
+    id: id(node._id),
+    label: node.name,
+    icon: node.icon ?? 'grid',
+    imageUrl: deviceUrl(node.imageUrl),
+    gradient: [node.color ?? DEFAULT_TAB_COLOR, '#FFFFFF'],
+  }));
+}
+
+/** Right pane of "All Categories": level-2 groups with their level-3 tiles. */
+export async function getCustomerCategory(categoryId) {
+  const node = findNode(await activeTree(), categoryId);
+  if (!node) throw new NotFoundError('Category not found.');
+  const groups = node.level === 1 ? node.children : [node];
+  const section = (group, items = group.children) => ({
+    id: id(group._id),
+    title: group.name,
+    viewAll: false,
+    items: items.map(customerTile),
+  });
+  const bare = groups.filter((group) => group.children.length === 0 && group !== node);
+  return {
+    id: id(node._id),
+    name: node.name,
+    heroBanner: node.imageUrl ? { title: node.name, imageUrl: deviceUrl(node.imageUrl) } : null,
+    sections: [
+      ...groups.filter((group) => group.children.length > 0).map((group) => section(group)),
+      // Level-2 categories with no level-3 children yet would otherwise be invisible.
+      ...(bare.length ? [section({ _id: `${node._id}-more`, name: node.name }, bare)] : []),
+    ],
+  };
+}
+
+/**
+ * Ids of the categories a customer can see (the category and every ancestor ACTIVE).
+ * With categoryId, only that subtree; returns null when that category is not visible.
+ */
+export async function visibleCategoryIds(categoryId = null) {
+  const tree = await activeTree();
+  let nodes = tree;
+  if (categoryId) {
+    const node = findNode(tree, String(categoryId));
+    if (!node) return null;
+    nodes = [node];
+  }
+  const ids = [];
+  const walk = (list) => list.forEach((node) => { ids.push(id(node._id)); walk(node.children); });
+  walk(nodes);
+  return ids;
 }

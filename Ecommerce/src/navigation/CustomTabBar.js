@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Animated, Image } from 'react-native';
+import { GlassView, isLiquidGlassAvailable } from 'expo-glass-effect';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { COLORS } from '../constants/colors';
 import { haptics } from '../utils/haptics';
@@ -10,6 +11,10 @@ const CUSTOM_ICONS = {
   Account: require('../assets/images/bottom_navbar/profile_logo.png'),
   Cart: require('../assets/images/bottom_navbar/cart_logo.png'),
 };
+
+// True only on iOS 26+; elsewhere the bar keeps its plain white fill.
+const HAS_GLASS = isLiquidGlassAvailable();
+const Bar = HAS_GLASS ? GlassView : View;
 
 const CIRCLE_SIZE = 58;
 const BAR_HORIZONTAL_PADDING = 4;
@@ -61,7 +66,11 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
       style={[styles.wrapper, { paddingBottom: Math.max(insets.bottom, 10) }]}
       pointerEvents="box-none"
     >
-      <View style={styles.bar} onLayout={handleBarLayout}>
+      <Bar
+        style={[styles.bar, HAS_GLASS && styles.barGlass]}
+        {...(HAS_GLASS ? { glassEffectStyle: 'regular' } : {})}
+        onLayout={handleBarLayout}
+      >
         {barWidth > 0 && (
           <Animated.View
             style={[
@@ -132,7 +141,7 @@ const CustomTabBar = ({ state, descriptors, navigation }) => {
             </TouchableOpacity>
           );
         })}
-      </View>
+      </Bar>
     </View>
   );
 };
@@ -162,6 +171,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 5,
   },
+  barGlass: { backgroundColor: 'transparent' },
   slidingCircle: {
     position: 'absolute',
     top: 6,

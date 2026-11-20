@@ -16,6 +16,9 @@ const DEFAULT_TOP_PORTION_HEIGHT = 100;
 const DEFAULT_REST_HEIGHT = 132; // search bar + category strip + their margins/padding
 const DEFAULT_GRADIENT = ['#FFCB9D', '#FFFFFF'];
 const GRADIENT_FADE_DURATION = 380;
+// Once collapsed, the category strip's static box leaves this much empty space under its underline
+// (the labels/underline rise 18px, plus the strip's own bottom padding). The background is shortened by it.
+const COLLAPSED_BOTTOM_TRIM = 24;
 
 const getGradientForCategory = (categoryTabs, categoryId) =>
   categoryTabs.find(tab => tab.id === categoryId)?.gradient || DEFAULT_GRADIENT;
@@ -99,6 +102,19 @@ const LocationSearchHeader = ({
     extrapolate: 'clamp',
   });
 
+  // Shrinks the background's bottom edge (top stays put) as the header collapses, with transform only:
+  // scaleY about the centre plus a half-trim translate keeps the top edge fixed.
+  const bgScale = scrollY.interpolate({
+    inputRange: [0, topPortionHeight],
+    outputRange: [1, (fullHeight - COLLAPSED_BOTTOM_TRIM) / fullHeight],
+    extrapolate: 'clamp',
+  });
+  const bgTranslateY = scrollY.interpolate({
+    inputRange: [0, topPortionHeight],
+    outputRange: [0, -COLLAPSED_BOTTOM_TRIM / 2],
+    extrapolate: 'clamp',
+  });
+
   const handleTopPortionLayout = e => {
     if (measuredTopRef.current) return;
     measuredTopRef.current = true;
@@ -112,13 +128,22 @@ const LocationSearchHeader = ({
   };
 
   return (
-    <Animated.View style={[styles.container, { transform: [{ translateY }] }]}>
-      <GradientBackground colors={baseGradient} />
-      {incomingGradient && (
-        <Animated.View style={[StyleSheet.absoluteFill, { opacity: gradientFade }]}>
-          <GradientBackground colors={incomingGradient} />
-        </Animated.View>
-      )}
+    // box-none: the trimmed-away blank area below the strip must not swallow touches meant for the page.
+    <Animated.View
+      pointerEvents="box-none"
+      style={[styles.container, { transform: [{ translateY }] }]}
+    >
+      <Animated.View
+        pointerEvents="none"
+        style={[styles.background, { transform: [{ translateY: bgTranslateY }, { scaleY: bgScale }] }]}
+      >
+        <GradientBackground colors={baseGradient} />
+        {incomingGradient && (
+          <Animated.View style={[StyleSheet.absoluteFill, { opacity: gradientFade }]}>
+            <GradientBackground colors={incomingGradient} />
+          </Animated.View>
+        )}
+      </Animated.View>
 
       <View style={{ paddingTop: topPaddingValue }}>
         <Animated.View onLayout={handleTopPortionLayout} style={{ opacity: topPortionOpacity }}>
@@ -196,6 +221,9 @@ const styles = StyleSheet.create({
     right: 0,
     zIndex: 20,
     elevation: 20,
+  },
+  background: {
+    ...StyleSheet.absoluteFillObject,
     backgroundColor: '#FFFFFF', // Safe fallback to fill any rendering gaps, matches gradient end
   },
   locationRow: {

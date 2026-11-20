@@ -5,14 +5,14 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
 /** Promo strip linking into the Flash Sale screen. */
-const FlashSaleBanner = ({ onPress }) => (
+const FlashSaleBanner = ({ onPress, title = 'Flash Sale is live!', subtitle = "Up to 80% off — grab it before it's gone" }) => (
   <TouchableOpacity activeOpacity={0.88} onPress={onPress} style={styles.wrapper}>
     <View style={styles.iconCircle}>
       <Text style={styles.iconEmoji}>⚡</Text>
     </View>
     <View style={styles.textWrap}>
-      <Text style={styles.title}>Flash Sale is live!</Text>
-      <Text style={styles.subtitle}>Up to 80% off — grab it before it's gone</Text>
+      <Text style={styles.title} numberOfLines={1}>{title}</Text>
+      <Text style={styles.subtitle} numberOfLines={1}>{subtitle}</Text>
     </View>
     <Icon name="chevron-right" size={18} color={COLORS.white} />
   </TouchableOpacity>

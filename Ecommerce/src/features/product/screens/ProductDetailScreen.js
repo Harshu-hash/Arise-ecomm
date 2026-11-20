@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -245,14 +245,63 @@ const InfoBlock = ({ title, children }) => (
   </View>
 );
 
+// Sellers write section titles in capitals ("PRODUCT STORY", "FEATURES & BENEFITS"); give them real heading styling.
+const HEADING_LINE = /^[A-Z][A-Z0-9 &,'’/-]{3,}$/;
+const Description = ({ text }) => (
+  <View style={styles.infoBlock}>
+    <Text style={styles.infoTitle}>Product Details</Text>
+    {text
+      .split(/\n+/)
+      .map(line => line.trim())
+      .filter(Boolean)
+      .map((line, i) =>
+        HEADING_LINE.test(line) ? (
+          <Text key={i} style={styles.descHeading}>
+            {line}
+          </Text>
+        ) : (
+          <Text key={i} style={styles.infoText}>
+            {line}
+          </Text>
+        ),
+      )}
+  </View>
+);
+
+const SpecTable = ({ title, rows }) =>
+  rows?.length > 0 ? (
+    <View style={[styles.specCard, styles.padded2]}>
+      <Text style={styles.specTitle}>{title}</Text>
+      {rows.map((row, i) => (
+        <View
+          key={`${row.label}-${i}`}
+          style={[styles.specTableRow, i === rows.length - 1 && styles.specTableRowLast]}
+        >
+          <Text style={styles.specTableLabel}>{row.label}</Text>
+          <Text style={styles.specTableValue}>{row.value}</Text>
+        </View>
+      ))}
+    </View>
+  ) : null;
+
 const ProductDetailContent = ({ product, navigation }) => {
   const insets = useSafeAreaInsets();
   const { width, height: windowHeight } = useWindowDimensions();
 
-  const gallery = product.images?.length ? product.images : [product.image].filter(Boolean);
   const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.color);
   const [selectedSize, setSelectedSize] = useState(null);
+  // The picked size/colour selects a variant, which owns its own price, stock and photos.
+  const activeVariant = selectedSize
+    ? product.variants.find(
+        v => v.size === selectedSize && (!v.color || !selectedColor || v.color === selectedColor),
+      ) ?? null
+    : null;
+  const price = activeVariant?.price ?? product.price;
+  const mrp = activeVariant?.mrp ?? product.mrp;
+  const productImages = product.images?.length ? product.images : [product.image].filter(Boolean);
+  const gallery = activeVariant?.images.length ? activeVariant.images : productImages;
+  useEffect(() => setActiveImage(0), [activeVariant?.id]);
   const [sizeError, setSizeError] = useState(false);
   const { data: wishlist } = useGetWishlistQuery();
   const [addWishlistItem, { isLoading: isAddingToWishlist }] = useAddWishlistItemMutation();
@@ -304,22 +353,29 @@ const ProductDetailContent = ({ product, navigation }) => {
 
   const discountPct =
     product.discountPct ||
-    (product.mrp > product.price
-      ? Math.round(((product.mrp - product.price) / product.mrp) * 100)
-      : 0);
-  const megaPrice = Math.round(product.price * 0.704);
-  const extraOff = product.price - megaPrice;
+    (mrp > price ? Math.round(((mrp - price) / mrp) * 100) : 0);
+  const megaPrice = Math.round(price * 0.704);
+  const extraOff = price - megaPrice;
 
-  const colours = COLOUR_OPTIONS.some(c => c.name === product.color)
-    ? COLOUR_OPTIONS
-    : [{ name: product.color, image: gallery[0] }, ...COLOUR_OPTIONS];
+  const colours = [
+    ...new Map(
+      product.variants
+        .filter(v => v.color)
+        .map(v => [v.color, { name: v.color, image: v.images[0] || productImages[0] }]),
+    ).values(),
+  ];
+  const variantLabel = [selectedColor, selectedSize && `Size ${selectedSize}`].filter(Boolean).join(', ');
 
   const requireSize = () => {
-    if (!selectedSize) {
+    if (product.sizes.length > 0 && !selectedSize) {
       setSizeError(true);
       return false;
     }
     setSizeError(false);
+    if (activeVariant && activeVariant.stock <= 0) {
+      toast.show('This size is out of stock.');
+      return false;
+    }
     return true;
   };
 
@@ -333,8 +389,8 @@ const ProductDetailContent = ({ product, navigation }) => {
     try {
       await addCartItem({
         productId: product.id,
-        variantId: `${selectedColor}-${selectedSize}`.toLowerCase().replace(/\s+/g, '-'),
-        variantLabel: `${selectedColor}, Size ${selectedSize}`,
+        variantId: variantLabel.toLowerCase().replace(/[\s,]+/g, '-'),
+        variantLabel,
         offerId: `offer-${product.id}`,
         quantity: 1,
       }).unwrap();
@@ -355,11 +411,11 @@ const ProductDetailContent = ({ product, navigation }) => {
           {
             id: product.id,
             name: `${product.brand} ${product.name}`,
-            variant: `${selectedColor}, Size ${selectedSize}`,
+            variant: variantLabel,
             qty: 1,
-            price: product.price,
-            mrp: product.mrp,
-            image: product.image || gallery[0],
+            price,
+            mrp,
+            image: gallery[0] || product.image,
           },
         ],
       });
@@ -367,7 +423,7 @@ const ProductDetailContent = ({ product, navigation }) => {
 
   const onShare = () => {
     Share.share({
-      message: `${product.brand} ${product.name} - ${formatINR(product.price)}`,
+      message: `${product.brand} ${product.name} - ${formatINR(price)}`,
     }).catch(() => {});
   };
 
@@ -531,12 +587,14 @@ const ProductDetailContent = ({ product, navigation }) => {
                 />
               )}
             />
-            <View style={styles.ratingPill}>
-              <Text style={styles.ratingPillText}>{product.rating}</Text>
-              <Icon name="star" size={11} color={GREEN} />
-              <View style={styles.ratingDivider} />
-              <Text style={styles.ratingPillCount}>{product.ratingCount}</Text>
-            </View>
+            {product.ratingCount > 0 ? (
+              <View style={styles.ratingPill}>
+                <Text style={styles.ratingPillText}>{product.rating}</Text>
+                <Icon name="star" size={11} color={GREEN} />
+                <View style={styles.ratingDivider} />
+                <Text style={styles.ratingPillCount}>{product.ratingCount}</Text>
+              </View>
+            ) : null}
             <View style={styles.dots}>
               {gallery.map((_, i) => (
                 <View key={i} style={[styles.dot, i === activeImage && styles.dotActive]} />
@@ -578,12 +636,12 @@ const ProductDetailContent = ({ product, navigation }) => {
               {product.name}
             </Text>
             <View style={styles.priceRow}>
-              {product.mrp > product.price ? (
+              {mrp > price ? (
                 <Text style={styles.mrp}>
-                  MRP <Text style={styles.mrpStrike}>{formatINR(product.mrp)}</Text>
+                  MRP <Text style={styles.mrpStrike}>{formatINR(mrp)}</Text>
                 </Text>
               ) : null}
-              <Text style={styles.price}>{formatINR(product.price)}</Text>
+              <Text style={styles.price}>{formatINR(price)}</Text>
               {discountPct > 0 ? (
                 <View style={styles.discountBadge}>
                   <Text style={styles.discountBadgeText}>{discountPct}% OFF!</Text>
@@ -616,6 +674,8 @@ const ProductDetailContent = ({ product, navigation }) => {
             </TouchableOpacity>
           </View>
 
+          {colours.length > 0 && (
+          <>
           {/* Colour */}
           <View style={[styles.padded, { marginTop: SPACING.xl }]}>
             <Text style={styles.label}>
@@ -642,6 +702,11 @@ const ProductDetailContent = ({ product, navigation }) => {
             )}
           />
 
+          </>
+          )}
+
+          {product.sizes.length > 0 && (
+          <>
           {/* Size */}
           <View style={[styles.padded, styles.sizeHeader]}>
             <Text style={styles.sizeTitle}>Select Size</Text>
@@ -676,6 +741,9 @@ const ProductDetailContent = ({ product, navigation }) => {
             <Text style={[styles.padded, styles.sizeErrorText]}>Please select a size</Text>
           ) : null}
 
+          </>
+          )}
+
           {/* Invisible placeholder reserving the in-page spot; the real buttons are the overlay below */}
           <View
             style={[styles.ctaRow, styles.padded, styles.ctaHidden]}
@@ -694,8 +762,14 @@ const ProductDetailContent = ({ product, navigation }) => {
             >
               <Icon name="map-pin" size={20} color={COLORS.textPrimary} />
               <Text style={styles.addressText} numberOfLines={1}>
-                <Text style={styles.addressBold}>{product.address.split(' - ')[0]} - </Text>
-                {product.address.split(' - ').slice(1).join(' - ')}
+                {product.address ? (
+                  <>
+                    <Text style={styles.addressBold}>{product.address.split(' - ')[0]} - </Text>
+                    {product.address.split(' - ').slice(1).join(' - ')}
+                  </>
+                ) : (
+                  'Select a delivery address'
+                )}
               </Text>
               <Text style={styles.changeText}>Change</Text>
             </TouchableOpacity>
@@ -709,12 +783,14 @@ const ProductDetailContent = ({ product, navigation }) => {
                   <Icon name="package" size={16} color={COLORS.textSecondary} />
                   <Text style={styles.standardText}>STANDARD</Text>
                 </View>
-                <Text style={styles.deliveryBy}>Delivery by {product.deliveryDate}</Text>
+                {product.deliveryDate ? (
+                  <Text style={styles.deliveryBy}>Delivery by {product.deliveryDate}</Text>
+                ) : null}
               </View>
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={styles.deliveryMrp}>MRP {formatINR(product.mrp)}</Text>
+                <Text style={styles.deliveryMrp}>MRP {formatINR(mrp)}</Text>
                 <Text style={styles.deliveryPrice}>
-                  {formatINR(product.price)}{' '}
+                  {formatINR(price)}{' '}
                   <Text style={styles.deliveryOff}>({discountPct}% OFF)</Text>
                 </Text>
               </View>
@@ -749,10 +825,17 @@ const ProductDetailContent = ({ product, navigation }) => {
 
           {/* Product details card */}
           <View style={[styles.detailsCard, styles.padded2]}>
-            <InfoBlock title="Product Details">{product.description}</InfoBlock>
-            <InfoBlock title="Size & Fit">{`Brand Fit:\n Fit: ${product.fit}\n ${product.modelInfo}`}</InfoBlock>
-            <InfoBlock title="Material & Care">{product.care}</InfoBlock>
+            {product.description ? <Description text={product.description} /> : null}
+            {product.fit || product.modelInfo ? (
+              <InfoBlock title="Size & Fit">
+                {[product.fit && `Fit: ${product.fit}`, product.modelInfo].filter(Boolean).join('\n')}
+              </InfoBlock>
+            ) : null}
+            {product.care ? <InfoBlock title="Material & Care">{product.care}</InfoBlock> : null}
           </View>
+
+          {/* Highlights: category attributes + the seller's "Label: value" lines, as a spec table. */}
+          <SpecTable title="Product Highlights" rows={product.specifications} />
 
           {/* Trust badges */}
           <View style={styles.badgeRow}>
@@ -817,6 +900,9 @@ const ProductDetailContent = ({ product, navigation }) => {
             />
           </Section>
 
+          {/* Review sections render sample data below; show them only once real reviews exist. */}
+          {product.reviewCount > 0 && (
+          <>
           {/* Ratings & Reviews */}
           <Section title="Ratings & Reviews" style={[styles.padded, { marginTop: SPACING.xxl }]}>
             <View style={styles.rowCenter}>
@@ -882,6 +968,9 @@ const ProductDetailContent = ({ product, navigation }) => {
             />
           </Section>
 
+          </>
+          )}
+
           <TouchableOpacity
             activeOpacity={0.8}
             onPress={handleViewQuestions}
@@ -896,26 +985,18 @@ const ProductDetailContent = ({ product, navigation }) => {
             <Icon name="chevron-right" size={20} color={COLORS.textTertiary} />
           </TouchableOpacity>
 
-          {/* Specifications: whatever category attributes the seller filled
-              in (fabric, connectivity, capacity, …) that have no dedicated
-              field of their own — rendered generically, not per-category. */}
-          {product.specifications?.length > 0 && (
-            <Dropdown title="Specifications" style={{ marginTop: SPACING.xxl }}>
-              {product.specifications.map((spec, i) => (
-                <View key={i} style={styles.specRow}>
-                  <Text style={styles.specLabel}>{spec.label}</Text>
-                  <Text style={styles.specValue}>{spec.value}</Text>
-                </View>
-              ))}
-            </Dropdown>
-          )}
-
           {/* More information */}
           <Dropdown title="More Information" style={{ marginTop: SPACING.xxl }}>
-            <Text style={styles.infoText}>Product Code: {product.productCode}</Text>
-            <InfoBlock title="Manufacturer Detail">{product.manufacturer}</InfoBlock>
-            <InfoBlock title="Packer Detail">{product.manufacturer}</InfoBlock>
-            <InfoBlock title="Country of Origin">{product.countryOfOrigin}</InfoBlock>
+            {product.productCode ? <Text style={styles.infoText}>Product Code: {product.productCode}</Text> : null}
+            {product.manufacturer ? (
+              <>
+                <InfoBlock title="Manufacturer Detail">{product.manufacturer}</InfoBlock>
+                <InfoBlock title="Packer Detail">{product.manufacturer}</InfoBlock>
+              </>
+            ) : null}
+            {product.countryOfOrigin ? (
+              <InfoBlock title="Country of Origin">{product.countryOfOrigin}</InfoBlock>
+            ) : null}
           </Dropdown>
 
           {/* Products you may like */}
@@ -1491,14 +1572,54 @@ const styles = StyleSheet.create({
   infoBlock: { marginBottom: SPACING.l },
   infoTitle: { fontSize: 14, fontWeight: '700', color: COLORS.textPrimary, marginBottom: 2 },
   infoText: { fontSize: 13, color: COLORS.textSecondary, lineHeight: 21 },
-  specRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: SPACING.s,
-    gap: SPACING.m,
+  descHeading: {
+    fontSize: 12,
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    color: COLORS.textPrimary,
+    marginTop: SPACING.m,
+    marginBottom: 2,
   },
-  specLabel: { fontSize: 13, color: COLORS.textSecondary },
-  specValue: { fontSize: 13, color: COLORS.textPrimary, fontWeight: '600', textAlign: 'right', flexShrink: 1 },
+  specCard: {
+    marginTop: SPACING.xxl,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: RADIUS.m,
+    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+  },
+  specTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+    backgroundColor: COLORS.mutedBg,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.border,
+  },
+  specTableRow: {
+    flexDirection: 'row',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: COLORS.border,
+  },
+  specTableRowLast: { borderBottomWidth: 0 },
+  specTableLabel: {
+    width: '38%',
+    fontSize: 13,
+    color: COLORS.textSecondary,
+    backgroundColor: COLORS.mutedBg,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+  },
+  specTableValue: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    paddingHorizontal: SPACING.l,
+    paddingVertical: SPACING.m,
+  },
 
   badgeRow: { flexDirection: 'row', justifyContent: 'space-around', marginTop: SPACING.xxl },
   badgeItem: { alignItems: 'center' },

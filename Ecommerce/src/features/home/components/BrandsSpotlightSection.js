@@ -65,11 +65,12 @@ const styles = StyleSheet.create({
   },
   row: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     paddingHorizontal: SPACING.l,
     gap: SPACING.s,
   },
   card: {
-    flex: 1,
+    width: '31.5%', // three columns; fewer items keep this size, not stretch
   },
   imageBox: {
     position: 'relative',

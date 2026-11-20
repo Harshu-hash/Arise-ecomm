@@ -7,5 +7,6 @@ export {
 export {
   findBrandForListing,
   incrementBrandUsage,
+  getBrandImages,
   listBrandsForSeller,
 } from '../application/brand.service.js';

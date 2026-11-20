@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
+import CategoryIcon from '../../../shared/components/CategoryIcon';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
@@ -15,7 +15,7 @@ const CategorySidebarRow = ({ item, isSelected, onPress }) => (
       {item.image ? (
         <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
       ) : (
-        <Icon name={item.icon || 'grid'} size={20} color={COLORS.primary} />
+        <CategoryIcon name={item.icon} size={20} color={COLORS.primary} />
       )}
     </View>
     <Text style={[styles.label, isSelected && styles.labelSelected]} numberOfLines={2}>

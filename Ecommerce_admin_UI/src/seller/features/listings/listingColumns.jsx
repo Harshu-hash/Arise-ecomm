@@ -1,7 +1,82 @@
 import { CrownFilled } from '@ant-design/icons';
-import { Avatar, Flex, Tag, Tooltip, Typography } from 'antd';
+import { Avatar, Button, Flex, Modal, Table, Tag, Tooltip, Typography } from 'antd';
+import { useState } from 'react';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
+
+/** The variant count; clicking it opens that product's variants (price, stock, status). */
+function VariantsCell({ count, row }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <Button
+        type="link"
+        onClick={(e) => {
+          e.stopPropagation(); // don't open the product page
+          setOpen(true);
+        }}
+      >
+        {count}
+      </Button>
+      {/* The modal renders in a portal but React bubbles its clicks to the table row. */}
+      <span role="presentation" onClick={(e) => e.stopPropagation()}>
+        <Modal
+          title={`${row.productTitle} — variants`}
+          open={open}
+          onCancel={() => setOpen(false)}
+          footer={null}
+          width={720}
+        >
+          <Table
+            size="small"
+            rowKey="offerId"
+            pagination={false}
+            scroll={{ x: true }}
+            dataSource={row.variants}
+            columns={[
+              {
+                title: 'Variant',
+                render: (_, v) => (
+                  <div>
+                    <Typography.Text strong>{v.label ?? 'Default'}</Typography.Text>
+                    <div>
+                      <Typography.Text type="secondary" style={{ fontSize: 12 }}>{v.sku}</Typography.Text>
+                    </div>
+                  </div>
+                ),
+              },
+              {
+                title: 'Price',
+                align: 'right',
+                render: (_, v) => (
+                  <>
+                    <MoneyText paise={v.sellingPricePaise} strong />
+                    {v.mrpPaise > v.sellingPricePaise && (
+                      <div>
+                        <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>
+                          <MoneyText paise={v.mrpPaise} type="secondary" />
+                        </Typography.Text>
+                      </div>
+                    )}
+                  </>
+                ),
+              },
+              {
+                title: 'Stock',
+                dataIndex: 'stock',
+                align: 'right',
+                render: (stock) => (
+                  <Typography.Text type={stock === 0 ? 'danger' : stock < 20 ? 'warning' : undefined}>{stock}</Typography.Text>
+                ),
+              },
+              { title: 'Status', dataIndex: 'status', render: (status) => <StatusTag domain="listing" code={status} /> },
+            ]}
+          />
+        </Modal>
+      </span>
+    </>
+  );
+}
 
 /** Columns for the seller's My Listings table. */
 export const listingColumns = [
@@ -51,39 +126,13 @@ export const listingColumns = [
     ),
   },
   {
-    key: 'sellingPricePaise',
-    title: 'Price',
-    dataIndex: 'sellingPricePaise',
-    align: 'right',
+    key: 'variants',
+    title: 'Variants',
+    dataIndex: 'variantCount',
+    align: 'center',
     priority: 1,
-    width: 120,
-    sorter: true,
-    render: (paise, row) => (
-      <div>
-        <MoneyText paise={paise} strong />
-        {row.mrpPaise > paise && (
-          <div>
-            <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>
-              <MoneyText paise={row.mrpPaise} type="secondary" />
-            </Typography.Text>
-          </div>
-        )}
-      </div>
-    ),
-  },
-  {
-    key: 'stock',
-    title: 'Stock',
-    dataIndex: 'stock',
-    align: 'right',
-    priority: 2,
-    width: 90,
-    sorter: true,
-    render: (stock) => (
-      <Typography.Text type={stock === 0 ? 'danger' : stock < 20 ? 'warning' : undefined}>
-        {stock}
-      </Typography.Text>
-    ),
+    width: 110,
+    render: (count, row) => <VariantsCell count={count} row={row} />,
   },
   {
     key: 'buyBox',

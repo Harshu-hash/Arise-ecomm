@@ -98,9 +98,9 @@ export default function MediaWorkflowUpload({
     <Space direction="vertical" size={8} style={{ width: '100%' }}>
       <Space size={[8, 8]} wrap role="list" aria-label={`${label} uploads`}>
         {items.map((item, index) => (
-          <div key={item.mediaId ?? item.id} role="listitem" style={{ width: imageOnly ? 112 : 240, border: '1px solid var(--ant-color-border)', borderRadius: 8, overflow: 'hidden' }}>
+          <div key={item.mediaId ?? item.id} role="listitem" style={{ width: imageOnly ? 136 : 240, border: '1px solid var(--ant-color-border)', borderRadius: 8, overflow: 'hidden' }}>
             {imageOnly ? <img src={item.previewUrl} alt={`${label} ${index + 1}${index === 0 ? ', cover' : ''}`} style={{ width: '100%', height: 104, objectFit: 'cover', display: 'block' }} /> : <Typography.Text ellipsis style={{ display: 'block', padding: 10 }}>{item.fileName}</Typography.Text>}
-            <Space size={0} style={{ padding: 3 }}>
+            <Space size={0} wrap style={{ padding: 3 }}>
               {imageOnly && <Tooltip title={index === 0 ? 'Cover image' : 'Make cover'}><Button type="text" size="small" aria-label={index === 0 ? 'Cover image' : `Make ${item.fileName} cover`} icon={index === 0 ? <StarFilled style={{ color: '#faad14' }} /> : <StarOutlined />} onClick={() => cover(index)} /></Tooltip>}
               <Button type="text" size="small" aria-label={`Move ${item.fileName} left`} icon={<ArrowLeftOutlined />} disabled={index === 0} onClick={() => move(index, -1)} />
               <Button type="text" size="small" aria-label={`Move ${item.fileName} right`} icon={<ArrowRightOutlined />} disabled={index === items.length - 1} onClick={() => move(index, 1)} />

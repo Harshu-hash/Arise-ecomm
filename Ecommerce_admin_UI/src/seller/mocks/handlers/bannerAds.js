@@ -1,10 +1,10 @@
 import { http as mswHttp } from 'msw';
 import { db, findById, id, insert } from '@mocks/db/store';
-import { bannerAdDisplayStatus, bannerAdPrice } from '@core/utils/bannerAds';
+import { HOLDS_SLOT, bannerAdDisplayStatus, bannerAdPrice, rangesOverlap } from '@core/utils/bannerAds';
 import { listResult, parseListQuery } from '@mocks/engine/list';
 import { mockNowIso } from '@mocks/engine/settings';
 import { scheduleSave } from '@mocks/persistence';
-import { badRequest, created, notFound, ok, okList, unauthorized, validationFailed } from '@mocks/engine/respond';
+import { badRequest, conflict, created, notFound, ok, okList, unauthorized, validationFailed } from '@mocks/engine/respond';
 import { resolveCaller, sellerFor } from '@seller/mocks/engine/sellerAuth';
 import { SELLER_BASE } from './auth';
 
@@ -24,7 +24,14 @@ export const sellerBannerAdHandlers = [
   mswHttp.get(`${SELLER_BASE}/banner-ads/placements`, async ({ request }) => {
     const c = context(request);
     if (c.response) return c.response;
-    return ok(db.bannerAdPlacements.filter((placement) => placement.enabled));
+    // Booked ranges are anonymous: sellers see which days are taken, never by whom.
+    const today = new Date().toISOString().slice(0, 10);
+    return ok(db.bannerAdPlacements.filter((placement) => placement.enabled).map((placement) => ({
+      ...placement,
+      bookedRanges: db.bannerAdBookings
+        .filter((b) => b.placementId === placement.id && HOLDS_SLOT.includes(b.status) && b.endsOn >= today)
+        .map(({ startsOn, endsOn }) => ({ startsOn, endsOn })),
+    })));
   }),
 
   mswHttp.get(`${SELLER_BASE}/banner-ads/destinations`, async ({ request }) => {
@@ -68,31 +75,31 @@ export const sellerBannerAdHandlers = [
     if (!placement?.enabled) errors.placementId = 'Choose an available placement.';
     if (!['SHOP', 'PRODUCT'].includes(body.destinationType)) errors.destinationType = 'Choose where the banner should open.';
     if (!body.destinationValue) errors.destinationValue = 'Choose a destination.';
-    if (!body.desktopCreative?.mediaId) errors.desktopCreative = 'Upload the desktop creative.';
     if (!body.mobileCreative?.mediaId) errors.mobileCreative = 'Upload the mobile creative.';
     const price = placement ? bannerAdPrice({ startsOn: body.startsOn, endsOn: body.endsOn, dailyRatePaise: placement.dailyRatePaise }) : null;
     if (!price) errors.dateRange = 'Choose a valid date range.';
     const today = new Date().toISOString().slice(0, 10);
     if (body.startsOn < today) errors.dateRange = 'The campaign cannot start in the past.';
     if (Object.keys(errors).length) return validationFailed(errors);
+    const taken = db.bannerAdBookings.some((b) => b.placementId === placement.id && HOLDS_SLOT.includes(b.status) && rangesOverlap(b, body));
+    if (taken) return conflict('Some of these dates were just booked by someone else. Pick other dates for this slot.', 'SLOT_BOOKED');
 
     const ownsDestination = body.destinationType === 'SHOP'
       ? body.destinationValue === c.user.sellerId
       : db.offers.some((offer) => offer.sellerId === c.user.sellerId && offer.productId === body.destinationValue && offer.status === 'LIVE');
     if (!ownsDestination) return validationFailed({ destinationValue: 'Choose your own live shop or product.' });
 
-    const desktop = findById('mediaResources', body.desktopCreative.mediaId);
     const mobile = findById('mediaResources', body.mobileCreative.mediaId);
-    if (desktop?.sellerId !== c.user.sellerId || mobile?.sellerId !== c.user.sellerId || desktop.status !== 'READY' || mobile.status !== 'READY') {
+    if (mobile?.sellerId !== c.user.sellerId || mobile.status !== 'READY') {
       return validationFailed({ creatives: 'Use creatives uploaded by this seller account.' });
     }
 
     const booking = insert('bannerAdBookings', {
       id: id('BAD', 5), sellerId: c.user.sellerId, sellerName: c.seller.storeName,
-      campaignName: body.campaignName.trim(), placementId: placement.id, placementName: placement.name,
+      campaignName: body.campaignName.trim(), placementId: placement.id, placementName: placement.name, categoryId: placement.categoryId ?? null, categoryName: placement.categoryName ?? null,
       destinationType: body.destinationType, destinationValue: body.destinationValue,
       startsOn: body.startsOn, endsOn: body.endsOn,
-      desktopCreative: body.desktopCreative, mobileCreative: body.mobileCreative,
+      mobileCreative: body.mobileCreative,
       ...price, status: 'PENDING_REVIEW', paymentStatus: 'PAID', paymentMethod: body.paymentMethod,
       paymentReference: `MOCK-PAY-${Date.now()}`, paidAt: mockNowIso(), submittedAt: mockNowIso(),
       rejectionReason: null, decidedAt: null, impressions: 0, clicks: 0, createdAt: mockNowIso(), version: 1,

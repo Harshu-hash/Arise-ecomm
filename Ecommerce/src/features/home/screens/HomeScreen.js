@@ -1,6 +1,6 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Animated, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Animated, RefreshControl, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { RADIUS, SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
@@ -18,10 +18,12 @@ import TopValueDealsSection from '../components/TopValueDealsSection';
 import ProductFeedSection from '../components/ProductFeedSection';
 import AddressSelectSheet from '../components/AddressSelectSheet';
 import HomeScreenSkeleton from '../components/HomeScreenSkeleton';
+import { homeApi } from '../api/home.api';
 import { useGetHomeQuery } from '../api/home.query';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
 
+const FOR_YOU_TAB_ID = 'foryou'; // reserved first tab served by the backend: the main home feed
 const DEFAULT_HEADER_HEIGHT = 272;
 const AD_SHEET_PARALLAX_DISTANCE = 50;
 const AD_SHEET_PARALLAX_SCROLL_RANGE = 160;
@@ -44,21 +46,47 @@ const SectionLoadWarning = ({ count, onRetry }) => (
 );
 
 const HomeScreen = ({ navigation }) => {
-  const { data, error, isLoading, isFetching, refetch } = useGetHomeQuery();
-  const isAuthenticated = useSelector(selectIsAuthenticated);
-  const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
   const [activeCategoryId, setActiveCategoryId] = useState(null);
+  // `data` keeps the previous tab's response while a new tab loads, so the header never flashes away.
+  const { data, currentData, error, isLoading, isFetching, refetch } = useGetHomeQuery(
+    activeCategoryId && activeCategoryId !== FOR_YOU_TAB_ID ? activeCategoryId : undefined,
+  );
+  // Warm every header tab's page once the header is known, so switching tabs shows cached content at once.
+  const prefetchHome = homeApi.usePrefetch('getHome');
+  const tabIds = (data?.header.categoryTabs ?? []).map(tab => tab.id).join(',');
+  useEffect(() => {
+    tabIds
+      .split(',')
+      .filter(tabId => tabId && tabId !== FOR_YOU_TAB_ID)
+      .forEach(tabId => prefetchHome(tabId, { ifOlderThan: 60 }));
+  }, [tabIds, prefetchHome]);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  // Home is personal once signed in ("Still looking for these?"): reload it when the user signs in or out.
+  const authSeen = useRef(isAuthenticated);
+  useEffect(() => {
+    if (authSeen.current === isAuthenticated) return;
+    authSeen.current = isAuthenticated;
+    refetch();
+  }, [isAuthenticated, refetch]);
+  const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
   const [selectedAddressId, setSelectedAddressId] = useState(null);
   const [isAddressSheetVisible, setIsAddressSheetVisible] = useState(false);
   const [headerHeight, setHeaderHeight] = useState(DEFAULT_HEADER_HEIGHT);
   const scrollY = useRef(new Animated.Value(0)).current;
+  // The tab bar belongs to the navigator, outside this screen, so the sheet cannot be raised above it
+  // with z-index; hide the bar while the sheet is open instead.
+  useLayoutEffect(() => {
+    navigation?.setOptions({ tabBarStyle: { display: isAddressSheetVisible ? 'none' : 'flex' } });
+  }, [navigation, isAddressSheetVisible]);
 
   if (isLoading) return <HomeScreenSkeleton />;
   if (error || !data) {
     return <ErrorState message={error?.message} onRetry={refetch} />;
   }
 
-  const hasContent =
+  // `data` keeps the previous tab's page while the new one loads; don't show it as if it were this tab's.
+  const switchingTab = !currentData && isFetching;
+  const hasSections =
     data.heroBanners.length > 0 ||
     data.adBanners.length > 0 ||
     data.recentlyViewed.length > 0 ||
@@ -68,6 +96,7 @@ const HomeScreen = ({ navigation }) => {
     data.brandsSpotlight.length > 0 ||
     data.topValueDeals.length > 0 ||
     data.productFeed.length > 0;
+  const hasContent = hasSections || data.header.categoryTabs.length > 0;
 
   if (!hasContent) {
     return (
@@ -115,9 +144,10 @@ const HomeScreen = ({ navigation }) => {
           />
         }
       >
-        {data.heroBanners.length > 0 ? <HeroBannerCarousel banners={data.heroBanners} /> : null}
+        {switchingTab ? <ActivityIndicator style={styles.tabLoader} color={COLORS.primary} /> : null}
+        {!switchingTab && data.heroBanners.length > 0 ? <HeroBannerCarousel banners={data.heroBanners} /> : null}
 
-        <Animated.View style={{ transform: [{ translateY: adSheetParallaxY }] }}>
+        {switchingTab ? null : <Animated.View style={{ transform: [{ translateY: adSheetParallaxY }] }}>
           {data.failedSections.length > 0 ? (
             <SectionLoadWarning count={data.failedSections.length} onRetry={refetch} />
           ) : null}
@@ -132,7 +162,11 @@ const HomeScreen = ({ navigation }) => {
             />
           ) : null}
           {data.showFlashSale ? (
-            <FlashSaleBanner onPress={() => navigation?.navigate('FlashSale')} />
+            <FlashSaleBanner
+              title={data.flashSale?.title}
+              subtitle={data.flashSale?.subtitle}
+              onPress={() => navigation?.navigate('FlashSale')}
+            />
           ) : null}
           {data.adTiles.length > 0 ? (
             <AdTileRow tiles={data.adTiles} onPressTile={() => navigation?.navigate('Offers')} />
@@ -163,7 +197,10 @@ const HomeScreen = ({ navigation }) => {
               onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
             />
           ) : null}
-        </Animated.View>
+          {!hasSections && !isFetching ? (
+            <Text style={styles.emptyNote}>Nothing to show in this category yet.</Text>
+          ) : null}
+        </Animated.View>}
       </Animated.ScrollView>
 
       <LocationSearchHeader
@@ -215,6 +252,8 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   sectionWarningText: { flex: 1, color: COLORS.textPrimary, fontSize: 13 },
+  tabLoader: { marginTop: 120 },
+  emptyNote: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 14, marginTop: 80 },
   retryText: { color: COLORS.primary, fontWeight: '700', marginLeft: SPACING.m },
 });
 

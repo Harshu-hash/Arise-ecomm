@@ -92,3 +92,14 @@ test('generateSku prefers a custom SKU, otherwise derives one from brand and pro
   assert.equal(generateSku({ brandName: 'Nova', productId: 'p1', index: 2 }), 'NOVA-p1-3');
   assert.equal(generateSku({ productId: 'p1', index: 0 }), 'SKU-p1-1');
 });
+
+test('customer price is the cheapest in-stock live offer, falling back to out-of-stock ones', async () => {
+  const { bestOffer } = await import('../src/modules/product/application/customerCatalog.service.js');
+  const offers = [
+    { sellingPricePaise: 900, stock: 0 },
+    { sellingPricePaise: 1500, stock: 5 },
+    { sellingPricePaise: 1300, stock: 2 },
+  ];
+  assert.equal(bestOffer(offers).sellingPricePaise, 1300);
+  assert.equal(bestOffer([offers[0]]).sellingPricePaise, 900);
+});

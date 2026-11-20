@@ -14,34 +14,28 @@ import {
   Button,
   Card,
   Col,
-  DatePicker,
   Descriptions,
   Flex,
-  Form,
   Input,
-  InputNumber,
   List,
   Modal,
   Progress,
   Row,
   Space,
-  Statistic,
+  Table,
   Tag,
   Typography,
 } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
-import { paiseToRupees, rupeesToPaise } from '@core/utils/money';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import MoneyText from '@ui/components/MoneyText';
-import ImageUpload from '@ui/components/ImageUpload/ImageUpload';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
 import { listingKeys, listingsApi } from '../api/listings.api';
 import EditListingModal from '../components/EditListingModal';
-import QuickEdit from '../components/QuickEdit';
 
 const CHECK_ICON = {
   PASS: <CheckCircleTwoTone twoToneColor="#26A541" />,
@@ -55,27 +49,13 @@ export default function ListingDetailPage() {
   const { message } = App.useApp();
   const queryClient = useQueryClient();
   const [editOpen, setEditOpen] = useState(false);
-  const [editImages, setEditImages] = useState([]);
-  const [editForm] = Form.useForm();
   const [lifecycleAction, setLifecycleAction] = useState(null);
   const [reason, setReason] = useState('');
-  const [scheduleOpen, setScheduleOpen] = useState(false);
-  const [variantOpen, setVariantOpen] = useState(false);
-  const [variantImages, setVariantImages] = useState([]);
-  const [scheduleForm] = Form.useForm();
-  const [variantForm] = Form.useForm();
 
   const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: listingKeys.detail(id),
     queryFn: () => listingsApi.detail(id),
   });
-
-  const { data: catAttrs } = useQuery({
-    queryKey: ['seller', 'catalog', 'attributes', data?.product?.categoryId],
-    queryFn: () => listingsApi.categoryAttributes(data.product.categoryId),
-    enabled: Boolean(data?.product?.categoryId),
-  });
-  const sizeCharts = catAttrs?.sizeCharts ?? [];
 
   const { data: feePreview } = useQuery({
     queryKey: ['seller', 'listings', id, 'fee-preview', data?.sellingPricePaise],
@@ -93,23 +73,6 @@ export default function ListingDetailPage() {
     queryClient.invalidateQueries({ queryKey: ['seller', 'listings', 'list'] });
   };
 
-  const priceMut = useMutation({
-    mutationFn: (rupees) => listingsApi.setPrice(id, rupeesToPaise(rupees)),
-    onSuccess: () => {
-      message.success('Price updated.');
-      invalidate();
-    },
-    onError: (e) =>
-      message.error(e?.fieldErrors?.sellingPricePaise ?? e?.message ?? 'Could not update price.'),
-  });
-  const stockMut = useMutation({
-    mutationFn: (stock) => listingsApi.setStock(id, stock),
-    onSuccess: () => {
-      message.success('Stock updated.');
-      invalidate();
-    },
-    onError: (e) => message.error(e?.message ?? 'Could not update stock.'),
-  });
   const resubmitMut = useMutation({
     mutationFn: () => listingsApi.resubmit(id),
     onSuccess: () => {
@@ -117,29 +80,6 @@ export default function ListingDetailPage() {
       invalidate();
     },
     onError: (e) => message.error(e?.message ?? 'Could not resubmit.'),
-  });
-  const editMut = useMutation({
-    mutationFn: (values) =>
-      listingsApi.update(id, {
-        title: values.title,
-        description: values.description,
-        highlights: (values.highlights ?? '')
-          .split('\n')
-          .map((s) => s.trim())
-          .filter(Boolean),
-        images: editImages,
-        sizeChartId: values.sizeChartId ?? null,
-        returnPolicy: {
-          windowDays: values.returnWindowDays ?? 7,
-          type: values.returnType ?? 'RETURN',
-        },
-      }),
-    onSuccess: () => {
-      message.success('Listing updated.');
-      setEditOpen(false);
-      invalidate();
-    },
-    onError: (e) => message.error(e?.message ?? 'Could not save.'),
   });
   const submitDraftMut = useMutation({
     mutationFn: () => listingsApi.update(id, { submitForQc: true }),
@@ -160,36 +100,6 @@ export default function ListingDetailPage() {
     onError: (e) =>
       message.error(e?.fieldErrors?.reason ?? e?.message ?? 'Could not update the listing.'),
   });
-  const scheduleMut = useMutation({
-    mutationFn: (values) =>
-      listingsApi.setPrice(id, {
-        sellingPricePaise: rupeesToPaise(values.price),
-        mrpPaise: rupeesToPaise(values.mrp),
-        scheduledAt: values.scheduledAt.toISOString(),
-      }),
-    onSuccess: () => {
-      message.success('Price change scheduled.');
-      setScheduleOpen(false);
-      scheduleForm.resetFields();
-      invalidate();
-    },
-    onError: (e) => message.error(e?.message ?? 'Could not schedule the price.'),
-  });
-  const variantMut = useMutation({
-    mutationFn: (values) =>
-      listingsApi.updateVariant(id, {
-        ...values,
-        images: variantImages,
-        dimsCm: { l: values.dimsL, w: values.dimsW, h: values.dimsH },
-      }),
-    onSuccess: () => {
-      message.success('Variant details updated.');
-      setVariantOpen(false);
-      invalidate();
-    },
-    onError: (e) => message.error(e?.message ?? 'Could not update the variant.'),
-  });
-
   if (isLoading) return <FullPageSpinner label="Loading listing…" />;
   if (isError) return <ErrorState error={error} onRetry={refetch} />;
 
@@ -229,22 +139,8 @@ export default function ListingDetailPage() {
               </>
             )}
             <>
-              <Button
-                icon={<EditOutlined />}
-                onClick={() => {
-                  editForm.setFieldsValue({
-                    title: product.title,
-                    description: product.description,
-                    highlights: (product.highlights ?? []).join('\n'),
-                    sizeChartId: product.sizeChartId ?? undefined,
-                    returnType: product.returnPolicy?.type ?? 'RETURN',
-                    returnWindowDays: product.returnPolicy?.windowDays ?? 7,
-                  });
-                  setEditImages(product.images ?? []);
-                  setEditOpen(true);
-                }}
-              >
-                Edit content
+              <Button icon={<EditOutlined />} onClick={() => setEditOpen(true)}>
+                Edit product
               </Button>
             </>
             {data.productStatus === 'LIVE' && data.status === 'LIVE' && (
@@ -328,25 +224,113 @@ export default function ListingDetailPage() {
                 <Typography.Paragraph>{product.description}</Typography.Paragraph>
               </>
             )}
-            <Button
-              onClick={() => {
-                variantForm.setFieldsValue({
-                  sellerSku: data.sellerSku,
-                  sku: variant?.sku,
-                  barcode: variant?.ean,
-                  taxCode: data.taxCode,
-                  weightG: variant?.weightG,
-                  dimsL: variant?.dimsCm?.l,
-                  dimsW: variant?.dimsCm?.w,
-                  dimsH: variant?.dimsCm?.h,
-                });
-                setVariantImages(variant?.images ?? []);
-                setVariantOpen(true);
-              }}
-            >
-              Edit variant details
-            </Button>
+            {product?.imageUrls?.length > 1 && (
+              <Space wrap style={{ marginBottom: 12 }}>
+                {product.imageUrls.map((url) => (
+                  <Avatar key={url} shape="square" size={64} src={url} />
+                ))}
+              </Space>
+            )}
+            {product?.highlights?.length > 0 && (
+              <>
+                <Typography.Paragraph type="secondary" style={{ marginBottom: 4 }}>
+                  Highlights
+                </Typography.Paragraph>
+                <ul style={{ marginTop: 0 }}>
+                  {product.highlights.map((h) => (
+                    <li key={h}>{h}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            <Descriptions column={{ xs: 1, sm: 2 }} size="small" bordered style={{ marginBottom: 12 }}>
+              {Object.entries(product?.attributes ?? {}).map(([k, v]) => (
+                <Descriptions.Item key={k} label={k}>
+                  {Array.isArray(v) ? v.join(', ') : String(v)}
+                </Descriptions.Item>
+              ))}
+              {[
+                ['Fit', product?.fit],
+                ['Care', product?.care],
+                ['Model info', product?.modelInfo],
+                ['Manufacturer', product?.manufacturer],
+                ['Country of origin', product?.countryOfOrigin],
+                ['Product code', product?.productCode],
+                ['GST', product?.gstRate != null ? `${product.gstRate}%` : null],
+                [
+                  'Returns',
+                  product?.returnPolicy
+                    ? `${product.returnPolicy.type} · ${product.returnPolicy.windowDays} days`
+                    : null,
+                ],
+              ]
+                .filter(([, v]) => v)
+                .map(([label, v]) => (
+                  <Descriptions.Item key={label} label={label}>
+                    {v}
+                  </Descriptions.Item>
+                ))}
+            </Descriptions>
           </Card>
+
+          {data.variants?.length > 0 && (
+            <Card title={`Variants (${data.variants.length})`} style={{ marginBottom: 16 }}>
+              <Table
+                size="small"
+                rowKey="offerId"
+                pagination={false}
+                scroll={{ x: true }}
+                dataSource={data.variants}
+                onRow={(v) => ({ onClick: () => v.offerId !== id && navigate(`/listings/${v.offerId}`) })}
+                rowClassName={(v) => (v.offerId === id ? 'ant-table-row-selected' : '')}
+                columns={[
+                  {
+                    title: 'Variant',
+                    render: (_, v) => (
+                      <Flex gap={8} align="center">
+                        <Avatar shape="square" size={36} src={v.imageUrls?.[0]} />
+                        <div>
+                          <Typography.Text strong>{v.label ?? 'Default'}</Typography.Text>
+                          <div>
+                            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                              {v.sku}
+                            </Typography.Text>
+                          </div>
+                        </div>
+                      </Flex>
+                    ),
+                  },
+                  {
+                    title: 'Price',
+                    align: 'right',
+                    render: (_, v) => (
+                      <>
+                        <MoneyText paise={v.sellingPricePaise} strong />
+                        {v.mrpPaise > v.sellingPricePaise && (
+                          <div>
+                            <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>
+                              <MoneyText paise={v.mrpPaise} type="secondary" />
+                            </Typography.Text>
+                          </div>
+                        )}
+                      </>
+                    ),
+                  },
+                  { title: 'Stock', dataIndex: 'stock', align: 'right' },
+                  { title: 'EAN', dataIndex: 'ean', render: (e) => e ?? '—' },
+                  {
+                    title: 'Weight / size',
+                    render: (_, v) =>
+                      `${v.weightG} g · ${v.dimsCm?.l}×${v.dimsCm?.w}×${v.dimsCm?.h} cm`,
+                  },
+                  { title: 'Status', dataIndex: 'status', render: (s) => <StatusTag domain="listing" code={s} /> },
+                ]}
+              />
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+                Click a variant to edit its price, stock and details.
+              </Typography.Text>
+            </Card>
+          )}
 
           {submission?.autoChecks?.length > 0 && (
             <Card title="QC auto-checks" size="small">
@@ -432,50 +416,6 @@ export default function ListingDetailPage() {
         </Col>
 
         <Col xs={24} lg={8}>
-          <Card title="Price & stock" style={{ marginBottom: 16 }}>
-            <Space direction="vertical" size={16} style={{ width: '100%' }}>
-              <Flex justify="space-between" align="center">
-                <Statistic
-                  title="Selling price"
-                  valueRender={() => <MoneyText paise={data.sellingPricePaise} strong />}
-                />
-                <Statistic
-                  title="MRP"
-                  valueRender={() => <MoneyText paise={data.mrpPaise} type="secondary" />}
-                />
-              </Flex>
-              <>
-                <QuickEdit
-                  label="Update price (₹)"
-                  initial={paiseToRupees(data.sellingPricePaise)}
-                  max={paiseToRupees(data.mrpPaise)}
-                  loading={priceMut.isPending}
-                  onSave={(v) => priceMut.mutate(v)}
-                />
-                <Button
-                  onClick={() => {
-                    scheduleForm.setFieldsValue({
-                      price: paiseToRupees(data.sellingPricePaise),
-                      mrp: paiseToRupees(data.mrpPaise),
-                    });
-                    setScheduleOpen(true);
-                  }}
-                >
-                  Schedule price
-                </Button>
-              </>
-              <>
-                <QuickEdit
-                  label="Update stock"
-                  initial={data.stock}
-                  loading={stockMut.isPending}
-                  integer
-                  onSave={(v) => stockMut.mutate(v)}
-                />
-              </>
-            </Space>
-          </Card>
-
           <Card title="On this listing" size="small">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
               <Flex justify="space-between">
@@ -534,15 +474,13 @@ export default function ListingDetailPage() {
       </Row>
 
       <EditListingModal
+        data={data}
         open={editOpen}
-        onCancel={() => setEditOpen(false)}
-        form={editForm}
-        onFinish={(v) => editMut.mutate(v)}
-        loading={editMut.isPending}
-        images={editImages}
-        onImagesChange={setEditImages}
-        sizeCharts={sizeCharts}
-        isLive={data.status === 'LIVE'}
+        onClose={() => setEditOpen(false)}
+        onSaved={() => {
+          setEditOpen(false);
+          invalidate();
+        }}
       />
       <Modal
         title={`${lifecycleAction ?? ''} listing offer`}
@@ -573,90 +511,6 @@ export default function ListingDetailPage() {
             This restores only your offer on the live canonical product.
           </Typography.Paragraph>
         )}
-      </Modal>
-      <Modal
-        title="Schedule a price"
-        open={scheduleOpen}
-        onCancel={() => setScheduleOpen(false)}
-        onOk={() => scheduleForm.submit()}
-        confirmLoading={scheduleMut.isPending}
-      >
-        <Form
-          form={scheduleForm}
-          layout="vertical"
-          onFinish={(values) => scheduleMut.mutate(values)}
-        >
-          <Form.Item name="price" label="Selling price (₹)" rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="mrp" label="MRP (₹)" rules={[{ required: true }]}>
-            <InputNumber min={1} style={{ width: '100%' }} />
-          </Form.Item>
-          <Form.Item name="scheduledAt" label="Effective at" rules={[{ required: true }]}>
-            <DatePicker showTime style={{ width: '100%' }} />
-          </Form.Item>
-        </Form>
-      </Modal>
-      <Modal
-        title="Edit variant and offer metadata"
-        open={variantOpen}
-        onCancel={() => setVariantOpen(false)}
-        onOk={() => variantForm.submit()}
-        confirmLoading={variantMut.isPending}
-        width={720}
-      >
-        <Form form={variantForm} layout="vertical" onFinish={(values) => variantMut.mutate(values)}>
-          <Row gutter={12}>
-            <Col xs={24} sm={12}>
-              <Form.Item name="sellerSku" label="Seller SKU">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="sku" label="Catalogue SKU">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="barcode" label="Barcode / EAN">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={12}>
-              <Form.Item name="taxCode" label="Tax code">
-                <Input />
-              </Form.Item>
-            </Col>
-            <Col xs={24} sm={6}>
-              <Form.Item name="weightG" label="Weight (g)">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={8} sm={6}>
-              <Form.Item name="dimsL" label="Length (cm)">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={8} sm={6}>
-              <Form.Item name="dimsW" label="Width (cm)">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-            <Col xs={8} sm={6}>
-              <Form.Item name="dimsH" label="Height (cm)">
-                <InputNumber min={1} style={{ width: '100%' }} />
-              </Form.Item>
-            </Col>
-          </Row>
-          <Form.Item label="Variant media">
-            <ImageUpload
-              value={variantImages}
-              onChange={setVariantImages}
-              maxCount={4}
-              label={variant?.label ?? 'Variant'}
-            />
-          </Form.Item>
-        </Form>
       </Modal>
     </Flex>
   );

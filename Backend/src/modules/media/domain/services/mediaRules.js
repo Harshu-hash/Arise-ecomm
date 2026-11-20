@@ -11,6 +11,8 @@ import { FILE_KIND, UPLOAD_PURPOSES, VISIBILITY } from '../../../../shared/const
  */
 export const MEDIA_KINDS = Object.freeze({
   PRODUCT_IMAGE: { purpose: UPLOAD_PURPOSES.PRODUCT_MEDIA, expect: FILE_KIND.IMAGE, maxBytes: env.MAX_UPLOAD_BYTES },
+  // Paid shop-banner creative (mobile only): a public image, exact size is enforced by the banner-ad booking.
+  BANNER_AD_MOBILE: { purpose: UPLOAD_PURPOSES.PRODUCT_MEDIA, expect: FILE_KIND.IMAGE, maxBytes: env.MAX_UPLOAD_BYTES },
   PRODUCT_VIDEO: { purpose: UPLOAD_PURPOSES.PRODUCT_MEDIA, expect: FILE_KIND.VIDEO, maxBytes: env.MAX_VIDEO_BYTES },
   PRODUCT_COMPLIANCE: { purpose: UPLOAD_PURPOSES.PRODUCT_COMPLIANCE, expect: null, maxBytes: env.MAX_UPLOAD_BYTES },
 });

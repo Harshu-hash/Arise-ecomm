@@ -310,6 +310,8 @@ const RAW = {
     EXPIRED: ['Expired', T.idle],
   },
   bannerAd: {
+    PENDING_PAYMENT: ['Awaiting payment', T.waiting],
+    EXPIRED: ['Expired', T.idle],
     PENDING_REVIEW: ['Awaiting review', T.waiting],
     APPROVED: ['Approved', T.good],
     SCHEDULED: ['Scheduled', T.waiting],

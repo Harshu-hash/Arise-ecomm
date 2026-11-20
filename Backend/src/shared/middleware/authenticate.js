@@ -15,6 +15,20 @@ export function authenticate(req, _res, next) {
   }
 }
 
+// For public reads that personalise when a customer happens to be signed in: a missing or bad token is just anonymous.
+export function optionalAuthenticate(req, _res, next) {
+  try {
+    const [scheme, token] = (req.get('authorization') ?? '').split(' ');
+    if (scheme === 'Bearer' && token) {
+      const claims = verifyAccessToken(token);
+      req.auth = { userId: claims.sub, role: claims.role, sellerId: claims.sellerId ?? null };
+    }
+  } catch {
+    // anonymous
+  }
+  next();
+}
+
 // Role gate only; ownership (e.g. seller owns this fulfilment) is still checked in the use-case.
 export const authorize =
   (...roles) =>

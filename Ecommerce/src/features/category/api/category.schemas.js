@@ -13,7 +13,8 @@ export const categoryTreeResponseSchema = apiEnvelope(z.array(categorySummarySch
 const categoryTileSchema = z.object({
   id: z.string().min(1),
   label: z.string().min(1),
-  imageUrl: z.string().url(),
+  imageUrl: z.string().url().nullable().optional(),
+  icon: z.string().nullable().optional(),
   badge: z.string().nullable().optional(),
   badgeVariant: z.enum(['buyNow', 'notifyMe', 'recent', 'applyNow', 'title']).nullable().optional(),
   target: z

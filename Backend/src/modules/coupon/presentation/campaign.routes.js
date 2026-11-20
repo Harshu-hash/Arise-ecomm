@@ -14,6 +14,7 @@ import {
   getCampaign,
   listCampaigns,
   listSubmissions,
+  setHomeFlashSale,
   updateCampaign,
 } from '../application/campaign.service.js';
 import { CAMPAIGN_STATUS, CAMPAIGN_TYPES, CUSTOMER_SECTIONS, SUBMISSION_DECISIONS, SUBMISSION_STATUS } from '../domain/constants/campaign.js';
@@ -40,6 +41,7 @@ const decisionSchema = z.object({
   reason: z.string().trim().min(1).max(500).optional(),
 }).strict();
 const idParams = z.object({ id: objectIdSchema });
+const flashSaleSchema = z.object({ enabled: z.boolean() }).strict();
 // `status=all` is what the UI sends for its "All" tab.
 const csv = (allowed) => z.string().optional().transform((value) => (value ? value.split(',').filter((item) => allowed.includes(item)) : []));
 const campaignQuery = pageQuery
@@ -73,6 +75,9 @@ export function createCampaignRouter() {
   );
   router.post('/:id/status', validate({ params: idParams, body: statusSchema }), statusPermission, async (req, res) =>
     sendCommand(res, await changeCampaignStatus(req.params.id, req.body.status, req.auth)),
+  );
+  router.post('/:id/home-flash-sale', requirePermission('marketing.campaign.edit'), validate({ params: idParams, body: flashSaleSchema }), async (req, res) =>
+    sendCommand(res, await setHomeFlashSale(req.params.id, req.body.enabled, req.auth)),
   );
   router.get('/:id/submissions', requirePermission('marketing.campaign.view'), validate({ params: idParams, query: submissionQuery }), async (req, res) => {
     const { data, meta } = await listSubmissions(req.params.id, req.query);

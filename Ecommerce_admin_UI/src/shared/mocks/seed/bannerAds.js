@@ -4,9 +4,9 @@ import { mockNowIso } from '../engine/settings';
 
 export function seedBannerAdPlacements() {
   return [
-    ['Customer app shop banner', 'One responsive shop promotion slot', 150000, 1440, 480, 1080, 1080],
-  ].map(([name, description, dailyRatePaise, desktopWidth, desktopHeight, mobileWidth, mobileHeight]) => insert('bannerAdPlacements', {
-    id: id('BAP', 3), name, description, dailyRatePaise, desktopWidth, desktopHeight,
+    ['Customer app shop banner', 'One responsive shop promotion slot', 150000, 1080, 1080],
+  ].map(([name, description, dailyRatePaise, mobileWidth, mobileHeight]) => insert('bannerAdPlacements', {
+    id: id('BAP', 3), name, description, dailyRatePaise,
     mobileWidth, mobileHeight, enabled: true, updatedAt: mockNowIso(), version: 1,
   }));
 }
@@ -20,7 +20,6 @@ export function seedBannerAdBookings() {
     id: id('BAD', 5), sellerId: seller.id, sellerName: seller.storeName,
     campaignName: 'Winter shop showcase', placementId: placement.id, placementName: placement.name,
     destinationType: 'SHOP', destinationValue: seller.id, startsOn: '2026-11-20', endsOn: '2026-11-24',
-    desktopCreative: { mediaId: null, previewUrl: 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=1200&q=80', fileName: 'winter-desktop.jpg' },
     mobileCreative: { mediaId: null, previewUrl: 'https://images.unsplash.com/photo-1445205170230-053b83016050?auto=format&fit=crop&w=700&q=80', fileName: 'winter-mobile.jpg' },
     ...price, status: 'PENDING_REVIEW', paymentStatus: 'PAID', paymentReference: 'MOCK-PAY-1001',
     paidAt: mockNowIso(), submittedAt: mockNowIso(), rejectionReason: null, decidedAt: null,

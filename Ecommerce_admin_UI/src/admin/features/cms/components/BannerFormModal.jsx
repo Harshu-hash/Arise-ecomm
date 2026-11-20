@@ -1,15 +1,17 @@
 import { UploadOutlined } from '@ant-design/icons';
 import { App, Button, DatePicker, Flex, Form, Image, Input, Modal, Select, Upload } from 'antd';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { dayjs } from '@core/utils/date';
+import { catalogApi, catalogKeys } from '@admin/features/catalog/api/catalog.api';
 import { cmsApi } from '../api/cms.api';
 
 // Server field paths that differ from this form's field names.
 const SERVER_FIELD = { 'images.mobile_16_9': 'imageUrl', 'images.tile_1_1': 'imageUrl', 'images.web': 'imageUrl', startsAt: 'window', endsAt: 'window' };
 
 const PLACEMENTS = [
-  { value: 'HOME_HERO', label: 'Home hero' },
+  { value: 'HOME_HERO', label: 'Home hero (For You page)' },
+  { value: 'CATEGORY_HERO', label: 'Category page hero' },
   { value: 'HOME_AD_TILES', label: 'Home ad tiles' },
   { value: 'OFFERS_PAGE', label: 'Offers page' },
 ];
@@ -68,6 +70,15 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const kind = Form.useWatch('kind', form);
+  const placements = Form.useWatch('placements', form);
+  const showsOnCategoryPages = placements?.includes('CATEGORY_HERO');
+  // Customer category pages are the top-level categories, so only those are offered.
+  const categoryTree = useQuery({
+    queryKey: catalogKeys.categoryTree,
+    queryFn: () => catalogApi.categoryTree(),
+    enabled: open && Boolean(showsOnCategoryPages),
+  });
+  const categoryOptions = (categoryTree.data?.data ?? []).map((c) => ({ value: c.id, label: c.name }));
 
   useEffect(() => {
     if (!open) return;
@@ -79,6 +90,7 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
         imageUrl: banner.images?.mobile_16_9 ?? '',
         altText: banner.altText,
         placements: banner.placements,
+        categoryIds: banner.categoryIds ?? [],
         window: [dayjs(banner.startsAt), dayjs(banner.endsAt)],
       });
     } else {
@@ -113,6 +125,7 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
       images: { mobile_16_9: v.imageUrl, tile_1_1: v.imageUrl, web: v.imageUrl },
       altText: v.altText,
       placements: v.placements,
+      categoryIds: v.placements.includes('CATEGORY_HERO') ? v.categoryIds ?? [] : [],
       startsAt: v.window[0].startOf('day').toISOString(),
       endsAt: v.window[1].endOf('day').toISOString(),
     };
@@ -146,6 +159,16 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
         <Form.Item name="placements" label="Placements" rules={[{ required: true, type: 'array', min: 1, message: 'Choose at least one placement.' }]}>
           <Select mode="multiple" options={PLACEMENTS} />
         </Form.Item>
+        {showsOnCategoryPages && (
+          <Form.Item
+            name="categoryIds"
+            label="Category pages"
+            extra="The banner shows on these categories' pages in the customer app."
+            rules={[{ required: true, type: 'array', min: 1, message: 'Choose at least one category.' }]}
+          >
+            <Select mode="multiple" placeholder="Choose categories" loading={categoryTree.isLoading} options={categoryOptions} optionFilterProp="label" />
+          </Form.Item>
+        )}
         <Form.Item
           name="window"
           label="Schedule"

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../constants/colors';
 import { SPACING, RADIUS } from '../../constants/spacing';
+import DiscountBadge from './DiscountBadge';
 import PriceBlock from './PriceBlock';
 import RatingBadge from './RatingBadge';
 
@@ -21,6 +22,7 @@ const MarketProductCard = ({ product, onPress, showRating = false, showDelivery 
         ) : (
           <View style={styles.placeholder} />
         )}
+        <DiscountBadge price={price} mrp={mrp} style={styles.discountBadge} />
         {showRating && rating != null ? (
           <RatingBadge variant="pill" rating={rating} style={styles.ratingOverlay} />
         ) : null}
@@ -57,6 +59,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: COLORS.mutedBg,
   },
+  discountBadge: { left: 6, top: 6 },
   ratingOverlay: {
     position: 'absolute',
     left: 6,

@@ -9,6 +9,15 @@ export const productApi = baseApi.injectEndpoints({
       transformResponse: mapProductDetail,
       providesTags: (_, __, productId) => [{ type: 'Product', id: productId }],
       keepUnusedDataFor: 300,
+      // Opening a product while signed in adds it to "Still looking for these?" on Home: refresh that feed.
+      async onQueryStarted(_productId, { dispatch, getState, queryFulfilled }) {
+        try {
+          await queryFulfilled;
+          if (getState().auth.accessToken) dispatch(baseApi.util.invalidateTags([{ type: 'Home', id: 'FEED' }]));
+        } catch {
+          // a failed product load changes nothing on Home
+        }
+      },
     }),
   }),
 });

@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
-import { CAMPAIGN_TRANSITIONS, REVIEWABLE_STATUSES, SUBMISSION_DECISIONS, SUBMISSION_STATUS } from '../domain/constants/campaign.js';
+import { CAMPAIGN_STATUS, CAMPAIGN_TRANSITIONS, REVIEWABLE_STATUSES, SUBMISSION_DECISIONS, SUBMISSION_STATUS } from '../domain/constants/campaign.js';
 import { canTransition, windowErrors } from '../domain/services/campaignRules.js';
 import { Campaign } from '../infrastructure/persistence/campaign.model.js';
 import { CampaignSubmission } from '../infrastructure/persistence/campaignSubmission.model.js';
@@ -53,6 +53,7 @@ function serializeCampaign(row, stats) {
     startsAt: row.startsAt,
     endsAt: row.endsAt,
     submissionDeadline: row.submissionDeadline,
+    homeFlashSale: Boolean(row.homeFlashSale),
     createdAt: row.createdAt,
     sellersJoined: stats.sellers,
     pendingCount: stats.PENDING,
@@ -147,7 +148,9 @@ export async function changeCampaignStatus(id, to, actor) {
   const before = await findCampaign(id);
   const illegal = () => new ConflictError('ILLEGAL_TRANSITION', `A ${before.status} campaign cannot move to ${to}.`);
   if (!canTransition(before.status, to)) throw illegal();
-  const updated = await Campaign.findOneAndUpdate({ _id: id, status: before.status }, { $set: { status: to } }, { new: true }).lean();
+  // A finished campaign gives up the home flash sale slot.
+  const closing = [CAMPAIGN_STATUS.ENDED, CAMPAIGN_STATUS.CANCELLED].includes(to);
+  const updated = await Campaign.findOneAndUpdate({ _id: id, status: before.status }, { $set: { status: to, ...(closing ? { homeFlashSale: false } : {}) } }, { new: true }).lean();
   if (!updated) throw illegal();
   await recordAudit({ action: 'marketing.campaign.status', subjectType: 'promoCampaign', subjectId: id, before: { status: before.status }, after: { status: to }, actor });
   return withStats(updated);
@@ -217,4 +220,29 @@ export async function decideSubmissions(campaignId, { submissionIds, decision, r
     actor,
   });
   return { updated, skipped: submissionIds.length - updated };
+}
+
+// Statuses in which a campaign can be (or stay) the home flash sale; a draft has no entries yet and closed ones are over.
+const FLASH_ELIGIBLE = [CAMPAIGN_STATUS.OPEN, CAMPAIGN_STATUS.SCHEDULED, CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.PAUSED];
+
+/** The admin picks which campaign is the home-screen flash sale. Choosing one replaces whichever held it before. */
+export async function setHomeFlashSale(id, enabled, actor) {
+  const campaign = await findCampaign(id);
+  if (enabled && !FLASH_ELIGIBLE.includes(campaign.status)) {
+    throw new ConflictError('CAMPAIGN_NOT_ELIGIBLE', 'Only an open, scheduled, live or paused campaign can be the home flash sale.');
+  }
+  const previous = enabled ? await Campaign.findOne({ homeFlashSale: true, _id: { $ne: id } }, 'name').lean() : null;
+  try {
+    if (enabled) await Campaign.updateMany({ homeFlashSale: true, _id: { $ne: id } }, { $set: { homeFlashSale: false } });
+    await Campaign.updateOne({ _id: id }, { $set: { homeFlashSale: enabled } });
+  } catch (error) {
+    if (error?.code === 11000) throw new ConflictError('CONFLICT', 'Another admin just changed the flash sale. Try again.');
+    throw error;
+  }
+  const result = await withStats({ ...campaign, homeFlashSale: enabled });
+  await recordAudit({
+    action: 'marketing.campaign.home_flash_sale', subjectType: 'promoCampaign', subjectId: id,
+    before: { homeFlashSale: Boolean(campaign.homeFlashSale) }, after: { homeFlashSale: enabled, replaced: previous?.name ?? null }, actor,
+  });
+  return { ...result, replacedCampaign: previous ? previous.name : null };
 }

@@ -20,10 +20,11 @@ const fields = {
   images: z.object({ mobile_16_9: cmsImage, tile_1_1: cmsImage, web: cmsImage }).strict(),
   altText: z.string().trim().min(1, 'Required for accessibility.').max(200),
   placements: z.array(z.enum(BANNER_PLACEMENTS)).min(1, 'Choose a placement.').max(BANNER_PLACEMENTS.length),
+  categoryIds: z.array(objectIdSchema).max(50),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
 };
-const createSchema = z.object(fields).strict();
+const createSchema = z.object({ ...fields, categoryIds: fields.categoryIds.default([]) }).strict();
 const updateSchema = z.object(Object.fromEntries(Object.entries(fields).map(([key, schema]) => [key, schema.optional()]))).strict();
 const idParams = z.object({ id: objectIdSchema });
 const csv = (allowed) => z.string().optional().transform((value) => (value ? value.split(',').filter((item) => allowed.includes(item)) : []));
