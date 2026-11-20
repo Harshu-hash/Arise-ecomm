@@ -10,6 +10,7 @@ import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
 import useListQuery from '@ui/hooks/useListQuery';
+import useRealtime from '@ui/hooks/useRealtime';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { marketingApi, marketingKeys } from '../api/marketing.api';
 import CouponFormDrawer from '../components/CouponFormDrawer';
@@ -38,6 +39,8 @@ export default function CouponsListPage() {
   });
 
   const refreshAll = () => queryClient.invalidateQueries({ queryKey: ['marketing', 'coupons'] });
+  // A colleague's change (or a reconnect after a dropped connection) refreshes the list without a manual reload.
+  useRealtime('admin', { 'marketing:changed': refreshAll, 'session:ready': refreshAll });
 
   const pause = useMutation({
     mutationFn: (id) => marketingApi.pauseCoupon(id),

@@ -30,7 +30,7 @@ function StoreLogoField({ value = [], onChange }) {
 
 const DOC_STATUS_COLOR = { APPROVED: 'green', PENDING: 'gold', REJECTED: 'red' };
 
-export default function ProfilePage() {
+export default function ProfilePage({ embedded = false }) {
   const { message } = App.useApp();
   const client = useQueryClient();
   const [form] = Form.useForm();
@@ -59,7 +59,7 @@ export default function ProfilePage() {
   const warnings = documents.filter((document) => ['EXPIRED', 'EXPIRING_SOON'].includes(document.expiryState));
 
   return <Flex vertical gap={16}>
-    <PageHeader title="Business Profile" breadcrumbs={[{ label: 'Settings' }, { label: 'Business Profile' }]} subtitle="Public storefront details are editable immediately; verified identity changes require review." />
+    {!embedded && <PageHeader title="Business Profile" breadcrumbs={[{ label: 'Settings' }, { label: 'Business Profile' }]} subtitle="Public storefront details are editable immediately; verified identity changes require review." />}
     {warnings.length > 0 && <Alert type={warnings.some((document) => document.expiryState === 'EXPIRED') ? 'error' : 'warning'} showIcon message="Verification documents need attention" description={warnings.map((document) => `${document.label}: ${document.expiryState === 'EXPIRED' ? 'expired' : 'expires soon'}`).join(' · ')} />}
     <Row gutter={[16, 16]}><Col xs={24} lg={14}><Card title="Public store identity" style={{ marginBottom: 16 }}><Form form={form} layout="vertical" onFinish={saveMut.mutate}><Form.Item name="storeName" label="Public store name" rules={[{ required: true }]}><Input /></Form.Item><Form.Item name="logo" label="Store logo"><StoreLogoField /></Form.Item><Button type="primary" htmlType="submit" loading={saveMut.isPending}>Save public profile</Button></Form></Card>
       <Card title="Verified legal identity" extra={<Button onClick={() => { changeForm.setFieldsValue({ proposedValue: seller.legalName }); setChangeOpen(true); }}>Request legal-name change</Button>}><Descriptions column={1} size="small"><Descriptions.Item label="Legal entity name">{seller.legalName}</Descriptions.Item><Descriptions.Item label="GSTIN">{seller.gstin ?? 'Not set'}</Descriptions.Item><Descriptions.Item label="PAN">{seller.pan ?? 'Not set'}</Descriptions.Item><Descriptions.Item label="Tier">{seller.tier}</Descriptions.Item><Descriptions.Item label="Registered location">{seller.city}, {seller.state}</Descriptions.Item></Descriptions>{changeRequests.length > 0 && <List size="small" header="Change requests" dataSource={changeRequests} renderItem={(request) => <List.Item><Space direction="vertical" size={0}><Typography.Text>{request.currentValue} → {request.proposedValue}</Typography.Text><Typography.Text type="secondary">{request.reason}</Typography.Text></Space><Tag color={request.status === 'APPROVED' ? 'green' : request.status === 'REJECTED' ? 'red' : 'gold'}>{request.status}</Tag></List.Item>} />}</Card>

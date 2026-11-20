@@ -26,7 +26,7 @@ export default function DealCalendar({ deals, loading }) {
           : 'Moved.',
       );
     },
-    onError: (e) => message.error(e.message),
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
   });
 
   if (loading) return <Skeleton active paragraph={{ rows: 6 }} />;
@@ -44,6 +44,7 @@ export default function DealCalendar({ deals, loading }) {
             <DatePicker
               size="small"
               value={dayjs(deal.slotDate)}
+              disabledDate={(d) => d.isBefore(dayjs().startOf('day'))}
               onChange={(d) => d && reschedule.mutate({ id: deal.id, slotDate: d.format('YYYY-MM-DD') })}
               style={{ width: '100%' }}
             />

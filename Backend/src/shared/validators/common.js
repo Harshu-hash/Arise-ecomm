@@ -32,3 +32,7 @@ export function parseSort(sort, allowed, fallback) {
 }
 
 export const booleanQuery = z.enum(['true', 'false']).transform((value) => value === 'true');
+
+// Comma-separated filter such as `status=ACTIVE,PAUSED`; values outside `allowed` are dropped (the UI also sends `all`).
+export const csvQuery = (allowed) =>
+  z.string().optional().transform((value) => (value ? value.split(',').filter((item) => allowed.includes(item)) : []));

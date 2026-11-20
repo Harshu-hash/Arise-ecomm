@@ -7,6 +7,7 @@ export const cmsApi = {
   updateHomeDraft: (sections) => api.patch('/cms/home/draft', { sections }),
   publishHome: (note) => api.post('/cms/home/publish', { note }),
   rollbackHome: (versionId, reason) => api.post('/cms/home/rollback', { versionId, reason }),
+  decideRollback: (versionId, decision) => api.post(`/cms/home/versions/${versionId}/rollback/${decision}`, {}),
 
   categoryTabs: () => api.get('/cms/category-tabs'),
   updateCategoryTab: (id, payload) => api.patch(`/cms/category-tabs/${id}`, payload),

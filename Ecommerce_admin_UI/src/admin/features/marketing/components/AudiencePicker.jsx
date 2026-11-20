@@ -12,10 +12,12 @@ import { marketingApi } from '../api/marketing.api';
 export default function AudiencePicker({ value, onChange, segments }) {
   const audience = value ?? { type: 'ALL' };
 
+  // The server can size everyone / new / a chosen list; a segment (or an empty list) has nothing to ask about yet.
   const reach = useQuery({
     queryKey: ['marketing', 'audienceReach', audience],
     queryFn: () => marketingApi.campaignReach(audience),
     staleTime: 10_000,
+    enabled: audience.type === 'CUSTOM' ? Boolean(audience.customerIds?.length) : audience.type !== 'SEGMENT',
   });
 
   return (
@@ -27,7 +29,8 @@ export default function AudiencePicker({ value, onChange, segments }) {
         options={[
           { value: 'ALL', label: 'Everyone' },
           { value: 'NEW', label: 'New customers (no orders yet)' },
-          { value: 'SEGMENT', label: 'A saved segment' },
+          // Offered only when the caller has segments to choose from (segments are not built on the server yet).
+          ...(segments?.length || audience.type === 'SEGMENT' ? [{ value: 'SEGMENT', label: 'A saved segment' }] : []),
           { value: 'CUSTOM', label: 'Specific customers' },
         ]}
       />

@@ -7,6 +7,7 @@ import ConfirmActionModal from '@ui/components/ConfirmActionModal';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
+import useRealtime from '@ui/hooks/useRealtime';
 import { cmsApi, cmsKeys } from '../api/cms.api';
 import SectionEditor from '../components/SectionEditor';
 import TabsEditor from '../components/TabsEditor';
@@ -26,10 +27,14 @@ export default function HomeLayoutPage() {
 
   const draft = useQuery({ queryKey: cmsKeys.homeDraft, queryFn: () => cmsApi.homeDraft() });
 
+  // A colleague's edit, publish or rollback (or a reconnect after a dropped connection) refreshes this page.
+  const refreshCms = () => queryClient.invalidateQueries({ queryKey: ['cms'] });
+  useRealtime('admin', { 'cms:changed': refreshCms, 'session:ready': refreshCms });
+
   const saveSections = useMutation({
     mutationFn: (sections) => cmsApi.updateHomeDraft(sections),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: cmsKeys.homeDraft }),
-    onError: (e) => message.error(e.message),
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
   });
 
   const publish = useMutation({

@@ -1,5 +1,5 @@
 import { randomBytes } from 'node:crypto';
-import { AppError, ForbiddenError, UnauthorizedError } from '../../../shared/errors/AppError.js';
+import { AppError, ForbiddenError, UnauthorizedError, ValidationError } from '../../../shared/errors/AppError.js';
 import { decryptField, encryptField, hashPassword, sha256, verifyPassword } from '../../../shared/utils/crypto.js';
 import { generateTotpSecret, totpUri, verifyTotp } from '../../../shared/utils/totp.js';
 import { ROLES } from '../../../shared/constants/roles.js';
@@ -35,6 +35,16 @@ export function publicUser(user) {
     ...(SELLER_ROLES.includes(user.role) ? { onboardingComplete: true } : {}),
     ...(user.role === ROLES.ADMIN ? { permissions: user.permissions ?? [], scope: user.scope ?? null } : {}),
   };
+}
+
+const SELLER_ROLE_NAMES = { [ROLES.SELLER]: 'Owner', [ROLES.SELLER_STAFF]: 'Staff' };
+
+/** The user as a signed-in client needs it: sellers also get their store, role label and account status. */
+export async function sessionUser(user) {
+  const base = publicUser(user);
+  if (!SELLER_ROLES.includes(user.role)) return base;
+  const seller = user.sellerId ? await Seller.findById(user.sellerId, 'storeName status').lean() : null;
+  return { ...base, storeName: seller?.storeName ?? null, roleName: SELLER_ROLE_NAMES[user.role], accountStatus: seller?.status ?? null };
 }
 
 function maskEmail(email) {
@@ -96,7 +106,7 @@ async function issueChallenge(user) {
 async function finishLogin(user, device) {
   const tokens = await createSession({ userId: user._id, role: user.role, sellerId: user.sellerId, device });
   await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
-  return { stage: 'authenticated', tokens, user: publicUser(user) };
+  return { stage: 'authenticated', tokens, user: await sessionUser(user) };
 }
 
 // Shared with the invite-accept flow: a freshly-activated account goes through the same
@@ -181,8 +191,12 @@ export async function enrolTwoFactor({ challengeId, code, device }) {
 
 export async function changePassword({ userId, currentPassword, newPassword }) {
   const user = await User.findById(userId);
+  // 422 on the field, not 401: the console treats any 401 as "session expired" and would sign the user out.
   if (!user || !(await verifyPassword(currentPassword, user.passwordHash))) {
-    throw new UnauthorizedError('Current password is incorrect.');
+    throw new ValidationError('Current password is incorrect.', { currentPassword: ['Current password is incorrect.'] });
+  }
+  if (currentPassword === newPassword) {
+    throw new ValidationError('Choose a different password.', { newPassword: ['The new password must be different from the current one.'] });
   }
   user.passwordHash = await hashPassword(newPassword);
   user.mustChangePassword = false;

@@ -10,3 +10,5 @@ export {
 export { getUserAuthorization } from '../application/userAuthorization.service.js';
 
 export { getSellerOwnerEmail, getSellerSummaries, getUserSummaries } from '../application/sellerLookup.service.js';
+
+export { countCustomers, findCustomers, getCustomer } from '../application/customerLookup.service.js';

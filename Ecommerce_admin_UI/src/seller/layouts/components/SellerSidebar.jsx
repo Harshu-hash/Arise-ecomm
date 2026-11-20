@@ -1,7 +1,9 @@
 import { Menu } from 'antd';
-import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useMemo, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { LAYOUT } from '@theme/tokens';
+import { settingsApi, settingsKeys } from '@seller/features/settings/api/settings.api';
 import { NAV_GROUPS } from '@seller/nav/navigation';
 import { SELLER_ACCENT } from '@seller/theme';
 import { NAV_ICONS } from './navIcons';
@@ -13,6 +15,10 @@ import { NAV_ICONS } from './navIcons';
 export default function SellerSidebar({ collapsed, onNavigate }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  // The store's own logo replaces the "A" mark; it updates when the logo is saved on the Business Profile (same query).
+  const profile = useQuery({ queryKey: settingsKeys.profile, queryFn: settingsApi.profile, staleTime: 5 * 60_000 });
+  const logoUrl = profile.data?.seller?.logoUrl;
+  const [brokenLogo, setBrokenLogo] = useState(null);
 
   const { items, openKeys } = useMemo(() => {
     const built = [];
@@ -62,8 +68,12 @@ export default function SellerSidebar({ collapsed, onNavigate }) {
         className="arise-brand"
         style={{ height: LAYOUT.headerHeight, padding: collapsed ? '0 22px' : '0 20px' }}
       >
-        <div aria-hidden className="arise-brand-mark" style={{ background: SELLER_ACCENT, color: '#fff' }}>
-          A
+        <div aria-hidden className="arise-brand-mark" style={{ background: SELLER_ACCENT, color: '#fff', overflow: 'hidden' }}>
+          {logoUrl && brokenLogo !== logoUrl ? (
+            <img src={logoUrl} alt="" onError={() => setBrokenLogo(logoUrl)} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
+          ) : (
+            'A'
+          )}
         </div>
         {!collapsed && <span className="arise-brand-name">Arise Seller</span>}
       </div>

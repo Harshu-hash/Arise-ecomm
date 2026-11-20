@@ -6,7 +6,7 @@ import { clearRefreshCookie, readRefreshCookie, setRefreshCookie } from '../../.
 import { sendCommand } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { verifyRefreshToken } from '../../../shared/utils/jwt.js';
-import { enrolTwoFactor, login, publicUser, verifyTwoFactor } from '../application/auth.service.js';
+import { enrolTwoFactor, login, sessionUser, verifyTwoFactor } from '../application/auth.service.js';
 import { revokeSession, rotateSession } from '../application/session.service.js';
 import { User } from '../infrastructure/persistence/user.model.js';
 import { deviceOf, sendAuthResult } from './authResult.js';
@@ -64,7 +64,7 @@ export function createAuthRouter({ allowedRoles, cookiePath }) {
       const tokens = await rotateSession(refreshToken);
       setRefreshCookie(res, tokens.refreshToken, tokens.refreshExpiresAt, cookiePath);
       const user = await User.findById(userId);
-      return sendCommand(res, { accessToken: tokens.accessToken, user: user ? publicUser(user) : null });
+      return sendCommand(res, { accessToken: tokens.accessToken, user: user ? await sessionUser(user) : null });
     } catch (error) {
       clearRefreshCookie(res, cookiePath);
       return next(error);

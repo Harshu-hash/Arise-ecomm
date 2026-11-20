@@ -116,6 +116,30 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `GET` | `/api/admin/v1/campaigns/:id/submissions` | Bearer JWT + `marketing.campaign.view` | Paginated seller product entries for a campaign (`q`, `status`, `sort`) with status facets. |
 | `POST` | `/api/admin/v1/campaigns/:id/submissions/decision` | Bearer JWT + `marketing.campaign.edit` | Approves, rejects or requests changes on one or many PENDING entries; approval needs the campaign minimum discount. Returns `{ updated, skipped }`. |
 
+### coupons and deals (admin marketing console)
+
+Status is never stored: coupons derive it from state, schedule and usage; deals from their schedule. Money is integer paise. Writes push `marketing:changed` to the `admin` socket room (clients refetch).
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/admin/v1/coupons` | Bearer JWT + `marketing.coupon.view` | Paginated coupons (`q`, `type`, `status`, `fundedBy`, `sort` incl. `budgetBurnPct`) with status/type facets. |
+| `POST` | `/api/admin/v1/coupons` | Bearer JWT + `marketing.coupon.create` | Creates a live coupon. Code is upper-cased and unique; fields of other discount types are cleared; schedule, limits, budget and a custom audience (real active customers) are validated. Audited. |
+| `GET` | `/api/admin/v1/coupons/:id` | Bearer JWT + `marketing.coupon.view` | One coupon with `performance` (redemptions/discount given come from checkout counters; GMV and new customers stay 0 until orders exist) and `redemptions` (empty until orders exist). |
+| `PATCH` | `/api/admin/v1/coupons/:id` | Bearer JWT + `marketing.coupon.edit` | Edits an unfinished coupon; the start only before it starts; the discount only before its first redemption. Saving a DRAFT (a clone) makes it live. Audited. |
+| `POST` | `/api/admin/v1/coupons/:id/pause` | Bearer JWT + `marketing.coupon.pause` | Toggles pause/resume (ACTIVE or SCHEDULED ⇄ PAUSED). |
+| `POST` | `/api/admin/v1/coupons/:id/end` | Bearer JWT + `marketing.coupon.pause` | Ends an open coupon now; cannot be undone (clone it to run again). |
+| `POST` | `/api/admin/v1/coupons/:id/clone` | Bearer JWT + `marketing.coupon.create` | Copies a coupon as a DRAFT with a fresh code and dates starting now. |
+| `POST` | `/api/admin/v1/coupons/:id/test` | Bearer JWT + `marketing.coupon.view` | Runs the shared evaluator for a customer and live products at today's shelf prices: `{ applicable, reasons, discountPaise, ... }`. |
+| `POST` | `/api/admin/v1/campaigns/reach` | Bearer JWT + `marketing.coupon.view` or `marketing.campaign.view` | `{ reach }` customers an audience (`ALL`, `NEW`, `CUSTOM`) would reach. Segments are not built yet. |
+| `GET` | `/api/seller/v1/coupons` | Bearer JWT (seller or staff) | The seller's own coupons only (`q`, `status`, `sort`, paging) with status facets; pushes `coupon:changed` to the seller room on any change. |
+| `POST` | `/api/seller/v1/coupons` | Bearer JWT (seller owner) | Creates a seller-funded coupon (percent, flat or free delivery; no audience/budget/stacking). Applies to that seller's items only. Code is unique across the platform. Audited. |
+| `POST` | `/api/seller/v1/coupons/:id/pause`, `/resume`, `/end` | Bearer JWT (seller owner) | Explicit pause, resume, or end (final). Another seller's coupon is `404`. Audited. |
+| `GET` | `/api/admin/v1/deals` | Bearer JWT + `marketing.deal.view` | Paginated deals (`q`, `placement`, `tag`, `status`, `sort`) with status/placement/tag facets. |
+| `GET` | `/api/admin/v1/deals/calendar` | Bearer JWT + `marketing.deal.view` | Deals holding a Deal-of-the-Day slot from today (India) onward. |
+| `POST` | `/api/admin/v1/deals` | Bearer JWT + `marketing.deal.create` | Builds a deal on a LIVE product's cheapest in-stock offer; the deal price must undercut it, the end must be ≤ 90 days out, the slot day (optional) must fall inside the run and be free (`409 SLOT_TAKEN`). Audited. |
+| `POST` | `/api/admin/v1/deals/:id/reschedule` | Bearer JWT + `marketing.deal.edit` | Moves a deal's slot day; if another deal holds it the two swap when legal. Returns `{ moved, swappedWith }`. Audited. |
+| `DELETE` | `/api/admin/v1/deals/:id` | Bearer JWT + `marketing.deal.delete` | Removes a deal. Audited. |
+
 ## review
 
 | Method | Path | Auth | Purpose |
@@ -136,6 +160,29 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/admin/v1/banners` | Bearer JWT + `cms.banner.create` | Creates a banner; images must be URLs returned by the `CMS_MEDIA` upload. Audited. |
 | `PATCH` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.edit` | Edits a banner (name, images, alt text, placements, schedule). Audited. |
 | `DELETE` | `/api/admin/v1/banners/:id` | Bearer JWT + `cms.banner.delete` | Removes a banner immediately. Audited. |
+
+### content (home layout, header tabs, static pages)
+
+Writes push `cms:changed` to the `admin` socket room. Once a home layout is published, `GET /api/customer/v1/home` (For You page only) shows only its enabled sections, in its order; before that the built-in sections are unchanged. Header category/brand tabs follow the console's label, colour, order and visibility.
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/admin/v1/cms/home/draft` | Bearer JWT + `cms.home.view` | The editable draft (created from the published layout on first use). |
+| `PATCH` | `/api/admin/v1/cms/home/draft` | Bearer JWT + `cms.home.edit` | Replaces the draft's sections (known types, an optional item limit 1–30 where it applies, only `AD_TILE_ROW`/`TOP_VALUE_DEALS` repeatable, ≤ 30). Not audited (autosave). |
+| `GET` | `/api/admin/v1/cms/home/published` | Bearer JWT + `cms.home.view` | The published layout in the shape the app consumes; `404` until something is published. |
+| `GET` | `/api/admin/v1/cms/home/versions` | Bearer JWT + `cms.home.view` | Latest 50 versions (DRAFT / PUBLISHED / ARCHIVED) with any pending rollback request. |
+| `POST` | `/api/admin/v1/cms/home/publish` | Bearer JWT + `cms.home.publish` | Publishes the draft (at least one section on), archives the previous one and opens a fresh draft. `201`. Audited. |
+| `POST` | `/api/admin/v1/cms/home/rollback` | Bearer JWT + `cms.home.rollback` | Requests a rollback to an archived version (reason required, one pending at a time). `202`: nothing changes until another admin approves. |
+| `POST` | `/api/admin/v1/cms/home/versions/:id/rollback/approve` | Bearer JWT + `cms.home.rollback` | A different admin than the requester approves; the version goes live. `403` for the requester. Audited. |
+| `POST` | `/api/admin/v1/cms/home/versions/:id/rollback/reject` | Bearer JWT + `cms.home.rollback` | Rejects (or the requester withdraws) a pending rollback. Audited. |
+| `GET` | `/api/admin/v1/cms/category-tabs` | Bearer JWT + `cms.home.view` | One tab per customer-visible root category (new categories appear last). |
+| `PATCH` | `/api/admin/v1/cms/category-tabs/reorder` | Bearer JWT + `cms.home.edit` | `{ orderedIds }` — every tab exactly once. Audited. |
+| `PATCH` | `/api/admin/v1/cms/category-tabs/:id` | Bearer JWT + `cms.home.edit` | Label, icon, two hex gradient colours, layout variant, visibility. Audited. |
+| `GET` | `/api/admin/v1/cms/brand-tabs` | Bearer JWT + `cms.home.view` | The home header's brand switch. |
+| `PATCH` | `/api/admin/v1/cms/brand-tabs/:id` | Bearer JWT + `cms.home.edit` | Label, logo URL, target, visibility. Audited. |
+| `GET` | `/api/admin/v1/static-pages` | Bearer JWT + `cms.page.view` | About, Privacy, Terms, Return, Shipping and Seller policy pages (version history without bodies). |
+| `GET` | `/api/admin/v1/static-pages/:id` | Bearer JWT + `cms.page.view` | One page with its body. |
+| `PATCH` | `/api/admin/v1/static-pages/:id` | Bearer JWT + `cms.page.publish` | Publishes a new body (1–100,000 chars) as a new version; `materialChange` flags it for customer re-acceptance. Audited. |
 
 ## bannerAd
 
@@ -195,6 +242,7 @@ Admins create campaigns (`/api/admin/v1/campaigns`, above) and move them DRAFT -
 |---|---|---|---|
 | `GET` | `/health` | none | Internal health probe used by the load balancer/orchestrator. |
 | `GET` | `/api/customer/v1/health` | none | Customer-contract health check (aliases the internal `/health` probe). |
+| `GET` | `/api/admin/v1/lookups/:entity` | Bearer JWT + the entity's view permission (or the marketing screens that use it) | Option lists for the console's searchable selects. Entities: `product` (LIVE only), `customer` (active). Query: `q`, `ids` (comma list), `limit` ≤ 50. |
 
 ## webhooks
 

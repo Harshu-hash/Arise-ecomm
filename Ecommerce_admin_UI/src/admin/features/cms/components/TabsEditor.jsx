@@ -21,12 +21,12 @@ export default function TabsEditor({ kind }) {
   const update = useMutation({
     mutationFn: ({ id, payload }) => updateFn(id, payload),
     onSuccess: () => query.refetch(),
-    onError: (e) => message.error(e.message),
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
   });
   const reorder = useMutation({
     mutationFn: (orderedIds) => cmsApi.reorderCategoryTabs(orderedIds),
     onSuccess: () => query.refetch(),
-    onError: (e) => message.error(e.message),
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
   });
 
   if (query.isLoading) return <Skeleton active paragraph={{ rows: 4 }} />;
