@@ -6,6 +6,7 @@ export const MAINTENANCE_JOBS = Object.freeze({
   WEBHOOK_SWEEP: 'webhooks.sweep',
   OUTBOX_CLEANUP: 'outbox.cleanup',
   UPLOAD_TMP_CLEANUP: 'uploads.tmp-cleanup',
+  ACCOUNT_DELETION: 'customers.account-deletion',
 });
 
 export function createMaintenanceQueue() {
@@ -22,4 +23,5 @@ export async function registerMaintenanceSchedules(queue) {
   await queue.upsertJobScheduler('webhooks-sweep', { every: 60_000 }, { name: MAINTENANCE_JOBS.WEBHOOK_SWEEP });
   await queue.upsertJobScheduler('outbox-cleanup', { pattern: '0 3 * * *' }, { name: MAINTENANCE_JOBS.OUTBOX_CLEANUP });
   await queue.upsertJobScheduler('uploads-tmp-cleanup', { every: 60 * 60_000 }, { name: MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP });
+  await queue.upsertJobScheduler('customer-account-deletion', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.ACCOUNT_DELETION });
 }

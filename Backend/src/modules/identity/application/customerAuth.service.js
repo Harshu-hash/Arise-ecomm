@@ -23,12 +23,17 @@ const normaliseIdentifier = (identifier) => {
 };
 
 const userFilter = ({ kind, value }) => ({ role: ROLES.CUSTOMER, [kind]: value });
-const makeOtp = () => String(randomInt(1000, 10_000));
+const accountExists = ({ kind }) =>
+  new ConflictError(
+    'CUSTOMER_EXISTS',
+    `An account already exists for this ${kind === 'phone' ? 'mobile number' : 'email address'}.`,
+  );
+export const makeOtp = () => String(randomInt(1000, 10_000));
 const purposeOf = (stage) => Object.entries(STAGES).find(([, value]) => value === stage)?.[0];
 const mask = ({ kind, value }) =>
   kind === 'email' ? value.replace(/(^.).*(@.*$)/, '$1***$2') : `******${value.slice(-4)}`;
 
-async function deliverOtp(target, code) {
+export async function deliverOtp(target, code) {
   const message = `Your Arise verification code is ${code}. It expires in 5 minutes.`;
   if (target.kind === 'email') {
     await sendMail({ to: target.value, subject: 'Your Arise verification code', text: message });
@@ -80,7 +85,7 @@ async function createChallenge({ target, purpose, name = null, userId = null }) 
 export async function startCustomerAuth({ identifier, purpose, name }) {
   const target = normaliseIdentifier(identifier);
   const user = await User.findOne(userFilter(target));
-  if (purpose === 'SIGNUP' && user) throw new ConflictError('CUSTOMER_EXISTS', 'An account already exists for this email or phone.');
+  if (purpose === 'SIGNUP' && user) throw accountExists(target);
   return createChallenge({ target, purpose, name, userId: user?._id });
 }
 
@@ -131,11 +136,11 @@ export async function verifyCustomerOtp({ challengeId, otp, device, requiredStag
   let user = challenge.userId ? await User.findById(challenge.userId) : null;
   if (challenge.stage === STAGES.SIGNUP) {
     const target = normaliseIdentifier(challenge.target);
-    if (await User.exists(userFilter(target))) throw new ConflictError('CUSTOMER_EXISTS', 'An account already exists for this email or phone.');
+    if (await User.exists(userFilter(target))) throw accountExists(target);
     try {
       user = await User.create({ role: ROLES.CUSTOMER, [target.kind]: target.value, name: challenge.name, status: 'ACTIVE' });
     } catch (error) {
-      if (error?.code === 11000) throw new ConflictError('CUSTOMER_EXISTS', 'An account already exists for this email or phone.');
+      if (error?.code === 11000) throw accountExists(target);
       throw error;
     }
   }

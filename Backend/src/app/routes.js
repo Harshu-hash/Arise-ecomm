@@ -10,6 +10,8 @@ import { createSettingsRouter } from '../modules/admin/presentation/settings.rou
 import { createAdminUsersRouter } from '../modules/identity/presentation/adminUsers.routes.js';
 import { createAuthRouter } from '../modules/identity/presentation/auth.routes.js';
 import { createCustomerAuthRouter } from '../modules/identity/presentation/customerAuth.routes.js';
+import { createCustomerAddressRouter } from '../modules/customer/presentation/address.routes.js';
+import { createCustomerPrivacyRouter } from '../modules/customer/presentation/privacy.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
@@ -34,7 +36,7 @@ import { createBrandRouter } from '../modules/catalog/presentation/brand.routes.
 import { createSizeChartRouter } from '../modules/catalog/presentation/sizeChart.routes.js';
 import { createPaymentWebhookRouter } from '../modules/payment/presentation/payment.webhook.routes.js';
 import { createAuditRouter } from '../modules/system/presentation/audit.routes.js';
-import { createUploadRouter } from '../modules/system/presentation/upload.routes.js';
+import { createCustomerMediaRouter, createUploadRouter } from '../modules/system/presentation/upload.routes.js';
 import { createSystemRouter } from '../modules/system/presentation/system.routes.js';
 import { metricsHandler } from '../infrastructure/observability/metrics.js';
 import { ROLES } from '../shared/constants/roles.js';
@@ -155,8 +157,11 @@ export function createRoutes() {
   root.use('/api/customer/v1/categories', createCustomerCategoryRouter());
   root.use('/api/customer/v1/products', createCustomerProductRouter());
   root.use('/api/customer/v1/search', createCustomerSearchRouter());
+  root.use('/api/customer/v1/media', createCustomerMediaRouter());
   root.use('/api/customer/v1/flash-sales', createCustomerFlashSaleRouter());
   root.use('/api/customer/v1/promotions', createCustomerPromotionRouter({ brandTabs: BRAND_TABS }));
+  root.use('/api/customer/v1', createCustomerAddressRouter());
+  root.use('/api/customer/v1', createCustomerPrivacyRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();

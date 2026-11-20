@@ -235,6 +235,8 @@ export async function recordProductView(userId, productId) {
   await RecentView.updateOne({ userId, productId }, { $set: { viewedAt: new Date() } }, { upsert: true });
 }
 
+export const deleteCustomerProductHistory = (userId) => RecentView.deleteMany({ userId: String(userId) });
+
 /**
  * "Still looking for these?", "Suggested For You" and "Brands in Spotlight" for the For You page.
  * Recently viewed and the personalised half of suggestions need a signed-in customer; the rest is public.

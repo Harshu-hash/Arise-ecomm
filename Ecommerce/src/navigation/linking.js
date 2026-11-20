@@ -29,7 +29,6 @@ export const linking = {
           OrderDetail: 'orders/:orderId',
           Tracking: 'orders/:orderId/tracking',
           Wishlist: 'wishlist',
-          AddCard: 'payment-methods/setup-complete',
           HelpCenter: 'help',
           TicketDetail: 'support/tickets/:ticketId',
         },

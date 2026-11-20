@@ -154,11 +154,16 @@ test('customer auth: OTP signup, login, refresh, password reset and logout', opt
   assert.equal((await post('/logout', { refreshToken: activeSession.refreshToken })).status, 200);
   assert.equal((await post('/refresh', { refreshToken: activeSession.refreshToken })).status, 401);
 
+  // A seller may shop with the same phone; uniqueness is per audience/role, not global.
+  await User.create({ role: 'SELLER', phone: '9876543210', name: 'Seller Customer' });
   const phoneSignup = await post('/start', { identifier: '9876543210', purpose: 'SIGNUP', name: 'Phone Customer' });
   const phoneChallenge = (await phoneSignup.json()).data;
   const phoneSession = await post('/verify-otp', { challengeId: phoneChallenge.challengeId, otp: phoneChallenge.devHint.code });
   assert.equal(phoneSession.status, 200);
   assert.equal((await phoneSession.json()).data.user.phone, '9876543210');
+  const duplicatePhone = await post('/start', { identifier: '9876543210', purpose: 'SIGNUP', name: 'Duplicate' });
+  assert.equal(duplicatePhone.status, 409);
+  assert.match((await duplicatePhone.json()).error.message, /mobile number/);
 });
 
 test('webhook processor: handled, unhandled, failing and replayed receipts', opts, async () => {
@@ -1256,4 +1261,150 @@ test('campaigns: seller enters products, admin approves, customers see them at t
   await seller.withdrawEntry('s1', entry.id);
   assert.equal((await get('/flash-sales/current')).status, 404);
   assert.equal((await enter('s1', 900))[0].status, 'PENDING');
+});
+
+test('customer profile: edits name/gender/photo, and swaps a phone only after its code is verified', opts, async () => {
+  const { mkdir, writeFile } = await import('node:fs/promises');
+  const { join: joinPath } = await import('node:path');
+  const profile = await import('../src/modules/identity/application/customerProfile.service.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { AuthChallenge } = await import('../src/modules/identity/infrastructure/persistence/authChallenge.model.js');
+  const { sha256 } = await import('../src/shared/utils/crypto.js');
+  await Promise.all([User.init(), AuthChallenge.init()]);
+
+  const me = await User.create({ role: 'CUSTOMER', name: 'Asha', phone: '9876500001' });
+  await User.create({ role: 'CUSTOMER', name: 'Other', phone: '9876500002' });
+  const id = String(me._id);
+
+  let view = await profile.updateCustomerProfile(id, { name: 'Asha K', gender: 'FEMALE' });
+  assert.deepEqual([view.name, view.gender, view.phoneMasked, view.pendingVerification], ['Asha K', 'FEMALE', '******0001', null]);
+
+  // a photo must be this customer's own upload, still on disk
+  await assert.rejects(profile.updateCustomerProfile(id, { avatarMediaId: 'public/avatars/someone-else/x.png' }), { code: 'VALIDATION_ERROR' });
+  const key = `public/avatars/${id}/me.png`;
+  await mkdir(joinPath(process.env.UPLOAD_DIR, 'public', 'avatars', id), { recursive: true });
+  await writeFile(joinPath(process.env.UPLOAD_DIR, key), 'png');
+  assert.match((await profile.updateCustomerProfile(id, { avatarMediaId: key })).avatarUrl, /\/uploads\/avatars\//);
+
+  await assert.rejects(profile.updateCustomerProfile(id, { newPhone: '+91 98765 00002' }), { code: 'CONTACT_IN_USE' });
+  await assert.rejects(profile.updateCustomerProfile(id, { newEmail: 'a@x.io', newPhone: '9876500003' }), { code: 'VALIDATION_ERROR' });
+  view = await profile.updateCustomerProfile(id, { newPhone: '+91 98765 00003' });
+  assert.deepEqual([view.pendingVerification.field, view.pendingVerification.destinationMasked, view.phoneMasked], ['PHONE', '******0003', '******0001']);
+
+  // the code is never returned; set a known one to exercise verification
+  await AuthChallenge.updateOne({ _id: view.pendingVerification.challengeId }, { $set: { codeHash: sha256('1234') } });
+  await assert.rejects(profile.verifyContactChange(id, { challengeId: view.pendingVerification.challengeId, otp: '0000' }), { code: 'OTP_INVALID' });
+  view = await profile.verifyContactChange(id, { challengeId: view.pendingVerification.challengeId, otp: '1234' });
+  assert.deepEqual([view.phoneMasked, view.pendingVerification], ['******0003', null]);
+  assert.equal((await User.findById(id)).phone, '9876500003');
+  await assert.rejects(profile.verifyContactChange(id, { challengeId: String(new mongoose.Types.ObjectId()), otp: '1234' }), { code: 'OTP_EXPIRED' });
+});
+
+test('customer addresses: CRUD, ownership and exactly one default', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { AddressBook } = await import('../src/modules/customer/infrastructure/persistence/addressBook.model.js');
+  await AddressBook.init();
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/customer/v1`;
+  const token = (id) => signAccessToken({ sub: String(id), role: 'CUSTOMER' });
+  const customerId = new mongoose.Types.ObjectId();
+  const otherCustomerId = new mongoose.Types.ObjectId();
+  const call = (method, path, body, accessToken = token(customerId)) =>
+    fetch(`${base}${path}`, {
+      method,
+      headers: { authorization: `Bearer ${accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+  const home = {
+    label: 'Home', name: 'Asha Rao', phone: '+91 98765 43210', line: '221B Baker Street',
+    city: 'Ahmedabad', state: 'Gujarat', pincode: '380015', isDefault: false,
+  };
+
+  assert.equal((await fetch(`${base}/addresses`)).status, 401);
+  const firstResponse = await call('POST', '/addresses', home);
+  assert.equal(firstResponse.status, 201);
+  const first = (await firstResponse.json()).data;
+  assert.equal(first.isDefault, true);
+
+  const secondResponse = await call('POST', '/addresses', {
+    ...home, label: 'Work', line: '4th Floor, Tech Park One', pincode: '380054', isDefault: false,
+  });
+  const second = (await secondResponse.json()).data;
+  assert.equal(second.isDefault, false);
+  assert.equal((await call('PATCH', `/addresses/${second.id}`, { label: 'Other' })).status, 200);
+  assert.equal((await call('POST', '/addresses', { ...home, pincode: '110001' })).status, 409);
+
+  const switched = await Promise.all([
+    call('POST', `/addresses/${first.id}/default`),
+    call('POST', `/addresses/${second.id}/default`),
+  ]);
+  assert.ok(switched.every((response) => response.status === 200));
+  let list = (await (await call('GET', '/addresses')).json()).data;
+  assert.equal(list.items.filter((address) => address.isDefault).length, 1);
+  assert.ok([first.id, second.id].includes(list.defaultAddressId));
+
+  assert.equal((await call('GET', '/addresses', null, token(otherCustomerId))).status, 200);
+  assert.deepEqual((await (await call('GET', '/addresses', null, token(otherCustomerId))).json()).data.items, []);
+  assert.equal((await call('DELETE', `/addresses/${second.id}`, null, token(otherCustomerId))).status, 404);
+  assert.equal((await call('DELETE', `/addresses/${second.id}`)).status, 200);
+  list = (await (await call('GET', '/addresses')).json()).data;
+  assert.deepEqual([list.items.length, list.items[0].isDefault], [1, true]);
+});
+
+test('customer privacy: schedules deletion once and anonymizes due accounts', opts, async (t) => {
+  const { mkdir, stat, writeFile } = await import('node:fs/promises');
+  const { join: joinPath } = await import('node:path');
+  const { createApp } = await import('../src/app/app.js');
+  const { createSession } = await import('../src/modules/identity/public/index.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { AuthSession } = await import('../src/modules/identity/infrastructure/persistence/session.model.js');
+  const { AddressBook } = await import('../src/modules/customer/infrastructure/persistence/addressBook.model.js');
+  const { AccountDeletion } = await import('../src/modules/customer/infrastructure/persistence/accountDeletion.model.js');
+  const { processDueAccountDeletions } = await import('../src/modules/customer/application/privacy.service.js');
+  const { RecentView } = await import('../src/modules/product/infrastructure/persistence/recentView.model.js');
+  await Promise.all([User.init(), AuthSession.init(), AddressBook.init(), AccountDeletion.init(), RecentView.init()]);
+
+  const id = new mongoose.Types.ObjectId();
+  const avatarKey = `public/avatars/${id}/me.png`;
+  await mkdir(joinPath(process.env.UPLOAD_DIR, 'public', 'avatars', String(id)), { recursive: true });
+  await writeFile(joinPath(process.env.UPLOAD_DIR, avatarKey), 'png');
+  await User.create({ _id: id, role: 'CUSTOMER', name: 'Delete Me', email: `delete-${id}@arise.test`, avatarKey });
+  await AddressBook.create({ customerId: id, addresses: [] });
+  await RecentView.create({ userId: String(id), productId: new mongoose.Types.ObjectId() });
+  const session = await createSession({ userId: id, role: 'CUSTOMER' });
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}/api/customer/v1/privacy`;
+  const call = (method, path, body) => fetch(`${base}${path}`, {
+    method,
+    headers: { authorization: `Bearer ${session.accessToken}`, ...(body ? { 'content-type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+
+  const eligibility = await call('GET', '/deletion-eligibility');
+  assert.equal(eligibility.status, 200);
+  assert.deepEqual((await eligibility.json()).data, { eligible: true, blockers: [], existingRequest: null });
+  assert.equal((await call('POST', '/deletion-request', { reasonCode: 'PRIVACY', acknowledged: false })).status, 422);
+  const scheduled = await call('POST', '/deletion-request', { reasonCode: 'PRIVACY', acknowledged: true });
+  assert.equal(scheduled.status, 202);
+  const first = (await scheduled.json()).data.existingRequest;
+  const repeated = await call('POST', '/deletion-request', { reasonCode: 'OTHER', acknowledged: true });
+  assert.equal((await repeated.json()).data.existingRequest.id, first.id);
+  assert.equal(await AccountDeletion.countDocuments({ customerId: id }), 1);
+
+  assert.deepEqual(await processDueAccountDeletions(new Date()), { completed: 0 });
+  assert.deepEqual(await processDueAccountDeletions(new Date(Date.now() + 8 * 24 * 60 * 60_000)), { completed: 1 });
+  const customer = await User.findById(id).lean();
+  assert.deepEqual([customer.status, customer.name, customer.email, customer.avatarKey], ['DEACTIVATED', 'Deleted customer', undefined, undefined]);
+  assert.equal(await AddressBook.exists({ customerId: id }), null);
+  assert.equal(await RecentView.countDocuments({ userId: String(id) }), 0);
+  assert.equal((await AuthSession.findOne({ userId: String(id) }).lean()).revokedReason, 'account_deleted');
+  assert.equal((await AccountDeletion.findOne({ customerId: id }).lean()).status, 'COMPLETED');
+  await assert.rejects(stat(joinPath(process.env.UPLOAD_DIR, avatarKey)), { code: 'ENOENT' });
 });

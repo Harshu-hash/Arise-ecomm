@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { env } from '../../../config/env.js';
 import { getUserAuthorization } from '../../identity/public/index.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
@@ -19,6 +20,10 @@ import {
 } from '../application/campaign.service.js';
 import { CAMPAIGN_STATUS, CAMPAIGN_TYPES, CUSTOMER_SECTIONS, SUBMISSION_DECISIONS, SUBMISSION_STATUS } from '../domain/constants/campaign.js';
 
+// Images must be files stored through the CMS_MEDIA upload, not arbitrary external URLs.
+const cmsImage = z.url().max(500).refine((url) => url.startsWith(`${env.PUBLIC_ORIGIN}/uploads/cms/`), 'Upload the image first.');
+const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FF6A3D.');
+
 const CAMPAIGN_SORTABLE = ['createdAt', 'startsAt', 'endsAt', 'name'];
 const SUBMISSION_SORTABLE = ['submittedAt', 'dealPricePaise', 'discountPct'];
 
@@ -31,8 +36,11 @@ const fields = {
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
   submissionDeadline: z.coerce.date().nullable(),
+  backgroundImageUrl: cmsImage.nullable(),
+  heroImageUrl: cmsImage.nullable(),
+  gradient: z.array(hexColor).length(2).nullable(),
 };
-const createSchema = z.object({ ...fields, tagline: fields.tagline.default(''), submissionDeadline: fields.submissionDeadline.default(null) }).strict();
+const createSchema = z.object({ ...fields, tagline: fields.tagline.default(''), submissionDeadline: fields.submissionDeadline.default(null), backgroundImageUrl: fields.backgroundImageUrl.default(null), heroImageUrl: fields.heroImageUrl.default(null), gradient: fields.gradient.default(null) }).strict();
 const updateSchema = z.object(Object.fromEntries(Object.entries(fields).map(([key, schema]) => [key, schema.optional()]))).strict();
 const statusSchema = z.object({ status: z.enum(Object.values(CAMPAIGN_STATUS)) }).strict();
 const decisionSchema = z.object({

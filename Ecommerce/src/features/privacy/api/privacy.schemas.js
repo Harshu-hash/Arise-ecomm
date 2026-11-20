@@ -1,26 +1,6 @@
 import { z } from 'zod';
 import { apiEnvelope } from '@features/auth/api/auth.schemas';
 
-export const communicationPreferencesSchema = z.object({
-  orderUpdatesPush: z.boolean(),
-  orderUpdatesEmail: z.boolean(),
-  orderUpdatesSms: z.boolean(),
-  offersPush: z.boolean(),
-  offersEmail: z.boolean(),
-  offersSms: z.boolean(),
-  recommendationsPush: z.boolean(),
-  updatedAt: z.string().datetime(),
-});
-export const communicationPreferencesResponseSchema = apiEnvelope(communicationPreferencesSchema);
-export const exportRequestSchema = z.object({
-  id: z.string().min(1),
-  status: z.enum(['REQUESTED', 'PREPARING', 'READY', 'EXPIRED', 'FAILED']),
-  requestedAt: z.string().datetime(),
-  readyBy: z.string().datetime(),
-  downloadUrl: z.string().url().nullable(),
-  expiresAt: z.string().datetime().nullable(),
-});
-export const exportRequestResponseSchema = apiEnvelope(exportRequestSchema.nullable());
 export const deletionEligibilitySchema = z.object({
   eligible: z.boolean(),
   blockers: z.array(

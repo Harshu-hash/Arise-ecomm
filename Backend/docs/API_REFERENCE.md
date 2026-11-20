@@ -170,10 +170,41 @@ Admins create campaigns (`/api/admin/v1/campaigns`, above) and move them DRAFT -
 | `POST` | `/api/admin/v1/campaigns/:id/home-flash-sale` | Bearer JWT + `marketing.campaign.edit` | `{ enabled }`: makes this campaign the home-screen flash sale, replacing the previous one (only one at a time; the response names the `replacedCampaign`). Open, scheduled, live or paused campaigns only. Ending or cancelling a campaign clears it. Audited. |
 | `GET` | `/api/customer/v1/flash-sales/current` | none | The campaign the admin set as the home flash sale, while it is running on its dates, with its approved products; `404` when none. |
 | `GET` | `/api/customer/v1/promotions` | none | Every live campaign (whatever its placement) as a promotion with product tiles: the Deals tab. |
+| `—` | campaign look | — | Admin campaigns also take optional `backgroundImageUrl` and `heroImageUrl` (CMS_MEDIA upload URLs) and `gradient` (`[top, bottom]` hex colours); promotions return them for the Deals card (image blended under the gradient) and the campaign page hero. |
 | `GET` | `/api/customer/v1/promotions/:id` | none | One live campaign (any placement) with `relatedProducts` at the deal price. |
 | `GET` | `/api/customer/v1/promotions/:id/products` | none | The campaign's approved products, paged (`cursor`, `limit`). |
 
 `/api/customer/v1/home` also returns `FLASH_SALE` (when the admin-chosen flash sale is live; `metadata` has its title and subtitle) and `TOP_VALUE_DEALS` (one card per live `TOP_VALUE_DEALS` campaign) on the For You page.
+
+## customer profile
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/customer/v1/me` | Bearer JWT (customer) | The customer's profile: name, masked email/phone, gender, `avatarUrl`, and any `pendingVerification` (new email/phone awaiting its code). |
+| `PATCH` | `/api/customer/v1/me` | Bearer JWT (customer) | `{ name?, gender?, avatarMediaId?, newEmail?, newPhone? }`. Name, gender and photo apply at once (the photo id is the one the upload returned, and must be this customer's own upload). A new email or phone (one at a time) does not replace the current one: it sends a code to the new address and returns `pendingVerification`. `409 CONTACT_IN_USE` when another account has it. |
+| `POST` | `/api/customer/v1/me/contact/verify` | Bearer JWT (customer) | `{ challengeId, otp }`: the code proves ownership and the new email/phone replaces the old one. `422 OTP_INVALID` (5 tries), `410 OTP_EXPIRED` (10 minutes). |
+| `POST` | `/api/customer/v1/media/uploads` | Bearer JWT (customer) | Multipart `file` + `purpose=PROFILE_IMAGE` (JPG/PNG/WebP). Returns `{ id, url, thumbnailUrl, mimeType, sizeBytes, status }`; pass `id` as `avatarMediaId`. |
+
+## customer addresses
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/customer/v1/addresses` | Bearer JWT (customer) | Lists only this customer's saved addresses and `defaultAddressId`. |
+| `POST` | `/api/customer/v1/addresses` | Bearer JWT (customer) | Saves a serviceable address. The first address is always the default; setting another default is atomic. |
+| `PATCH` | `/api/customer/v1/addresses/:addressId` | Bearer JWT (customer) | Updates the customer's address. An address cannot be changed to an unsupported pincode. |
+| `DELETE` | `/api/customer/v1/addresses/:addressId` | Bearer JWT (customer) | Deletes the address; deleting the default promotes the first remaining address. |
+| `POST` | `/api/customer/v1/addresses/:addressId/default` | Bearer JWT (customer) | Makes a serviceable saved address the sole default. |
+| `POST` | `/api/customer/v1/addresses/validate` | Bearer JWT (customer) | Validates and normalizes address input before save; returns field errors or `409 ADDRESS_UNSERVICEABLE`. |
+| `GET` | `/api/customer/v1/serviceability?pincode=380015` | Bearer JWT (customer) | Returns delivery availability, location, estimated days, and a customer message. |
+
+## customer privacy
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `GET` | `/api/customer/v1/privacy/deletion-eligibility` | Bearer JWT (customer) | Returns real blockers from implemented commerce domains and any existing deletion request. |
+| `POST` | `/api/customer/v1/privacy/deletion-request` | Bearer JWT (customer) | `{ reasonCode, acknowledged: true }` schedules one idempotent deletion request after a seven-day cooling period. |
+
+The maintenance worker completes due requests every 15 minutes. It revokes sessions, removes verification challenges, addresses, recent product views and avatar files, and anonymizes the customer identity while retaining its opaque id and request record for referential/legal history.
 
 ## search
 

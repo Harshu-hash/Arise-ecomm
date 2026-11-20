@@ -14,6 +14,12 @@ export const profileApi = baseApi.injectEndpoints({
       transformResponse: mapProfile,
       invalidatesTags: [{ type: 'Profile', id: 'ME' }],
     }),
+    // Confirms a new email/phone with the code sent to it; only then does it replace the current one.
+    verifyContact: builder.mutation({
+      query: data => ({ url: PROFILE_ENDPOINTS.verifyContact, method: 'POST', data }),
+      transformResponse: mapProfile,
+      invalidatesTags: [{ type: 'Profile', id: 'ME' }],
+    }),
   }),
 });
-export const { useGetProfileQuery, useUpdateProfileMutation } = profileApi;
+export const { useGetProfileQuery, useUpdateProfileMutation, useVerifyContactMutation } = profileApi;

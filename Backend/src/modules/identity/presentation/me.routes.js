@@ -1,31 +1,26 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ROLES } from '../../../shared/constants/roles.js';
-import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { ForbiddenError, NotFoundError } from '../../../shared/errors/AppError.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate } from '../../../shared/middleware/authenticate.js';
 import { changePassword, publicUser } from '../application/auth.service.js';
+import { GENDERS, getCustomerProfile, updateCustomerProfile, verifyContactChange } from '../application/customerProfile.service.js';
 import { listSessions, revokeSession } from '../application/session.service.js';
 import { User } from '../infrastructure/persistence/user.model.js';
 
-const maskEmail = (email) => (email ? email.replace(/^(.).*(@.*)$/, '$1***$2') : null);
-const maskPhone = (phone) => (phone ? `${phone.slice(0, 3)}******${phone.slice(-4)}` : null);
-
-/** The customer app's profile contract; gender/avatar aren't stored yet, so they take neutral defaults. */
-export const customerProfile = (user) => ({
-  id: String(user._id),
-  name: user.name?.trim().length >= 2 ? user.name.trim() : 'Customer',
-  emailMasked: maskEmail(user.email),
-  phoneMasked: maskPhone(user.phone),
-  emailVerified: Boolean(user.email),
-  phoneVerified: Boolean(user.phone),
-  gender: 'PREFER_NOT_TO_SAY',
-  avatarUrl: null,
-  pendingVerification: null,
-  updatedAt: user.updatedAt.toISOString(),
-});
+// Customer profile edits: name/gender/photo, or a new email/phone that must be verified with a code first.
+const profilePatch = z.object({
+  name: z.string().trim().min(2, 'Enter at least 2 characters.').max(80).optional(),
+  gender: z.enum(GENDERS).optional(),
+  avatarMediaId: z.string().min(1).max(300).optional(), // the id the profile-photo upload returned
+  newEmail: z.email('Enter a valid email address.').max(254).transform((value) => value.toLowerCase()).optional(),
+  newPhone: z.string().trim().min(10).max(20).optional(),
+}).strict();
+const verifyContactBody = z.object({ challengeId: objectIdSchema, otp: z.string().trim().regex(/^\d{4,6}$/, 'Enter the code you received.') }).strict();
+const customersOnly = (req, _res, next) => next(req.auth.role === ROLES.CUSTOMER ? undefined : new ForbiddenError());
 
 const passwordSchema = z.object({ currentPassword: z.string().min(1), newPassword: z.string().min(8) });
 const sessionParams = z.object({ id: objectIdSchema });
@@ -36,13 +31,21 @@ export function createMeRouter() {
 
   router.get('/', async (req, res, next) => {
     try {
+      if (req.auth.role === ROLES.CUSTOMER) return sendData(res, await getCustomerProfile(req.auth.userId));
       const user = await User.findById(req.auth.userId);
       if (!user) throw new NotFoundError();
-      return sendData(res, user.role === ROLES.CUSTOMER ? customerProfile(user) : publicUser(user));
+      return sendData(res, publicUser(user));
     } catch (error) {
       return next(error);
     }
   });
+
+  router.patch('/', customersOnly, validate({ body: profilePatch }), async (req, res) =>
+    sendCommand(res, await updateCustomerProfile(req.auth.userId, req.body)),
+  );
+  router.post('/contact/verify', customersOnly, validate({ body: verifyContactBody }), async (req, res) =>
+    sendCommand(res, await verifyContactChange(req.auth.userId, req.body)),
+  );
 
   router.get('/sessions', async (req, res, next) => {
     try {

@@ -18,6 +18,9 @@ const userSchema = new mongoose.Schema(
     // Null while status is INVITED: no password exists until the invite is accepted.
     passwordHash: { type: String, default: null },
     name: { type: String, default: null },
+    // Customer-only profile fields.
+    gender: { type: String, enum: ['MALE', 'FEMALE', 'OTHER', 'PREFER_NOT_TO_SAY'], default: undefined },
+    avatarKey: { type: String, default: undefined }, // storage key of their profile photo (public/avatars/<userId>/...)
     // Set for SELLER / SELLER_STAFF only; multiple users (owner + staff) can share one sellerId.
     sellerId: { type: String, default: null },
     status: {
@@ -49,7 +52,10 @@ userSchema.index(
   { email: 1, role: 1 },
   { unique: true, partialFilterExpression: { email: { $type: 'string' } }, name: 'email_role_unique_when_present' },
 );
-userSchema.index({ phone: 1 }, { unique: true, sparse: true });
+userSchema.index(
+  { phone: 1, role: 1 },
+  { unique: true, partialFilterExpression: { phone: { $type: 'string' } }, name: 'phone_role_unique_when_present' },
+);
 userSchema.index({ sellerId: 1 });
 userSchema.index({ roleIds: 1 }, { sparse: true });
 

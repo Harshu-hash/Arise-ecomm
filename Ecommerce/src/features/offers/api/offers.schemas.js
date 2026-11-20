@@ -20,6 +20,10 @@ export const promotionSchema = z.object({
   endsAt: z.string().datetime(),
   couponCode: z.string().nullable(),
   couponHint: z.string().nullable(),
+  // Admin-set look; older responses omit them.
+  gradient: z.array(z.string()).length(2).nullable().optional(),
+  backgroundImageUrl: z.string().url().nullable().optional(),
+  heroImageUrl: z.string().url().nullable().optional(),
   items: z.array(promotionItemSchema),
 });
 

@@ -16,6 +16,7 @@ export const UPLOAD_PURPOSES = Object.freeze({
   SELLER_KYC: { folder: 'kyc', roles: SELLER_SIDE, kinds: [IMAGE, DOCUMENT], visibility: VISIBILITY.PRIVATE },
   RETURN_PROOF: { folder: 'returns', roles: [ROLES.CUSTOMER], kinds: [IMAGE, VIDEO], visibility: VISIBILITY.PRIVATE },
   REVIEW_MEDIA: { folder: 'reviews', roles: [ROLES.CUSTOMER], kinds: [IMAGE, VIDEO], visibility: VISIBILITY.PUBLIC },
+  PROFILE_IMAGE: { folder: 'avatars', roles: [ROLES.CUSTOMER], kinds: [IMAGE], visibility: VISIBILITY.PUBLIC },
   CMS_MEDIA: { folder: 'cms', roles: [ROLES.ADMIN], kinds: [IMAGE, VIDEO], visibility: VISIBILITY.PUBLIC },
 });
 

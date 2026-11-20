@@ -30,14 +30,12 @@ export const customerFixtureAdapter = config => {
     config.url?.startsWith('/promotions') ||
     config.url?.startsWith('/flash-sales') ||
     config.url === '/me/recently-viewed' ||
-    config.url === '/coupons/available' ||
-    config.url === '/me/ad-preferences'
+    config.url === '/coupons/available'
   )
     return customerExperienceFixtureAdapter(config);
   if (config.url?.startsWith('/auth')) return customerAuthFixtureAdapter(config);
   if (config.url === '/me') return customerProfileFixtureAdapter(config);
-  if (config.url?.startsWith('/privacy') || config.url === '/me/communication-preferences')
-    return customerPrivacyFixtureAdapter(config);
+  if (config.url?.startsWith('/privacy')) return customerPrivacyFixtureAdapter(config);
   if (
     config.url?.startsWith('/wallet') ||
     config.url?.startsWith('/gift-cards') ||

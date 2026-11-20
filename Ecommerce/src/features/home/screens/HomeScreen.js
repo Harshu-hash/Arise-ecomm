@@ -155,9 +155,7 @@ const HomeScreen = ({ navigation }) => {
           {data.recentlyViewed.length > 0 ? (
             <RecentlyViewedRail
               items={data.recentlyViewed}
-              onPressItem={item =>
-                navigation?.navigate('Category', { category: { name: item.title } })
-              }
+              onPressItem={item => navigation?.navigate('ProductDetail', { productId: item.id })}
               onSeeAll={() => navigation?.navigate('RecentlyViewed')}
             />
           ) : null}

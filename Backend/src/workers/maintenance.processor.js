@@ -6,6 +6,7 @@ import { MAINTENANCE_JOBS } from '../infrastructure/queue/maintenance.queue.js';
 import { TMP_DIR } from '../infrastructure/storage/local.storage.js';
 import { enqueueWebhookReceipt } from '../infrastructure/queue/webhook.queue.js';
 import { RECEIPT_STATUS, WebhookReceipt } from '../infrastructure/webhooks/webhookReceipt.model.js';
+import { processDueAccountDeletions } from '../modules/customer/application/privacy.service.js';
 
 const STALE_RECEIPT_MS = 2 * 60_000;
 const MAX_RECEIPT_ATTEMPTS = 24; // stop re-driving poison events; they stay FAILED for alerting/manual replay
@@ -55,5 +56,6 @@ export async function maintenanceJobProcessor(job) {
   if (job.name === MAINTENANCE_JOBS.WEBHOOK_SWEEP) return sweepWebhooks();
   if (job.name === MAINTENANCE_JOBS.OUTBOX_CLEANUP) return cleanOutbox();
   if (job.name === MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP) return cleanUploadTmp();
+  if (job.name === MAINTENANCE_JOBS.ACCOUNT_DELETION) return processDueAccountDeletions();
   throw new Error(`Unknown maintenance job ${job.name}`);
 }

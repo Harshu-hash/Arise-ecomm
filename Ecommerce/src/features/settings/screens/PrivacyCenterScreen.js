@@ -8,34 +8,6 @@ import { StatusBarManager, AccountListRow } from '../../../shared/components';
 
 const PRIVACY_ROWS = [
   {
-    id: 'communications',
-    icon: 'mail',
-    label: 'Communication Preferences',
-    subtitle: 'Choose order, offer and recommendation messages',
-    route: 'CommunicationPreferences',
-  },
-  {
-    id: 'permissions',
-    icon: 'toggle-right',
-    label: 'Manage App Permissions',
-    subtitle: 'Control camera, location, contacts & storage access',
-    route: 'ManagePermissions',
-  },
-  {
-    id: 'ads',
-    icon: 'target',
-    label: 'Ad Preferences',
-    subtitle: 'Manage how your data is used to personalise ads',
-    route: 'AdPreferences',
-  },
-  {
-    id: 'download',
-    icon: 'download',
-    label: 'Download My Data',
-    subtitle: 'Get a copy of the data we hold about you',
-    route: 'DownloadData',
-  },
-  {
     id: 'delete',
     icon: 'trash-2',
     label: 'Delete My Account',

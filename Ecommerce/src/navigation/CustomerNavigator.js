@@ -26,16 +26,10 @@ import AccountSettingsScreen from '@features/profile/screens/AccountSettingsScre
 import EditProfileScreen from '@features/profile/screens/EditProfileScreen';
 import SavedAddressesScreen from '@features/address/screens/SavedAddressesScreen';
 import AddEditAddressScreen from '@features/address/screens/AddEditAddressScreen';
-import SavedCardsScreen from '@features/payment/screens/SavedCardsScreen';
-import AddCardScreen from '@features/payment/screens/AddCardScreen';
 import AddGiftCardScreen from '@features/payment/screens/AddGiftCardScreen';
 import PrivacyCenterScreen from '@features/settings/screens/PrivacyCenterScreen';
-import ManagePermissionsScreen from '@features/settings/screens/ManagePermissionsScreen';
-import AdPreferencesScreen from '@features/settings/screens/AdPreferencesScreen';
-import DownloadDataScreen from '@features/settings/screens/DownloadDataScreen';
 import DeleteAccountScreen from '@features/settings/screens/DeleteAccountScreen';
 import PrivacyPolicyScreen from '@features/settings/screens/PrivacyPolicyScreen';
-import CommunicationPreferencesScreen from '@features/settings/screens/CommunicationPreferencesScreen';
 import ReviewsScreen from '@features/reviews/screens/ReviewsScreen';
 import WriteReviewScreen from '@features/reviews/screens/WriteReviewScreen';
 import QuestionsAnswersScreen from '@features/reviews/screens/QuestionsAnswersScreen';
@@ -47,7 +41,6 @@ import AboutScreen from '@features/settings/screens/AboutScreen';
 import TermsConditionsScreen from '@features/settings/screens/TermsConditionsScreen';
 import OffersScreen from '@features/offers/screens/OffersScreen';
 import DealDetailScreen from '@features/offers/screens/DealDetailScreen';
-import OfferCategoryScreen from '@features/offers/screens/OfferCategoryScreen';
 import CouponsScreen from '@features/coupons/screens/CouponsScreen';
 import WalletScreen from '@features/wallet/screens/WalletScreen';
 import WishlistScreen from '@features/wishlist/screens/WishlistScreen';
@@ -79,12 +72,8 @@ const ProtectedAccountSettings = withAuthGuard(AccountSettingsScreen);
 const ProtectedEditProfile = withAuthGuard(EditProfileScreen);
 const ProtectedSavedAddresses = withAuthGuard(SavedAddressesScreen);
 const ProtectedAddEditAddress = withAuthGuard(AddEditAddressScreen);
-const ProtectedSavedCards = withAuthGuard(SavedCardsScreen);
-const ProtectedAddCard = withAuthGuard(AddCardScreen);
 const ProtectedAddGiftCard = withAuthGuard(AddGiftCardScreen);
-const ProtectedDownloadData = withAuthGuard(DownloadDataScreen);
 const ProtectedDeleteAccount = withAuthGuard(DeleteAccountScreen);
-const ProtectedCommunicationPreferences = withAuthGuard(CommunicationPreferencesScreen);
 const ProtectedWriteReview = withAuthGuard(WriteReviewScreen);
 const ProtectedWallet = withAuthGuard(WalletScreen);
 const ProtectedWishlist = withAuthGuard(WishlistScreen);
@@ -124,16 +113,10 @@ const CustomerNavigator = () => (
     <Stack.Screen name="EditProfile" component={ProtectedEditProfile} />
     <Stack.Screen name="SavedAddresses" component={ProtectedSavedAddresses} />
     <Stack.Screen name="AddEditAddress" component={ProtectedAddEditAddress} />
-    <Stack.Screen name="SavedCards" component={ProtectedSavedCards} />
-    <Stack.Screen name="AddCard" component={ProtectedAddCard} />
     <Stack.Screen name="AddGiftCard" component={ProtectedAddGiftCard} />
     <Stack.Screen name="PrivacyCenter" component={PrivacyCenterScreen} />
-    <Stack.Screen name="ManagePermissions" component={ManagePermissionsScreen} />
-    <Stack.Screen name="AdPreferences" component={AdPreferencesScreen} />
-    <Stack.Screen name="DownloadData" component={ProtectedDownloadData} />
     <Stack.Screen name="DeleteAccount" component={ProtectedDeleteAccount} />
     <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-    <Stack.Screen name="CommunicationPreferences" component={ProtectedCommunicationPreferences} />
     <Stack.Screen name="Reviews" component={ReviewsScreen} />
     <Stack.Screen name="WriteReview" component={ProtectedWriteReview} />
     <Stack.Screen name="QuestionsAnswers" component={QuestionsAnswersScreen} />
@@ -149,7 +132,6 @@ const CustomerNavigator = () => (
       component={DealDetailScreen}
       options={{ animation: 'slide_from_bottom' }}
     />
-    <Stack.Screen name="DealCategory" component={OfferCategoryScreen} />
     <Stack.Screen name="Coupons" component={CouponsScreen} />
     <Stack.Screen name="Wallet" component={ProtectedWallet} />
     <Stack.Screen name="Wishlist" component={ProtectedWishlist} />

@@ -9,4 +9,9 @@ export {
 
 export { getUserAuthorization } from '../application/userAuthorization.service.js';
 
+export {
+  anonymizeCustomerIdentity,
+  assertActiveCustomer,
+} from '../application/customerDeletion.service.js';
+
 export { getSellerOwnerEmail, getSellerSummaries, getUserSummaries } from '../application/sellerLookup.service.js';

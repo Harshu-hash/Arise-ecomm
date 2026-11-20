@@ -6,30 +6,6 @@ import {
 
 describe('customerPrivacyFixtureAdapter', () => {
   beforeEach(resetCustomerPrivacyFixture);
-  it('persists communication preferences', async () => {
-    await customerPrivacyFixtureAdapter({
-      url: '/me/communication-preferences',
-      method: 'patch',
-      data: { offersEmail: true },
-    });
-    const response = await customerPrivacyFixtureAdapter({
-      url: '/me/communication-preferences',
-      method: 'get',
-    });
-    expect(response.data.data.offersEmail).toBe(true);
-  });
-  it('creates only one active export request', async () => {
-    const first = await customerPrivacyFixtureAdapter({
-      url: '/privacy/export-request',
-      method: 'post',
-    });
-    const second = await customerPrivacyFixtureAdapter({
-      url: '/privacy/export-request',
-      method: 'post',
-    });
-    expect(second.data.data.id).toBe(first.data.data.id);
-    expect(first.data.data.status).toBe('REQUESTED');
-  });
   it('exposes deletion blockers and rejects unsafe deletion', async () => {
     const status = await customerPrivacyFixtureAdapter({
       url: '/privacy/deletion-eligibility',

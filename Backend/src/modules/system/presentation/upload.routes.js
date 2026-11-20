@@ -10,6 +10,7 @@ import { validate } from '../../../shared/http/validate.js';
 import { authenticate } from '../../../shared/middleware/authenticate.js';
 import { createRateLimiter } from '../../../shared/middleware/rateLimit.js';
 import { uploadSingle } from '../../../shared/middleware/upload.js';
+import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { verifyFileToken } from '../../../shared/utils/signedUrl.js';
 
 const bodySchema = z.object({ purpose: z.enum(Object.keys(UPLOAD_PURPOSES)) });
@@ -77,5 +78,36 @@ export function createUploadRouter() {
     });
   });
 
+  return router;
+}
+
+// Purposes the customer app's media uploads may use today; anything else gets a clear 400.
+const CUSTOMER_MEDIA_PURPOSES = ['PROFILE_IMAGE'];
+const customerMediaBody = z.object({ purpose: z.enum(CUSTOMER_MEDIA_PURPOSES) });
+
+// Mounted at /api/customer/v1/media: the customer app's upload contract ({ id, url, thumbnailUrl, mimeType, ... }).
+// The id is the storage key; whatever uses it (e.g. the profile photo) checks it lies in the caller's own folder.
+export function createCustomerMediaRouter() {
+  const router = Router();
+  router.post(
+    '/uploads',
+    authenticate,
+    createRateLimiter({ name: 'upload', windowMs: 60_000, limit: 30 }),
+    uploadSingle,
+    validate({ body: customerMediaBody }),
+    async (req, res, next) => {
+      try {
+        const purpose = UPLOAD_PURPOSES[req.body.purpose];
+        if (!req.file) throw new ValidationError('A file is required.', { file: ['Missing'] });
+        if (!purpose.roles.includes(req.auth.role)) throw new ForbiddenError();
+        const saved = await saveUpload({ file: req.file, allowedKinds: purpose.kinds, visibility: purpose.visibility, scope: `${purpose.folder}/${req.auth.userId}` });
+        const url = deviceUrl(publicUrl(saved.key));
+        return sendCommand(res, { id: saved.key, url, thumbnailUrl: url, mimeType: saved.mime, sizeBytes: saved.sizeBytes, status: 'READY' }, { status: 201 });
+      } catch (error) {
+        if (req.file) await rm(req.file.path, { force: true });
+        return next(error);
+      }
+    },
+  );
   return router;
 }

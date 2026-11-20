@@ -36,8 +36,6 @@ const OffersScreen = ({ navigation }) => {
         accent: section.accent,
       },
     });
-  const openCategory = section => () =>
-    navigation?.navigate('DealCategory', { category: section });
 
   return (
     <View style={styles.container}>
@@ -67,9 +65,11 @@ const OffersScreen = ({ navigation }) => {
             title={section.title}
             items={section.items}
             variant={section.variant}
+            gradient={section.gradient}
+            backgroundImage={section.backgroundImageUrl}
             countdownText={section.tag === 'FLASH DEAL' ? 'Limited time' : undefined}
             onPressItem={openDeal(section)}
-            onPressHeader={openCategory(section)}
+            onPressHeader={() => openDeal(section)(section.items[0] ?? {})}
           />
         ))}
       </ScrollView>

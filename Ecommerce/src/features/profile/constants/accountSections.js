@@ -4,12 +4,6 @@ export const ACCOUNT_SECTIONS = [
     rows: [
       { id: 'edit', icon: 'user', label: 'Edit Profile', route: 'EditProfile' },
       { id: 'orders', icon: 'package', label: 'My Orders', route: 'MyOrders' },
-      {
-        id: 'cards',
-        icon: 'credit-card',
-        label: 'Saved Credit / Debit & Gift Cards',
-        route: 'SavedCards',
-      },
       { id: 'addresses', icon: 'map-pin', label: 'Saved Addresses', route: 'SavedAddresses' },
       { id: 'privacy', icon: 'shield', label: 'Privacy Center', route: 'PrivacyCenter' },
       { id: 'language', icon: 'globe', label: 'Language', route: 'Language' },

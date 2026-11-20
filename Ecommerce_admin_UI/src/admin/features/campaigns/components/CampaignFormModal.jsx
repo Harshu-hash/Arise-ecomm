@@ -1,4 +1,5 @@
-import { DatePicker, Form, Input, InputNumber, Modal, Select } from 'antd';
+import { ColorPicker, DatePicker, Flex, Form, Input, InputNumber, Modal, Select, Typography } from 'antd';
+import { ImageUpload } from '@admin/features/cms/components/BannerFormModal';
 import { useEffect } from 'react';
 import { dayjs } from '@core/utils/date';
 import { CAMPAIGN_TYPES, CUSTOMER_SECTIONS } from '../api/campaigns.api';
@@ -29,6 +30,8 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
         ...initial,
         window: [dayjs(initial.startsAt), dayjs(initial.endsAt)],
         submissionDeadline: initial.submissionDeadline ? dayjs(initial.submissionDeadline) : null,
+        gradientTop: initial.gradient?.[0] ?? null,
+        gradientBottom: initial.gradient?.[1] ?? null,
       });
     } else {
       form.resetFields();
@@ -46,6 +49,10 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
       startsAt: v.window[0].toISOString(),
       endsAt: v.window[1].toISOString(),
       submissionDeadline: v.submissionDeadline ? v.submissionDeadline.toISOString() : null,
+      backgroundImageUrl: v.backgroundImageUrl || null,
+      heroImageUrl: v.heroImageUrl || null,
+      // Both colours or none: a half-set gradient falls back to the campaign type's colours.
+      gradient: v.gradientTop && v.gradientBottom ? [v.gradientTop, v.gradientBottom] : null,
     });
   };
 
@@ -144,6 +151,24 @@ export default function CampaignFormModal({ open, onClose, onSubmit, loading, in
           extra="Entries below this are auto-flagged and will fail approval."
         >
           <InputNumber min={1} max={95} precision={0} addonAfter="%" style={{ width: '100%' }} />
+        </Form.Item>
+
+        <Typography.Title level={5} style={{ marginTop: 8 }}>Look in the customer app</Typography.Title>
+        <Form.Item label="Card gradient" extra="Top and bottom colours of this campaign's card in the Deals section and of its page. Leave empty to use the default.">
+          <Flex gap={16}>
+            <Form.Item name="gradientTop" noStyle getValueFromEvent={(color) => (color && !color.cleared ? color.toHexString() : null)}>
+              <ColorPicker allowClear showText format="hex" disabledAlpha />
+            </Form.Item>
+            <Form.Item name="gradientBottom" noStyle getValueFromEvent={(color) => (color && !color.cleared ? color.toHexString() : null)}>
+              <ColorPicker allowClear showText format="hex" disabledAlpha />
+            </Form.Item>
+          </Flex>
+        </Form.Item>
+        <Form.Item name="backgroundImageUrl" label="Card background image" extra="Blended behind the gradient on the Deals card. Any shape; it is cropped to fit.">
+          <ImageUpload kind="FREE" removable />
+        </Form.Item>
+        <Form.Item name="heroImageUrl" label="Hero banner image" extra="Shown at the top of the campaign's own page. 16:9.">
+          <ImageUpload kind="HERO" removable />
         </Form.Item>
       </Form>
     </Modal>

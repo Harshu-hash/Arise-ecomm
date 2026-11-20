@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
   View,
   Text,
@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Animated,
   StatusBar,
   Share,
 } from 'react-native';
@@ -61,27 +60,17 @@ const DealDetailScreen = ({ navigation, route }) => {
         tag: promotion.tag,
         section: promotion.title,
         accent: promotion.accent,
+        heroImage: promotion.heroImageUrl,
       }
     : routeDeal;
-  const HERO_GRADIENT = buildGradient(deal.accent);
+  // The admin's own gradient when set (top, middle, bottom), else the default built from the accent.
+  const HERO_GRADIENT = promotion?.gradient ? [promotion.gradient[0], promotion.gradient[0], promotion.gradient[1]] : buildGradient(deal.accent);
 
   const secondsRemaining = promotion?.endsAt
     ? Math.max(0, Math.floor((new Date(promotion.endsAt).getTime() - Date.now()) / 1000))
     : 0;
   const { h, m, s } = useCountdown(secondsRemaining);
-  const pulse = useRef(new Animated.Value(1)).current;
   const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    const loop = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulse, { toValue: 1.06, duration: 900, useNativeDriver: true }),
-        Animated.timing(pulse, { toValue: 1, duration: 900, useNativeDriver: true }),
-      ])
-    );
-    loop.start();
-    return () => loop.stop();
-  }, [pulse]);
 
   const related = useMemo(() => promotion?.relatedProducts || [], [promotion?.relatedProducts]);
 
@@ -106,8 +95,13 @@ const DealDetailScreen = ({ navigation, route }) => {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollBody}
         bounces>
-        <View style={styles.hero}>
-          <GradientBackground colors={HERO_GRADIENT} id={`deal_grad_${deal.id}`} />
+        <View style={[styles.hero, deal.heroImage && styles.heroWithImage]}>
+          {/* The admin's hero banner fills the hero as is; only a campaign without one gets the gradient. */}
+          {deal.heroImage ? (
+            <Image source={{ uri: deal.heroImage }} style={StyleSheet.absoluteFill} resizeMode="cover" />
+          ) : (
+            <GradientBackground colors={HERO_GRADIENT} id={`deal_grad_${deal.id}`} />
+          )}
           <SafeAreaView edges={['top']} style={styles.heroSafe}>
             <View style={styles.heroTopRow}>
               <TouchableOpacity style={styles.iconBtn} onPress={() => navigation && navigation.goBack()}>
@@ -135,12 +129,6 @@ const DealDetailScreen = ({ navigation, route }) => {
                 {deal.section ? `${deal.section} · Verified sellers` : 'Handpicked value picks · Verified sellers'}
               </Text>
 
-              <Animated.View style={[styles.discountBubble, { transform: [{ scale: pulse }] }]}>
-                <Image source={{ uri: deal.image }} style={styles.discountImage} />
-                <View style={styles.discountOverlay}>
-                  <Text style={styles.discountValue} numberOfLines={2}>{deal.value}</Text>
-                </View>
-              </Animated.View>
             </View>
           </SafeAreaView>
         </View>
@@ -227,6 +215,7 @@ const DealDetailScreen = ({ navigation, route }) => {
 };
 
 const styles = StyleSheet.create({
+  heroWithImage: { minHeight: 300 }, // room for the banner now that the deal bubble is gone
   root: { flex: 1, backgroundColor: COLORS.mutedBg },
   scrollBody: { paddingBottom: 120 },
 
@@ -241,10 +230,6 @@ const styles = StyleSheet.create({
   heroTitle: { color: COLORS.white, fontSize: 26, fontWeight: '800', textAlign: 'center', marginTop: SPACING.s, letterSpacing: 0.2 },
   heroSubtitle: { color: 'rgba(255,255,255,0.85)', fontSize: 12.5, marginTop: 4, textAlign: 'center' },
 
-  discountBubble: { marginTop: SPACING.xl, width: 200, height: 200, borderRadius: 100, overflow: 'hidden', borderWidth: 4, borderColor: 'rgba(255,255,255,0.35)' },
-  discountImage: { width: '100%', height: '100%' },
-  discountOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(122,12,30,0.55)', alignItems: 'center', justifyContent: 'center', paddingHorizontal: SPACING.m },
-  discountValue: { color: COLORS.white, fontSize: 22, fontWeight: '900', textAlign: 'center' },
 
   timerStrip: { flexDirection: 'row', alignItems: 'center', gap: SPACING.s, backgroundColor: COLORS.offerRedLight, marginHorizontal: SPACING.l, marginTop: -SPACING.l, paddingHorizontal: SPACING.m, paddingVertical: SPACING.s, borderRadius: RADIUS.m, elevation: 3, shadowColor: '#000', shadowOpacity: 0.08, shadowRadius: 8, shadowOffset: { width: 0, height: 4 } },
   timerLabel: { color: COLORS.textPrimary, fontSize: 12.5, fontWeight: '600', flex: 1 },

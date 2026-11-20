@@ -19,7 +19,8 @@ const PLACEMENTS = [
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 const MAX_IMAGE_MB = 10; // matches the server's MAX_UPLOAD_BYTES default
 // Hero banners are 16:9 and tiles are 1:1; a small tolerance forgives rounding in exports.
-const KIND_RATIO = { HERO: { ratio: 16 / 9, label: '16:9' }, TILE: { ratio: 1, label: '1:1' } };
+// FREE = any shape (e.g. a background that is cropped to fit).
+const KIND_RATIO = { HERO: { ratio: 16 / 9, label: '16:9' }, TILE: { ratio: 1, label: '1:1' }, FREE: null };
 const RATIO_TOLERANCE = 0.05;
 
 function imageSize(file) {
@@ -33,7 +34,7 @@ function imageSize(file) {
 }
 
 /** Checks type, size and shape, uploads the file, and stores the returned public URL as the field value. */
-function ImageUpload({ value, onChange, kind }) {
+export function ImageUpload({ value, onChange, kind, removable = false }) {
   const { message } = App.useApp();
   const [uploading, setUploading] = useState(false);
 
@@ -43,8 +44,8 @@ function ImageUpload({ value, onChange, kind }) {
       if (!IMAGE_TYPES.includes(file.type)) throw new Error('Use a PNG, JPG or WebP image.');
       if (file.size > MAX_IMAGE_MB * 1024 * 1024) throw new Error(`The image must be under ${MAX_IMAGE_MB} MB.`);
       const { width, height } = await imageSize(file);
-      const { ratio, label } = KIND_RATIO[kind] ?? KIND_RATIO.HERO;
-      if (Math.abs(width / height - ratio) / ratio > RATIO_TOLERANCE) {
+      const { ratio, label } = (kind in KIND_RATIO ? KIND_RATIO[kind] : KIND_RATIO.HERO) ?? {};
+      if (ratio && Math.abs(width / height - ratio) / ratio > RATIO_TOLERANCE) {
         throw new Error(`This ${kind === 'TILE' ? 'tile' : 'hero'} banner needs a ${label} image; this one is ${width}×${height}.`);
       }
       onChange(await cmsApi.uploadImage(file));
@@ -62,6 +63,7 @@ function ImageUpload({ value, onChange, kind }) {
       <Upload accept="image/png,image/jpeg,image/webp" showUploadList={false} beforeUpload={upload} disabled={uploading}>
         <Button icon={<UploadOutlined />} loading={uploading}>{value ? 'Replace image' : 'Upload image'}</Button>
       </Upload>
+      {removable && value && <Button size="small" type="link" danger onClick={() => onChange(null)} style={{ padding: 0 }}>Remove image</Button>}
     </Flex>
   );
 }

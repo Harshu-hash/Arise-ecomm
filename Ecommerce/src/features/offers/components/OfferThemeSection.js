@@ -11,10 +11,14 @@ import { GradientBackground } from '../../../shared/components';
  * Tapping the title/"See All" opens the full category grid (onPressHeader);
  * tapping an item image opens that single deal's spotlight page (onPressItem).
  */
-const OfferThemeSection = ({ title, items, variant = 'gradient', countdownText, onPressItem, onPressHeader }) => (
+const OfferThemeSection = ({ title, items, variant = 'gradient', gradient, backgroundImage, countdownText, onPressItem, onPressHeader }) => (
   <View style={styles.panel}>
+    {/* The admin's background image sits under the gradient, which is made see-through so the two blend. */}
+    {backgroundImage ? <Image source={{ uri: backgroundImage }} style={StyleSheet.absoluteFill} resizeMode="cover" /> : null}
     {variant === 'gradient' ? (
-      <GradientBackground colors={[COLORS.campaignGradientStart, COLORS.campaignGradientEnd]} />
+      <View style={[StyleSheet.absoluteFill, backgroundImage && styles.blend]} pointerEvents="none">
+        <GradientBackground colors={gradient || [COLORS.campaignGradientStart, COLORS.campaignGradientEnd]} />
+      </View>
     ) : (
       <View style={[StyleSheet.absoluteFill, { backgroundColor: COLORS.offerRed }]} />
     )}
@@ -64,6 +68,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     backgroundColor: COLORS.campaignGradientStart,
   },
+  blend: { opacity: 0.78 },
   content: {
     padding: SPACING.l,
   },

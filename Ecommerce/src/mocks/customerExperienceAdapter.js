@@ -14,12 +14,6 @@ let recentlyViewed = RECENTLY_VIEWED.map((item, index) => ({
   subtitle: item.subtitle,
   viewedAt: new Date(Date.parse('2026-11-03T12:00:00.000Z') - index * 60000).toISOString(),
 }));
-let adPreferences = {
-  personalizedAds: true,
-  thirdPartyDataSharing: false,
-  locationBasedAds: false,
-  updatedAt: '2026-11-01T00:00:00.000Z',
-};
 
 const promotionSeeds = [
   {
@@ -119,12 +113,6 @@ export const resetCustomerExperienceFixture = () => {
     subtitle: item.subtitle,
     viewedAt: new Date(Date.parse('2026-11-03T12:00:00.000Z') - index * 60000).toISOString(),
   }));
-  adPreferences = {
-    personalizedAds: true,
-    thirdPartyDataSharing: false,
-    locationBasedAds: false,
-    updatedAt: '2026-11-01T00:00:00.000Z',
-  };
 };
 
 export const customerExperienceFixtureAdapter = async config => {
@@ -155,17 +143,6 @@ export const customerExperienceFixtureAdapter = async config => {
         ],
       },
     });
-  }
-  if (config.url === '/me/ad-preferences' && config.method === 'get') {
-    return response(config, { data: adPreferences });
-  }
-  if (config.url === '/me/ad-preferences' && config.method === 'patch') {
-    adPreferences = {
-      ...adPreferences,
-      ...config.data,
-      updatedAt: new Date().toISOString(),
-    };
-    return response(config, { data: adPreferences });
   }
   if (config.url === '/promotions' && config.method === 'get') {
     return response(config, {

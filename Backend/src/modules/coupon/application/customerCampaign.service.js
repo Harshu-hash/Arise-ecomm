@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { getLiveProductCards } from '../../product/public/index.js';
 import { CAMPAIGN_STATUS as C, SUBMISSION_STATUS as S } from '../domain/constants/campaign.js';
 import { Campaign } from '../infrastructure/persistence/campaign.model.js';
@@ -45,8 +46,11 @@ const promotionCard = (campaign, entries) => ({
   title: campaign.name,
   subtitle: campaign.tagline || 'Limited-time deals',
   tag: TYPE_LABEL[campaign.type],
-  accent: ACCENT[campaign.type],
+  accent: campaign.gradient?.[0] ?? ACCENT[campaign.type],
   variant: 'gradient',
+  gradient: campaign.gradient?.length === 2 ? campaign.gradient : null,
+  backgroundImageUrl: deviceUrl(campaign.backgroundImageUrl),
+  heroImageUrl: deviceUrl(campaign.heroImageUrl),
   startsAt: campaign.startsAt,
   endsAt: campaign.endsAt,
   couponCode: null,

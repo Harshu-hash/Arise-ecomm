@@ -18,7 +18,7 @@ import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import { useToast } from '../../../contexts/ToastContext';
 import { useUploadProfileImageMutation } from '@features/media';
-import { useGetProfileQuery, useUpdateProfileMutation } from '../api/profile.api';
+import { useGetProfileQuery, useUpdateProfileMutation, useVerifyContactMutation } from '../api/profile.api';
 
 const GENDERS = [
   ['MALE', 'Male'],
@@ -32,6 +32,8 @@ const EditProfileScreen = ({ navigation }) => {
   const query = useGetProfileQuery();
   const [updateProfile, { isLoading: isSaving }] = useUpdateProfileMutation();
   const [uploadImage, { isLoading: isUploading }] = useUploadProfileImageMutation();
+  const [verifyContact, { isLoading: isVerifying }] = useVerifyContactMutation();
+  const [otp, setOtp] = useState('');
   const [name, setName] = useState(''),
     [gender, setGender] = useState('PREFER_NOT_TO_SAY'),
     [newEmail, setNewEmail] = useState(''),
@@ -96,6 +98,17 @@ const EditProfileScreen = ({ navigation }) => {
     } catch (error) {
       setErrors(error.fieldErrors || {});
       toast.show(error.message || 'Could not update profile', { variant: 'error' });
+    }
+  };
+  const verify = async () => {
+    try {
+      await verifyContact({ challengeId: query.data.pendingVerification.challengeId, otp: otp.trim() }).unwrap();
+      setOtp('');
+      setErrors(current => ({ ...current, otp: null }));
+      toast.show('Contact updated', { variant: 'success', icon: 'check' });
+    } catch (error) {
+      setErrors(current => ({ ...current, ...(error.fieldErrors || {}) }));
+      toast.show(error.message || 'Could not verify the code', { variant: 'error' });
     }
   };
   if (query.isLoading) return <FullScreenLoader message="Loading profile..." />;
@@ -183,6 +196,26 @@ const EditProfileScreen = ({ navigation }) => {
             </Text>
           </View>
         ) : null}
+        {profile.pendingVerification ? (
+          <>
+            <Field
+              label={`Code sent to ${profile.pendingVerification.destinationMasked}`}
+              value={otp}
+              onChangeText={setOtp}
+              keyboardType="number-pad"
+              maxLength={6}
+              placeholder="Enter the code"
+              error={errors.otp}
+            />
+            <TouchableOpacity
+              disabled={isVerifying || otp.trim().length < 4}
+              onPress={verify}
+              style={[styles.verifyButton, (isVerifying || otp.trim().length < 4) && styles.disabled]}
+            >
+              <Text style={styles.saveText}>{isVerifying ? 'Verifying...' : 'Verify & update'}</Text>
+            </TouchableOpacity>
+          </>
+        ) : null}
       </ScrollView>
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, SPACING.l) }]}>
         <TouchableOpacity
@@ -208,6 +241,7 @@ const Field = ({ label, error, ...props }) => (
   </View>
 );
 const styles = StyleSheet.create({
+  verifyButton: { backgroundColor: COLORS.primary, borderRadius: 12, paddingVertical: 12, alignItems: 'center', marginBottom: SPACING.l },
   container: { flex: 1, backgroundColor: COLORS.background },
   header: {
     flexDirection: 'row',

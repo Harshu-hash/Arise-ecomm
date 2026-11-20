@@ -1,10 +1,3 @@
-import {
-  communicationPreferencesResponseSchema,
-  deletionEligibilityResponseSchema,
-  exportRequestResponseSchema,
-} from './privacy.schemas';
-export const mapCommunicationPreferences = payload =>
-  communicationPreferencesResponseSchema.parse(payload).data;
-export const mapExportRequest = payload => exportRequestResponseSchema.parse(payload).data;
+import { deletionEligibilityResponseSchema } from './privacy.schemas';
 export const mapDeletionEligibility = payload =>
   deletionEligibilityResponseSchema.parse(payload).data;
