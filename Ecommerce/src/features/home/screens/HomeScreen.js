@@ -10,7 +10,6 @@ import LocationSearchHeader from '../components/LocationSearchHeader';
 import HeroBannerCarousel from '../components/HeroBannerCarousel';
 import AdSheetCard from '../components/AdSheetCard';
 import RecentlyViewedRail from '../components/RecentlyViewedRail';
-import AdTileRow from '../components/AdTileRow';
 import FlashSaleBanner from '../components/FlashSaleBanner';
 import SuggestedForYouSection from '../components/SuggestedForYouSection';
 import BrandsSpotlightSection from '../components/BrandsSpotlightSection';
@@ -19,6 +18,7 @@ import ProductFeedSection from '../components/ProductFeedSection';
 import AddressSelectSheet from '../components/AddressSelectSheet';
 import HomeScreenSkeleton from '../components/HomeScreenSkeleton';
 import { homeApi } from '../api/home.api';
+import { HOME_SECTION_TYPES } from '../api/home.mapper';
 import { useGetHomeQuery } from '../api/home.query';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
@@ -87,15 +87,7 @@ const HomeScreen = ({ navigation }) => {
   // `data` keeps the previous tab's page while the new one loads; don't show it as if it were this tab's.
   const switchingTab = !currentData && isFetching;
   const hasSections =
-    data.heroBanners.length > 0 ||
-    data.adBanners.length > 0 ||
-    data.recentlyViewed.length > 0 ||
-    data.adTiles.length > 0 ||
-    data.showFlashSale ||
-    data.suggestedProducts.length > 0 ||
-    data.brandsSpotlight.length > 0 ||
-    data.topValueDeals.length > 0 ||
-    data.productFeed.length > 0;
+    data.heroBanners.length > 0 || data.adBanners.length > 0 || data.sections.length > 0;
   const hasContent = hasSections || data.header.categoryTabs.length > 0;
 
   if (!hasContent) {
@@ -121,6 +113,65 @@ const HomeScreen = ({ navigation }) => {
   const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
     useNativeDriver: true,
   });
+  // Below the pinned hero and ad banners, sections appear in the order the admin's published layout set.
+  const renderSection = section => {
+    switch (section.type) {
+      case HOME_SECTION_TYPES.recentlyViewed:
+        return (
+          <RecentlyViewedRail
+            key={section.id}
+            items={section.items}
+            onPressItem={item => navigation?.navigate('ProductDetail', { productId: item.id })}
+            onSeeAll={() => navigation?.navigate('RecentlyViewed')}
+          />
+        );
+      case HOME_SECTION_TYPES.flashSale:
+        return section.items.map(sale => (
+          <FlashSaleBanner
+            key={`${section.id}-${sale.id}`}
+            title={sale.title}
+            subtitle={sale.subtitle}
+            onPress={() => navigation?.navigate('FlashSale', { campaignId: sale.id })}
+          />
+        ));
+      case HOME_SECTION_TYPES.suggestedProducts:
+        return (
+          <SuggestedForYouSection
+            key={section.id}
+            products={section.items}
+            onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
+            onSeeAll={() => navigation?.navigate('SearchResults', {})}
+          />
+        );
+      case HOME_SECTION_TYPES.brandSpotlight:
+        return (
+          <BrandsSpotlightSection
+            key={section.id}
+            brands={section.items}
+            onPressBrand={brand => navigation?.navigate('Brands', { brandId: brand.id })}
+            onSeeAll={() => navigation?.navigate('Brands')}
+          />
+        );
+      case HOME_SECTION_TYPES.topValueDeals:
+        return (
+          <TopValueDealsSection
+            key={section.id}
+            deals={section.items}
+            onPressDeal={deal => navigation?.navigate('DealDetail', { deal })}
+          />
+        );
+      case HOME_SECTION_TYPES.productFeed:
+        return (
+          <ProductFeedSection
+            key={section.id}
+            products={section.items}
+            onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
+          />
+        );
+      default:
+        return null;
+    }
+  };
   const adSheetParallaxY = scrollY.interpolate({
     inputRange: [0, AD_SHEET_PARALLAX_SCROLL_RANGE],
     outputRange: [0, -AD_SHEET_PARALLAX_DISTANCE],
@@ -152,49 +203,7 @@ const HomeScreen = ({ navigation }) => {
             <SectionLoadWarning count={data.failedSections.length} onRetry={refetch} />
           ) : null}
           {data.adBanners.length > 0 ? <AdSheetCard banners={data.adBanners} /> : null}
-          {data.recentlyViewed.length > 0 ? (
-            <RecentlyViewedRail
-              items={data.recentlyViewed}
-              onPressItem={item => navigation?.navigate('ProductDetail', { productId: item.id })}
-              onSeeAll={() => navigation?.navigate('RecentlyViewed')}
-            />
-          ) : null}
-          {data.showFlashSale ? (
-            <FlashSaleBanner
-              title={data.flashSale?.title}
-              subtitle={data.flashSale?.subtitle}
-              onPress={() => navigation?.navigate('FlashSale')}
-            />
-          ) : null}
-          {data.adTiles.length > 0 ? (
-            <AdTileRow tiles={data.adTiles} onPressTile={() => navigation?.navigate('Offers')} />
-          ) : null}
-          {data.suggestedProducts.length > 0 ? (
-            <SuggestedForYouSection
-              products={data.suggestedProducts}
-              onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
-              onSeeAll={() => navigation?.navigate('SearchResults', {})}
-            />
-          ) : null}
-          {data.brandsSpotlight.length > 0 ? (
-            <BrandsSpotlightSection
-              brands={data.brandsSpotlight}
-              onPressBrand={brand => navigation?.navigate('Brands', { brandId: brand.id })}
-              onSeeAll={() => navigation?.navigate('Brands')}
-            />
-          ) : null}
-          {data.topValueDeals.length > 0 ? (
-            <TopValueDealsSection
-              deals={data.topValueDeals}
-              onPressDeal={deal => navigation?.navigate('DealDetail', { deal })}
-            />
-          ) : null}
-          {data.productFeed.length > 0 ? (
-            <ProductFeedSection
-              products={data.productFeed}
-              onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
-            />
-          ) : null}
+          {data.sections.map(renderSection)}
           {!hasSections && !isFetching ? (
             <Text style={styles.emptyNote}>Nothing to show in this category yet.</Text>
           ) : null}

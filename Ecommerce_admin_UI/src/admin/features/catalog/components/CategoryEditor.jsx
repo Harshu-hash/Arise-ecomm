@@ -179,6 +179,7 @@ export default function CategoryEditor({ categoryId, onSelect }) {
 
       <Form form={form} layout="vertical" requiredMark={false} onFinish={(v) => save.mutate(v)}>
         <CategoryPolicyFields
+          canEditCommission={allowedActions.includes('EDIT_COMMISSION')}
           hsnOptions={(hsn.data?.data ?? []).map((h) => ({
             value: h.code,
             label: `${h.code} — ${h.description} (${h.gstRate}%)`,

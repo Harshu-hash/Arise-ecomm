@@ -4,6 +4,7 @@ import { reportException } from '@core/crashReporting';
 import { COLORS } from '@constants/colors';
 import { SPACING } from '@constants/spacing';
 import AppButton from '@shared/buttons/AppButton';
+import { ThemeProvider } from '@theme';
 
 class ErrorBoundary extends React.Component {
   state = { error: null };
@@ -20,14 +21,17 @@ class ErrorBoundary extends React.Component {
 
   render() {
     if (!this.state.error) return this.props.children;
+    // The boundary wraps every provider (so it catches their errors too), so the fallback brings its own theme.
     return (
-      <View style={styles.container}>
-        <Text style={styles.title}>Arise needs to restart this screen</Text>
-        <Text style={styles.message}>
-          An unexpected app error occurred. No payment or order action was retried automatically.
-        </Text>
-        <AppButton title="Try again" onPress={this.reset} />
-      </View>
+      <ThemeProvider>
+        <View style={styles.container}>
+          <Text style={styles.title}>Arise needs to restart this screen</Text>
+          <Text style={styles.message}>
+            An unexpected app error occurred. No payment or order action was retried automatically.
+          </Text>
+          <AppButton title="Try again" onPress={this.reset} />
+        </View>
+      </ThemeProvider>
     );
   }
 }

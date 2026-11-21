@@ -9,6 +9,7 @@ import {
 } from '../../catalog/public/index.js';
 import { getCategoryForListing, incrementCategoryProductCount } from '../../category/public/index.js';
 import { resolveMediaKeys, urlForKey } from '../../media/public/index.js';
+import { recordListingStockEdits } from './inventory.service.js';
 import {
   buildVariantSpecs,
   generateSku,
@@ -367,6 +368,7 @@ export async function updateListing(offerId, body, { sellerId, actor }) {
   if (body.returnPolicy) Object.assign(product.returnPolicy, body.returnPolicy);
 
   const touched = [];
+  const stockEdits = [];
   for (const item of body.variants ?? []) {
     const o = await Offer.findOne({ _id: item.offerId, sellerId, productId: product._id });
     const v = o && (await Variant.findById(o.variantId));
@@ -374,6 +376,10 @@ export async function updateListing(offerId, body, { sellerId, actor }) {
     const price = item.sellingPricePaise ?? o.sellingPricePaise;
     const mrp = item.mrpPaise ?? o.mrpPaise;
     if (price > mrp) throw new ValidationError('Invalid pricing.', { sellingPricePaise: ['Selling price cannot exceed MRP.'] });
+    if (item.stock !== undefined && item.stock !== o.stock) {
+      stockEdits.push({ offer: o, before: o.stock });
+      o.version += 1; // an open stock-management edit of this row now gets VERSION_CONFLICT instead of overwriting it
+    }
     for (const f of ['sellerSku', 'taxCode', 'stock']) if (item[f] !== undefined) o[f] = item[f];
     o.sellingPricePaise = price;
     o.mrpPaise = mrp;
@@ -386,6 +392,7 @@ export async function updateListing(offerId, body, { sellerId, actor }) {
 
   await product.save();
   await Promise.all(touched.map((doc) => doc.save()));
+  await recordListingStockEdits(stockEdits, actor);
   // Keep every offer's list-row snapshot in step with the product.
   await Offer.updateMany(
     { productId: product._id },

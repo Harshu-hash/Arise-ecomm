@@ -9,6 +9,19 @@ export async function userHasPermission(userId, key) {
   return permissions.includes('*') || permissions.includes(key);
 }
 
+// Mount after `authenticate`: passes when the admin holds at least one of the keys (e.g. a picker shared by two screens).
+export function requireAnyPermission(...keys) {
+  return async (req, _res, next) => {
+    try {
+      const results = await Promise.all(keys.map((key) => userHasPermission(req.auth?.userId, key)));
+      if (!results.some(Boolean)) throw new ForbiddenError();
+      next();
+    } catch (error) {
+      next(error);
+    }
+  };
+}
+
 // Mount after `authenticate`. A wildcard ('*', super_admin) passes every check.
 export function requirePermission(key) {
   return async (req, _res, next) => {

@@ -9,6 +9,7 @@ import FilterBar from '@ui/components/FilterBar';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import useListQuery from '@ui/hooks/useListQuery';
+import useRealtime from '@ui/hooks/useRealtime';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { marketingApi, marketingKeys } from '../api/marketing.api';
 import DealFormModal from '../components/DealFormModal';
@@ -33,6 +34,10 @@ export default function DealsPage() {
     queryFn: () => marketingApi.dealsCalendar(),
     enabled: view === 'calendar',
   });
+
+  // A colleague's change (or a reconnect after a dropped connection) refreshes the list and calendar without a reload.
+  const refreshAll = () => queryClient.invalidateQueries({ queryKey: ['marketing', 'deals'] });
+  useRealtime('admin', { 'marketing:changed': refreshAll, 'session:ready': refreshAll });
 
   const remove = useMutation({
     mutationFn: (id) => marketingApi.deleteDeal(id),

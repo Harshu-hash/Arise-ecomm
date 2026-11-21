@@ -70,9 +70,6 @@ export default function CustomerDetailPage() {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>
               Customer since <DateText value={customer.joinedAt} variant="date" />
             </Typography.Text>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {customer.city}, {customer.state}
-            </Typography.Text>
           </>
         }
         actions={

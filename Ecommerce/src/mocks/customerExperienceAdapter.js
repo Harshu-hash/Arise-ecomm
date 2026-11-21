@@ -15,6 +15,12 @@ let recentlyViewed = RECENTLY_VIEWED.map((item, index) => ({
   viewedAt: new Date(Date.parse('2026-11-03T12:00:00.000Z') - index * 60000).toISOString(),
 }));
 
+// Two live home flash sales, to show the home screen rendering more than one banner at once.
+const flashSaleSeeds = [
+  { id: 'flash-current', title: 'Flash Sale', subtitle: "Up to 70% off — grab it before it's gone" },
+  { id: 'flash-weekend', title: 'Weekend Flash Sale', subtitle: 'Up to 50% off electronics' },
+];
+
 const promotionSeeds = [
   {
     id: 'everyday-essentials',
@@ -173,11 +179,19 @@ export const customerExperienceFixtureAdapter = async config => {
       data: { ...promotion(seed), relatedProducts: PRODUCT_FEED.slice(0, 6).map(toPromotionProduct) },
     });
   }
-  if (config.url === '/flash-sales/current' && config.method === 'get') {
+  if (config.url === '/flash-sales' && config.method === 'get') {
+    return response(config, {
+      data: flashSaleSeeds.map(({ id, title, subtitle }) => ({ id, title, subtitle, endsAt })),
+    });
+  }
+  const flashSaleMatch = config.url?.match(/^\/flash-sales\/([^/]+)$/);
+  if (flashSaleMatch && config.method === 'get') {
+    const seed = flashSaleSeeds.find(item => item.id === decodeURIComponent(flashSaleMatch[1]));
+    if (!seed) return reject(config, 404, 'FLASH_SALE_NOT_FOUND', 'That flash sale is not running right now.');
     return response(config, {
       data: {
-        id: 'flash-current',
-        title: 'Flash Sale',
+        id: seed.id,
+        title: seed.title,
         startsAt,
         endsAt,
         items: FLASH_SALE_PRODUCTS.map(item => ({

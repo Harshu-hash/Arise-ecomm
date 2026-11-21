@@ -1,1 +1,1 @@
-export { useGetCurrentFlashSaleQuery } from './flashSale.api';
+export { useGetFlashSaleQuery } from './flashSale.api';

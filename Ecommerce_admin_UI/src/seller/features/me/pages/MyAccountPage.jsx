@@ -1,10 +1,11 @@
 import { KeyOutlined } from '@ant-design/icons';
-import { Button, Card, Descriptions, Flex, Tag } from 'antd';
+import { Button, Card, Descriptions, Flex } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import { useCurrentUser } from '@core/auth/sessionStore';
 import PageHeader from '@ui/components/PageHeader';
+import ProfilePage from '@seller/features/settings/pages/ProfilePage';
 
-/** A read-only account summary for S1; full settings land in Phase S8. */
+/** My profile: who is signed in, followed by the store's business profile (the same, editable, page as Settings). */
 export default function MyAccountPage() {
   const user = useCurrentUser();
   const navigate = useNavigate();
@@ -12,26 +13,20 @@ export default function MyAccountPage() {
   return (
     <Flex vertical gap={16}>
       <PageHeader
-        title="My account"
-        subtitle="Your seller profile and sign-in."
-        actions={
-          <Button icon={<KeyOutlined />} onClick={() => navigate('/change-password')}>
-            Change password
-          </Button>
-        }
+        title="My profile"
+        breadcrumbs={[{ label: 'Account' }, { label: 'My profile' }]}
+        subtitle="Your details and the store you sell under."
+        actions={<Button icon={<KeyOutlined />} onClick={() => navigate('/change-password')}>Change password</Button>}
       />
-      <Card>
+      <Card title="Your details">
         <Descriptions column={{ xs: 1, sm: 2 }} bordered size="middle">
-          <Descriptions.Item label="Name">{user?.name}</Descriptions.Item>
-          <Descriptions.Item label="Email">{user?.email}</Descriptions.Item>
+          <Descriptions.Item label="Name">{user?.name ?? '—'}</Descriptions.Item>
+          <Descriptions.Item label="Role">{user?.roleName ?? '—'}</Descriptions.Item>
+          <Descriptions.Item label="Email">{user?.email ?? '—'}</Descriptions.Item>
           <Descriptions.Item label="Phone">{user?.phone ?? '—'}</Descriptions.Item>
-          <Descriptions.Item label="Store">{user?.storeName}</Descriptions.Item>
-          <Descriptions.Item label="Role">{user?.roleName}</Descriptions.Item>
-          <Descriptions.Item label="Account status">
-            <Tag color={user?.onboardingComplete ? 'green' : 'gold'}>{user?.accountStatus}</Tag>
-          </Descriptions.Item>
         </Descriptions>
       </Card>
+      <ProfilePage embedded />
     </Flex>
   );
 }

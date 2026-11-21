@@ -8,7 +8,7 @@ import { StatusBarManager, ProductCard } from '../../../shared/components';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import EmptyState from '../../../shared/EmptyState/EmptyState';
-import { useGetCurrentFlashSaleQuery } from '../api/flashSale.api';
+import { useGetFlashSaleQuery } from '../api/flashSale.api';
 
 const formatTime = (totalSeconds) => {
   const h = Math.floor(totalSeconds / 3600);
@@ -18,9 +18,10 @@ const formatTime = (totalSeconds) => {
   return `${pad(h)}:${pad(m)}:${pad(s)}`;
 };
 
-const FlashSaleScreen = ({ navigation }) => {
+const FlashSaleScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const { data: sale, isLoading, error, refetch } = useGetCurrentFlashSaleQuery();
+  const campaignId = route?.params?.campaignId;
+  const { data: sale, isLoading, error, refetch } = useGetFlashSaleQuery(campaignId, { skip: !campaignId });
   const [secondsLeft, setSecondsLeft] = useState(0);
 
   useEffect(() => {

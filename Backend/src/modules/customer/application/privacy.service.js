@@ -2,6 +2,7 @@ import { rm } from 'node:fs/promises';
 import { resolveKey } from '../../../infrastructure/storage/local.storage.js';
 import { anonymizeCustomerIdentity, assertActiveCustomer } from '../../identity/public/index.js';
 import { deleteCustomerProductHistory } from '../../product/public/index.js';
+import { deleteCustomerWishlist } from '../../wishlist/public/index.js';
 import { AccountDeletion } from '../infrastructure/persistence/accountDeletion.model.js';
 import { AddressBook } from '../infrastructure/persistence/addressBook.model.js';
 
@@ -55,6 +56,7 @@ async function completeDeletion(request) {
     anonymizeCustomerIdentity(customerId),
     AddressBook.deleteOne({ customerId }),
     deleteCustomerProductHistory(customerId),
+    deleteCustomerWishlist(customerId),
     rm(resolveKey(`public/avatars/${customerId}`), { recursive: true, force: true }),
   ]);
   await AccountDeletion.updateOne(

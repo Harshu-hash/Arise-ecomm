@@ -70,28 +70,35 @@ const productCard = (entry) => ({
   ratingCount: entry.ratingCount,
 });
 
-/** The admin-chosen home flash sale, if it is running on its dates and has something to show. */
-async function liveFlashSale(now) {
-  const campaign = await Campaign.findOne({ ...liveNow(now), homeFlashSale: true }).lean();
-  if (!campaign) return null;
-  const entries = (await entriesByCampaign([campaign._id])).get(String(campaign._id));
-  return entries.length ? { campaign, entries } : null;
+const flashSaleSummary = (campaign, entries) => ({
+  id: String(campaign._id),
+  title: campaign.name,
+  subtitle: campaign.tagline || `Up to ${Math.max(...entries.map((entry) => entry.discountPct))}% off — grab it before it's gone`,
+  endsAt: campaign.endsAt,
+});
+
+/** Every admin-chosen home flash sale that is running on its dates and has something to show, soonest-ending first. */
+async function liveFlashSales(now) {
+  const campaigns = await Campaign.find({ ...liveNow(now), homeFlashSale: true }).sort({ endsAt: 1 }).lean();
+  if (!campaigns.length) return [];
+  const entries = await entriesByCampaign(campaigns.map((campaign) => campaign._id));
+  return campaigns.map((campaign) => ({ campaign, entries: entries.get(String(campaign._id)) })).filter(({ entries }) => entries.length);
 }
 
-/** Home page: the flash-sale banner (only the campaign the admin set) and one "Top Value Deals" card per live campaign placed there. */
+/** The flash-sales list screen / anything else that needs just the banner summaries. */
+export async function listFlashSales(now = new Date()) {
+  return (await liveFlashSales(now)).map(({ campaign, entries }) => flashSaleSummary(campaign, entries));
+}
+
+/** Home page: one banner per live home flash sale, and one "Top Value Deals" card per live campaign placed there. */
 export async function listHomeCampaignSections(now = new Date()) {
-  const [flash, campaigns] = await Promise.all([
-    liveFlashSale(now),
+  const [flashSales, campaigns] = await Promise.all([
+    liveFlashSales(now),
     Campaign.find({ ...liveNow(now), customerSection: 'TOP_VALUE_DEALS' }).sort({ endsAt: 1 }).lean(),
   ]);
   const entries = await entriesByCampaign(campaigns.map((campaign) => campaign._id));
   return {
-    flashSale: flash && {
-      campaignId: String(flash.campaign._id),
-      title: flash.campaign.name,
-      subtitle: flash.campaign.tagline || `Up to ${Math.max(...flash.entries.map((entry) => entry.discountPct))}% off — grab it before it's gone`,
-      endsAt: flash.campaign.endsAt,
-    },
+    flashSales: flashSales.map(({ campaign, entries: flashEntries }) => flashSaleSummary(campaign, flashEntries)),
     topValueDeals: campaigns
       .filter((campaign) => entries.get(String(campaign._id)).length)
       .map((campaign) => {
@@ -107,16 +114,17 @@ export async function listHomeCampaignSections(now = new Date()) {
   };
 }
 
-/** The flash sale screen: the same campaign the home banner shows. */
-export async function getCurrentFlashSale(now = new Date()) {
-  const flash = await liveFlashSale(now);
-  if (!flash) throw new NotFoundError('No flash sale is live right now.');
+/** The flash sale screen: one specific home flash sale, by the id its banner was tapped with. */
+export async function getFlashSale(campaignId, now = new Date()) {
+  const campaign = await Campaign.findOne({ _id: campaignId, ...liveNow(now), homeFlashSale: true }).lean();
+  const entries = campaign && (await entriesByCampaign([campaign._id])).get(String(campaign._id));
+  if (!campaign || !entries.length) throw new NotFoundError('That flash sale is not running right now.');
   return {
-    id: String(flash.campaign._id),
-    title: flash.campaign.name,
-    startsAt: flash.campaign.startsAt,
-    endsAt: flash.campaign.endsAt,
-    items: flash.entries.map((entry) => ({
+    id: String(campaign._id),
+    title: campaign.name,
+    startsAt: campaign.startsAt,
+    endsAt: campaign.endsAt,
+    items: entries.map((entry) => ({
       id: entry.id,
       productId: entry.productId,
       brand: entry.brand || 'Brand',

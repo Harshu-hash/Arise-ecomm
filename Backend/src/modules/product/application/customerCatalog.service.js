@@ -61,6 +61,7 @@ function toCard(product, offers) {
     rating: null,
     ratingCount: 0,
     assured: offers.some((offer) => offer.ariseAssured),
+    inStock: offers.some((offer) => offer.stock > 0),
   };
 }
 

@@ -24,6 +24,13 @@ export async function listSettings() {
   return SETTINGS_SECTIONS.map((section) => serializeSection(section, byKey.get(section.id)));
 }
 
+// Read one section's effective values (stored over defaults) for other modules, e.g. getSettingsSection('orders').
+export async function getSettingsSection(sectionId) {
+  const section = SECTIONS_BY_ID.get(sectionId);
+  if (!section) throw new NotFoundError('That settings section does not exist.');
+  return serializeSection(section, await PlatformSetting.findOne({ key: sectionId }).lean()).values;
+}
+
 export async function updateSettingsSection(sectionId, { values, reason }, actor) {
   const section = SECTIONS_BY_ID.get(sectionId);
   if (!section) throw new NotFoundError('That settings section does not exist.');

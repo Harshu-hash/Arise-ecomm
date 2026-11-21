@@ -15,3 +15,5 @@ export {
 } from '../application/customerDeletion.service.js';
 
 export { getSellerOwnerEmail, getSellerSummaries, getUserSummaries } from '../application/sellerLookup.service.js';
+
+export { countCustomers, findCustomers, getCustomer } from '../application/customerLookup.service.js';

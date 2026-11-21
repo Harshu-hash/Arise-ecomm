@@ -10,7 +10,7 @@ const RETURN_TYPES = [
  * beneath it, which is why return window and GST sit here rather than on the
  * product.
  */
-export default function CategoryPolicyFields({ hsnOptions = [] }) {
+export default function CategoryPolicyFields({ hsnOptions = [], canEditCommission = false }) {
   return (
     <>
       <Row gutter={12}>
@@ -32,7 +32,7 @@ export default function CategoryPolicyFields({ hsnOptions = [] }) {
       </Row>
 
       <Row gutter={12}>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={6}>
           <Form.Item
             name="returnWindowDays"
             label="Return window"
@@ -41,14 +41,24 @@ export default function CategoryPolicyFields({ hsnOptions = [] }) {
             <InputNumber min={0} max={60} style={{ width: '100%' }} addonAfter="days" />
           </Form.Item>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={24} md={6}>
           <Form.Item name="returnTypes" label="Return types">
             <Select mode="multiple" options={RETURN_TYPES} placeholder="None" />
           </Form.Item>
         </Col>
-        <Col xs={24} md={8}>
+        <Col xs={12} md={6}>
           <Form.Item name="gstRate" label="GST rate">
             <Select options={[0, 5, 12, 18, 28].map((r) => ({ value: r, label: `${r}%` }))} />
+          </Form.Item>
+        </Col>
+        <Col xs={12} md={6}>
+          <Form.Item
+            name="commissionPct"
+            label="Commission"
+            rules={[{ required: true, message: 'Enter a commission rate (0 for none).' }]}
+            extra={canEditCommission ? 'Arise’s share of each sale here.' : 'Needs the Commission & fees edit permission.'}
+          >
+            <InputNumber min={0} max={40} step={0.5} precision={2} disabled={!canEditCommission} style={{ width: '100%' }} addonAfter="%" />
           </Form.Item>
         </Col>
       </Row>

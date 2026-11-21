@@ -36,14 +36,14 @@ export default function SellerUserMenu({ onSignOut }) {
           </div>
           <div>
             <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-              {user?.roleName} · {user?.storeName}
+              {[user?.roleName, user?.storeName].filter(Boolean).join(' · ')}
             </Typography.Text>
           </div>
         </div>
       ),
     },
     { type: 'divider' },
-    { key: '/account', icon: <UserOutlined />, label: 'My account' },
+    { key: '/account', icon: <UserOutlined />, label: 'My profile' },
     { key: '/change-password', icon: <KeyOutlined />, label: 'Change password' },
     { type: 'divider' },
     {

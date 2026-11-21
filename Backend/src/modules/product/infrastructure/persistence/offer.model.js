@@ -39,5 +39,6 @@ const offerSchema = new mongoose.Schema(
 // One seller may hold at most one offer per variant.
 offerSchema.index({ variantId: 1, sellerId: 1 }, { unique: true, name: 'offer_variant_seller_unique' });
 offerSchema.index({ sellerId: 1, status: 1, createdAt: -1 });
+offerSchema.index({ sellerId: 1, stock: 1, _id: 1 }); // seller stock management: sorted by quantity, and the low-stock filter
 
 export const Offer = mongoose.models.Offer ?? mongoose.model('Offer', offerSchema);

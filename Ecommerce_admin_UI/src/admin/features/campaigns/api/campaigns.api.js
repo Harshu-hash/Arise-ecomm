@@ -32,7 +32,7 @@ export const campaignsApi = {
   submissions: (id, params) => api.get(`/campaigns/${id}/submissions`, params),
   createCampaign: (payload) => api.post('/campaigns', payload),
   updateCampaign: (id, payload) => api.patch(`/campaigns/${id}`, payload),
-  // Makes this the one campaign shown as the home-screen flash sale (replacing any other), or clears it.
+  // Adds or removes this campaign's own banner from the home screen's flash sale slot; any number of campaigns can hold it at once.
   setHomeFlashSale: (id, enabled) => api.post(`/campaigns/${id}/home-flash-sale`, { enabled }),
   setStatus: (id, status) => api.post(`/campaigns/${id}/status`, { status }),
   // `decision` is 'approve' | 'reject' | 'changes'; one call covers one entry or a whole selection.

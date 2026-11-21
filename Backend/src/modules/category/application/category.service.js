@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
-import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import {
   attributeSetDetails,
   releaseAttributeSet,
@@ -35,6 +35,7 @@ export function serializeCategory(row, rootName = null) {
     gated: row.gated,
     codAllowed: row.codAllowed,
     gstRate: row.gstRate,
+    commissionPct: row.commissionPct ?? 0,
     hsnCode: row.hsnCode ?? null,
     attributeSetId: id(row.attributeSetId),
     imageUrl: row.imageUrl ?? null,
@@ -118,6 +119,7 @@ export async function getCategoryForListing(categoryId) {
     attributeSetId: id(category.attributeSetId),
     hsnCode: category.hsnCode,
     gstRate: category.gstRate,
+    commissionPct: category.commissionPct ?? 0,
     returnWindowDays: category.returnWindowDays,
     returnTypes: category.returnTypes,
     gated: category.gated,
@@ -167,7 +169,10 @@ export async function getCategory(categoryId, scope) {
   };
 }
 
-export async function createCategory(input, { scope, actor }) {
+export async function createCategory(input, { scope, actor, canEditCommission = false }) {
+  if (input.commissionPct !== undefined && !canEditCommission) {
+    throw new ForbiddenError('Setting a commission rate needs the "Commission & fees: edit rules" permission.');
+  }
   const parent = input.parentId ? await Category.findById(input.parentId).lean() : null;
   if (input.parentId && !parent) throw new ValidationError('Parent category not found.', { parentId: ['Parent category not found.'] });
   if (parent) assertInScope(parent, scope);
@@ -230,10 +235,14 @@ export async function createCategory(input, { scope, actor }) {
   return result;
 }
 
-export async function updateCategory(categoryId, input, { scope, actor }) {
+export async function updateCategory(categoryId, input, { scope, actor, canEditCommission = false }) {
   const before = await Category.findById(categoryId).lean();
   if (!before) throw new NotFoundError('Category not found.');
   assertInScope(before, scope);
+  // The editor sends every field on save, so only an actual change of rate needs the finance permission.
+  if (input.commissionPct !== undefined && input.commissionPct !== (before.commissionPct ?? 0) && !canEditCommission) {
+    throw new ForbiddenError('Changing the commission rate needs the "Commission & fees: edit rules" permission.');
+  }
   if (before.version !== input.version) {
     throw new ConflictError('VERSION_CONFLICT', 'Someone else changed this category while you were editing it.', {
       current: serializeCategory(before, await rootNameFor(before)),

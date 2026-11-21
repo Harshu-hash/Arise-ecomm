@@ -23,6 +23,17 @@ import { customerSellerFixtureAdapter } from './customerSellerAdapter';
 
 export const customerFixtureAdapter = config => {
   if (config.url === '/health') return customerExperienceFixtureAdapter(config);
+  if (config.url?.startsWith('/pages/')) {
+    const slug = config.url.split('/pages/')[1];
+    return Promise.resolve({
+      data: { data: { slug, title: slug, body: `Fixture content for "${slug}". The real text comes from admin CMS.`, publishedAt: new Date().toISOString() } },
+      status: 200,
+      statusText: 'OK',
+      headers: { 'content-type': 'application/json' },
+      config,
+      request: null,
+    });
+  }
   if (config.url?.startsWith('/seller-leads')) return customerSellerFixtureAdapter(config);
   if (config.url?.startsWith('/payment-methods'))
     return customerPaymentMethodsFixtureAdapter(config);

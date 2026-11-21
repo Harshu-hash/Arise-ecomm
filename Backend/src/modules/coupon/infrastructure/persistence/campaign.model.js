@@ -14,7 +14,7 @@ const campaignSchema = new mongoose.Schema(
     startsAt: { type: Date, required: true },
     endsAt: { type: Date, required: true },
     submissionDeadline: { type: Date, default: null },
-    // Set by an admin: this campaign is THE flash sale on the customer home screen. At most one campaign holds it.
+    // Set by an admin: shows this campaign as a flash-sale banner on the customer home screen. Any number of campaigns may hold it at once.
     homeFlashSale: { type: Boolean, default: false },
     // Look of the campaign in the customer app (all optional; URLs of CMS_MEDIA uploads).
     backgroundImageUrl: { type: String, default: null }, // blended behind the gradient on its Deals card
@@ -26,7 +26,6 @@ const campaignSchema = new mongoose.Schema(
 );
 
 campaignSchema.index({ status: 1, createdAt: -1 });
-// The database itself guarantees a single home flash sale, even if two admins set one at the same moment.
-campaignSchema.index({ homeFlashSale: 1 }, { unique: true, partialFilterExpression: { homeFlashSale: true }, name: 'one_home_flash_sale' });
+campaignSchema.index({ homeFlashSale: 1 });
 
 export const Campaign = mongoose.models.Campaign ?? mongoose.model('Campaign', campaignSchema);

@@ -95,13 +95,13 @@ export const catalogMasterHandlers = [
       node = node.parentId ? findById('categories', node.parentId) : null;
     }
 
-    return ok(category, {
+    return ok({ ...category, commissionPct: category.commissionPct ?? 0 }, {
       ancestors,
       childCount: db.categories.filter((c) => c.parentId === category.id).length,
       attributeSet: set,
       attributes: (set?.attributeIds ?? []).map((aid) => findById('attributes', aid)).filter(Boolean),
       sizeCharts: filter('sizeCharts', (s) => s.categoryId === category.id),
-      allowedActions: ['EDIT', ...(descendantsOf(category.id).length === 0 && category.liveListings === 0 ? ['DELETE'] : [])],
+      allowedActions: ['EDIT', 'EDIT_COMMISSION', ...(descendantsOf(category.id).length === 0 && category.liveListings === 0 ? ['DELETE'] : [])],
     });
   }),
 
@@ -146,6 +146,7 @@ export const catalogMasterHandlers = [
       codAllowed: body.codAllowed !== false,
       assuredEligible: level === 3,
       gstRate: body.gstRate ?? parent?.gstRate ?? 18,
+      commissionPct: body.commissionPct ?? parent?.commissionPct ?? 0,
       hsnCode: body.hsnCode ?? parent?.hsnCode ?? null,
       attributeSetId: body.attributeSetId ?? parent?.attributeSetId ?? null,
       liveListings: 0,
@@ -195,7 +196,7 @@ export const catalogMasterHandlers = [
     const patch = {};
     for (const key of [
       'name', 'status', 'sortOrder', 'returnWindowDays', 'returnTypes', 'gated',
-      'codAllowed', 'gstRate', 'hsnCode', 'attributeSetId', 'assuredEligible',
+      'codAllowed', 'gstRate', 'commissionPct', 'hsnCode', 'attributeSetId', 'assuredEligible',
       'imageUrl', 'icon',
     ]) {
       if (body[key] !== undefined) patch[key] = body[key];

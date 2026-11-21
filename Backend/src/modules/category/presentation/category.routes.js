@@ -25,6 +25,8 @@ const editableFields = {
   gated: z.boolean(),
   codAllowed: z.boolean(),
   gstRate: z.union([z.literal(0), z.literal(5), z.literal(12), z.literal(18), z.literal(28)]),
+  commissionPct: z.number().min(0, 'Commission cannot be negative.').max(40, 'Commission cannot exceed 40%.')
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9, 'Use at most two decimal places.'),
   hsnCode: z.string().trim().min(1).max(20).nullable(),
   attributeSetId: nullableObjectId,
   imageUrl: z.url().max(2048).nullable(),
@@ -39,6 +41,7 @@ const createSchema = z.object({
   gated: editableFields.gated.optional(),
   codAllowed: editableFields.codAllowed.optional(),
   gstRate: editableFields.gstRate.optional(),
+  commissionPct: editableFields.commissionPct.optional(),
   hsnCode: editableFields.hsnCode.optional(),
   attributeSetId: editableFields.attributeSetId.optional(),
   imageUrl: editableFields.imageUrl.optional(),
@@ -54,6 +57,8 @@ const updateSchema = z.object({
 const idParams = z.object({ id: objectIdSchema });
 
 const hasPermission = (permissions, key) => permissions.includes('*') || permissions.includes(key);
+// Commission is a finance rule: editing categories is not enough to change it.
+const canEditCommission = (req) => hasPermission(req.categoryAuthorization.permissions, 'finance.commission.edit');
 const requireCategoryPermission = (action) => (req, _res, next) =>
   next(hasPermission(req.categoryAuthorization.permissions, `catalog.category.${action}`) ? undefined : new ForbiddenError());
 
@@ -88,6 +93,7 @@ export function createCategoryRouter() {
       const permissions = req.categoryAuthorization.permissions;
       const allowedActions = [
         ...(hasPermission(permissions, 'catalog.category.edit') ? ['EDIT'] : []),
+        ...(hasPermission(permissions, 'catalog.category.edit') && canEditCommission(req) ? ['EDIT_COMMISSION'] : []),
         ...(result.meta.canDelete && hasPermission(permissions, 'catalog.category.delete') ? ['DELETE'] : []),
       ];
       return sendData(res, result.data, { meta: { ...result.meta, allowedActions } });
@@ -101,6 +107,7 @@ export function createCategoryRouter() {
       const data = await createCategory(req.body, {
         scope: req.categoryAuthorization.scope,
         actor: req.auth,
+        canEditCommission: canEditCommission(req),
       });
       return sendCommand(res, data, { status: 201 });
     } catch (error) {
@@ -113,6 +120,7 @@ export function createCategoryRouter() {
       return sendCommand(res, await updateCategory(req.params.id, req.body, {
         scope: req.categoryAuthorization.scope,
         actor: req.auth,
+        canEditCommission: canEditCommission(req),
       }));
     } catch (error) {
       return next(error);

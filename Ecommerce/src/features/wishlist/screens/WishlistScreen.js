@@ -189,6 +189,8 @@ const WishlistScreen = ({ navigation }) => {
 
       {wishlist.length === 0 ? (
         <FlatList
+          // Distinct keys: these two lists have different numColumns, which FlatList cannot change in place.
+          key="empty"
           data={[]}
           keyExtractor={() => 'empty'}
           refreshing={isFetching}
@@ -226,6 +228,7 @@ const WishlistScreen = ({ navigation }) => {
         />
       ) : (
         <FlatList
+          key="grid"
           data={wishlist}
           keyExtractor={item => item.id}
           numColumns={2}

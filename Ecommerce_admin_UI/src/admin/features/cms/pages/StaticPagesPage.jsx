@@ -5,6 +5,7 @@ import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import useRealtime from '@ui/hooks/useRealtime';
 import { cmsApi, cmsKeys } from '../api/cms.api';
 import StaticPageEditorDrawer from '../components/StaticPageEditorDrawer';
 
@@ -12,6 +13,8 @@ import StaticPageEditorDrawer from '../components/StaticPageEditorDrawer';
 export default function StaticPagesPage() {
   const [editingId, setEditingId] = useState(null);
   const query = useQuery({ queryKey: cmsKeys.staticPages, queryFn: () => cmsApi.staticPages() });
+  // A colleague's publish (or a reconnect after a dropped connection) refreshes the list without a reload.
+  useRealtime('admin', { 'cms:changed': query.refetch, 'session:ready': query.refetch });
 
   if (query.isLoading) return <FullPageSpinner />;
   if (query.error) return <ErrorState error={query.error} onRetry={query.refetch} />;

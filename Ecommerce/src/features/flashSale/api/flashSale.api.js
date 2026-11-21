@@ -4,11 +4,11 @@ import { mapFlashSale } from './flashSale.mapper';
 
 export const flashSaleApi = baseApi.injectEndpoints({
   endpoints: builder => ({
-    getCurrentFlashSale: builder.query({
-      query: () => ({ url: FLASH_SALE_ENDPOINTS.current }),
+    getFlashSale: builder.query({
+      query: campaignId => ({ url: FLASH_SALE_ENDPOINTS.byId(campaignId) }),
       transformResponse: mapFlashSale,
-      providesTags: [{ type: 'Product', id: 'FLASH_SALE' }],
+      providesTags: (_result, _error, campaignId) => [{ type: 'Product', id: `FLASH_SALE_${campaignId}` }],
     }),
   }),
 });
-export const { useGetCurrentFlashSaleQuery } = flashSaleApi;
+export const { useGetFlashSaleQuery } = flashSaleApi;

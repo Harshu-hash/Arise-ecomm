@@ -1,21 +1,17 @@
 import { Flex, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
-import { formatPercent } from '@core/utils/money';
 import DataTable from '@ui/components/DataTable/DataTable';
 import DateText from '@ui/components/DateText';
 import FilterBar from '@ui/components/FilterBar';
 import MaskedValue from '@ui/components/MaskedValue';
-import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { customerKeys } from '@admin/features/orders/api/orders.api';
 
-const RISK_COLOR = { HIGH: 'red', MEDIUM: 'gold', LOW: undefined };
-
 export default function CustomersListPage() {
   const navigate = useNavigate();
-  const state = useUrlTableState({ defaultSort: '-gmvPaise' });
+  const state = useUrlTableState({ defaultSort: '-joinedAt' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: customerKeys.list({ ...state.queryParams, tab: state.tab }),
@@ -40,50 +36,15 @@ export default function CustomersListPage() {
       ),
     },
     {
-      key: 'city', title: 'Location', dataIndex: 'city', priority: 2,
-      render: (city, row) => (
-        <Typography.Text type="secondary" style={{ fontSize: 12 }}>{city}, {row.state}</Typography.Text>
-      ),
+      key: 'email', title: 'Email', dataIndex: 'email', priority: 2,
+      render: (v, row) => <MaskedValue value={v} kind="email" entityType="customer" entityId={row.id} entityLabel={row.name} />,
     },
     {
-      key: 'ordersCount', title: 'Orders', dataIndex: 'ordersCount', sorter: true, align: 'right', priority: 1,
-      render: (v) => <span className="tabular">{v}</span>,
-    },
-    {
-      key: 'gmvPaise', title: 'Lifetime value', dataIndex: 'gmvPaise', sorter: true, align: 'right', priority: 1,
-      render: (v) => <MoneyText paise={v} compact />,
-    },
-    {
-      key: 'lastOrderAt', title: 'Last order', dataIndex: 'lastOrderAt', sorter: true, priority: 2,
+      key: 'lastLoginAt', title: 'Last sign-in', dataIndex: 'lastLoginAt', sorter: true, priority: 2,
       render: (v) => (v ? <DateText value={v} /> : <Typography.Text type="secondary">Never</Typography.Text>),
     },
     {
-      key: 'rtoPct', title: 'RTO', dataIndex: 'rtoPct', sorter: true, align: 'right', priority: 2,
-      render: (v) => (
-        <Typography.Text className="tabular" type={v > 25 ? 'danger' : undefined}>{formatPercent(v, 1)}</Typography.Text>
-      ),
-    },
-    {
-      key: 'returnPct', title: 'Returns', dataIndex: 'returnPct', align: 'right', priority: 3,
-      render: (v) => (
-        <Typography.Text className="tabular" type={v > 25 ? 'danger' : undefined}>{formatPercent(v, 1)}</Typography.Text>
-      ),
-    },
-    {
-      key: 'walletBalancePaise', title: 'Wallet', dataIndex: 'walletBalancePaise', align: 'right', priority: 3,
-      render: (v) => (v ? <MoneyText paise={v} /> : <Typography.Text type="secondary">—</Typography.Text>),
-    },
-    {
-      key: 'riskLevel', title: 'Risk', dataIndex: 'riskLevel', priority: 1,
-      render: (v, row) => (
-        <Space size={4}>
-          <Tag color={RISK_COLOR[v]} style={{ marginInlineEnd: 0 }}>{v.toLowerCase()}</Tag>
-          {row.openFlags > 0 && <Tag color="red" style={{ marginInlineEnd: 0 }}>{row.openFlags}</Tag>}
-        </Space>
-      ),
-    },
-    {
-      key: 'joinedAt', title: 'Joined', dataIndex: 'joinedAt', sorter: true, priority: 3, defaultHidden: true,
+      key: 'joinedAt', title: 'Joined', dataIndex: 'joinedAt', sorter: true, priority: 1,
       render: (v) => <DateText value={v} variant="date" />,
     },
   ];
@@ -98,24 +59,10 @@ export default function CustomersListPage() {
 
       <FilterBar
         schema={[
-          {
-            key: 'riskLevel', label: 'Risk', kind: 'select', width: 140,
-            options: [
-              { value: 'HIGH', label: 'High' },
-              { value: 'MEDIUM', label: 'Medium' },
-              { value: 'LOW', label: 'Low' },
-            ],
-          },
-          { key: 'city', label: 'City', kind: 'text', width: 150 },
-          {
-            key: 'platform', label: 'Platform', kind: 'select', width: 140,
-            options: [{ value: 'Android', label: 'Android' }, { value: 'iOS', label: 'iOS' }],
-          },
-          { key: 'codDisabled', label: 'COD disabled', kind: 'boolean' },
           { key: 'joinedAt', label: 'Joined', kind: 'dateRange' },
         ]}
         tableState={state}
-        searchPlaceholder="Search name, phone, email or ID"
+        searchPlaceholder="Search name, phone or email"
       />
 
       <DataTable
@@ -139,13 +86,8 @@ export default function CustomersListPage() {
         emptyProps={{ title: 'No customers match' }}
         mobileCard={(row) => (
           <Flex vertical gap={4}>
-            <Flex justify="space-between" gap={8}>
-              <Typography.Text strong>{row.name}</Typography.Text>
-              <Tag color={RISK_COLOR[row.riskLevel]} style={{ marginInlineEnd: 0 }}>{row.riskLevel.toLowerCase()}</Tag>
-            </Flex>
-            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
-              {row.ordersCount} orders · <MoneyText paise={row.gmvPaise} compact />
-            </Typography.Text>
+            <Typography.Text strong>{row.name}</Typography.Text>
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>Joined <DateText value={row.joinedAt} variant="date" /></Typography.Text>
           </Flex>
         )}
       />

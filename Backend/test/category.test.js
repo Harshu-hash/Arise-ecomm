@@ -20,6 +20,7 @@ test('new children inherit every policy and zero return windows clear return typ
     gated: true,
     codAllowed: false,
     gstRate: 5,
+    commissionPct: 12.5,
     hsnCode: '6205',
     attributeSetId: 'abc',
   };

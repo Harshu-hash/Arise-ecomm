@@ -78,18 +78,16 @@ export default function CampaignDetailPage() {
     onSuccess: ({ data }) => {
       invalidate();
       queryClient.invalidateQueries({ queryKey: ['admin', 'campaigns', 'list'] });
-      message.success(data.homeFlashSale
-        ? `Now the home flash sale${data.replacedCampaign ? ` (replaces ${data.replacedCampaign})` : ''}`
-        : 'Removed from the home screen');
+      message.success(data.homeFlashSale ? 'Now showing on the home screen' : 'Removed from the home screen');
     },
     onError: (e) => message.error(e.message),
   });
-  // Choosing a flash sale takes the slot from whichever campaign has it, so ask first.
+  // Any number of campaigns can hold the slot at once, so this just adds or removes this one's own banner.
   const toggleFlashSale = () => (campaign.homeFlashSale
     ? flashSale.mutate(false)
     : modal.confirm({
-      title: 'Show this campaign as the home flash sale?',
-      content: 'Customers will see its name on the flash sale banner on the home screen and its approved products on the flash sale page. Any campaign currently set as the flash sale is replaced.',
+      title: 'Show this campaign as a home flash sale?',
+      content: 'Customers will see its name on a flash sale banner on the home screen (alongside any other live home flash sale) and its approved products on its flash sale page.',
       okText: 'Set as flash sale',
       onOk: () => flashSale.mutateAsync(true).catch(() => undefined),
     }));

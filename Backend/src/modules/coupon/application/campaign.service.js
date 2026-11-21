@@ -228,24 +228,34 @@ export async function decideSubmissions(campaignId, { submissionIds, decision, r
 // Statuses in which a campaign can be (or stay) the home flash sale; a draft has no entries yet and closed ones are over.
 const FLASH_ELIGIBLE = [CAMPAIGN_STATUS.OPEN, CAMPAIGN_STATUS.SCHEDULED, CAMPAIGN_STATUS.ACTIVE, CAMPAIGN_STATUS.PAUSED];
 
-/** The admin picks which campaign is the home-screen flash sale. Choosing one replaces whichever held it before. */
+/** Campaigns placed on the customer home page (a home flash sale and/or a Top Value Deals card) that can still run. */
+export async function listHomePlacedCampaigns() {
+  const rows = await Campaign.find(
+    { status: { $nin: [CAMPAIGN_STATUS.ENDED, CAMPAIGN_STATUS.CANCELLED] }, $or: [{ homeFlashSale: true }, { customerSection: 'TOP_VALUE_DEALS' }] },
+    'name status startsAt endsAt homeFlashSale customerSection',
+  ).sort({ startsAt: 1, _id: 1 }).lean();
+  return rows.map((row) => ({
+    id: String(row._id),
+    name: row.name,
+    status: row.status,
+    startsAt: row.startsAt,
+    endsAt: row.endsAt,
+    homeFlashSale: Boolean(row.homeFlashSale),
+    topValueDeals: row.customerSection === 'TOP_VALUE_DEALS',
+  }));
+}
+
+/** The admin picks which campaigns show their own flash-sale banner on the home screen; any number can hold the slot at once. */
 export async function setHomeFlashSale(id, enabled, actor) {
   const campaign = await findCampaign(id);
   if (enabled && !FLASH_ELIGIBLE.includes(campaign.status)) {
     throw new ConflictError('CAMPAIGN_NOT_ELIGIBLE', 'Only an open, scheduled, live or paused campaign can be the home flash sale.');
   }
-  const previous = enabled ? await Campaign.findOne({ homeFlashSale: true, _id: { $ne: id } }, 'name').lean() : null;
-  try {
-    if (enabled) await Campaign.updateMany({ homeFlashSale: true, _id: { $ne: id } }, { $set: { homeFlashSale: false } });
-    await Campaign.updateOne({ _id: id }, { $set: { homeFlashSale: enabled } });
-  } catch (error) {
-    if (error?.code === 11000) throw new ConflictError('CONFLICT', 'Another admin just changed the flash sale. Try again.');
-    throw error;
-  }
+  await Campaign.updateOne({ _id: id }, { $set: { homeFlashSale: enabled } });
   const result = await withStats({ ...campaign, homeFlashSale: enabled });
   await recordAudit({
     action: 'marketing.campaign.home_flash_sale', subjectType: 'promoCampaign', subjectId: id,
-    before: { homeFlashSale: Boolean(campaign.homeFlashSale) }, after: { homeFlashSale: enabled, replaced: previous?.name ?? null }, actor,
+    before: { homeFlashSale: Boolean(campaign.homeFlashSale) }, after: { homeFlashSale: enabled }, actor,
   });
-  return { ...result, replacedCampaign: previous ? previous.name : null };
+  return result;
 }

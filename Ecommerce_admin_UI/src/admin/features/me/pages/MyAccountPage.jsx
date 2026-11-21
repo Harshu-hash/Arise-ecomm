@@ -1,13 +1,11 @@
 import { App, Col, Flex, Row } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { qk, queryClient } from '@core/api/queryClient';
 import { authApi } from '@core/auth/authApi';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { useCurrentUser } from '@core/auth/sessionStore';
 import PageHeader from '@ui/components/PageHeader';
-import BackupCodesModal from '../components/BackupCodesModal';
 import { NotificationsCard, ProfileCard, SecurityCard } from '../components/ProfileCards';
 import SessionsCard from '../components/SessionsCard';
 
@@ -16,7 +14,6 @@ export default function MyAccountPage() {
   const patchUser = useSessionStore((s) => s.patchUser);
   const { message } = App.useApp();
   const navigate = useNavigate();
-  const [newCodes, setNewCodes] = useState(null);
 
   const sessions = useQuery({
     queryKey: qk.mySessions,
@@ -41,12 +38,6 @@ export default function MyAccountPage() {
     onError: (e) => message.error(e.message),
   });
 
-  const regenerate = useMutation({
-    mutationFn: () => authApi.regenerateBackupCodes(),
-    onSuccess: (data) => setNewCodes(data.codes),
-    onError: (e) => message.error(e.message),
-  });
-
   return (
     <Flex vertical gap={16}>
       <PageHeader
@@ -67,10 +58,7 @@ export default function MyAccountPage() {
 
         <Col xs={24} lg={14}>
           <SecurityCard
-            user={user}
-            regenerating={regenerate.isPending}
             onChangePassword={() => navigate('/change-password')}
-            onRegenerateCodes={() => regenerate.mutate()}
           />
           <SessionsCard
             sessions={sessions.data}
@@ -81,8 +69,6 @@ export default function MyAccountPage() {
           />
         </Col>
       </Row>
-
-      <BackupCodesModal codes={newCodes} onClose={() => setNewCodes(null)} />
     </Flex>
   );
 }

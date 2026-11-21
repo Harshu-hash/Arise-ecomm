@@ -78,13 +78,6 @@ export const recentlyViewedItemSchema = z.object({
   subtitle: z.string().min(1),
 });
 
-export const adTileSchema = z.object({
-  id: z.string().min(1),
-  imageUrl: z.string().url(),
-  bannerText: z.string().min(1),
-  label: z.string().min(1),
-});
-
 export const productCardSchema = z.object({
   id: z.string().min(1),
   brand: z.string(),
@@ -104,6 +97,13 @@ export const brandSpotlightSchema = z.object({
   imageUrl: z.string().url(),
   discount: z.string().min(1),
   subtitle: z.string().min(1),
+});
+
+export const flashSaleItemSchema = z.object({
+  id: z.string().min(1),
+  title: z.string().min(1),
+  subtitle: z.string().min(1),
+  endsAt: z.string().datetime(),
 });
 
 export const dealCardSchema = z.object({

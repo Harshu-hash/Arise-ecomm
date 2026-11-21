@@ -1,1 +1,1 @@
-export const FLASH_SALE_ENDPOINTS = { current: '/flash-sales/current' };
+export const FLASH_SALE_ENDPOINTS = { byId: id => `/flash-sales/${id}` };

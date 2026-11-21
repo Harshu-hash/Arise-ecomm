@@ -85,8 +85,12 @@
       "parameters": [{ "$ref": "#/components/parameters/PromotionId" }, { "$ref": "#/components/parameters/Cursor" }],
       "get": { "operationId": "listPromotionProducts", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
     },
-    "/flash-sales/current": {
-      "get": { "operationId": "getCurrentFlashSale", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    "/flash-sales": {
+      "get": { "operationId": "listFlashSales", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/flash-sales/{flashSaleId}": {
+      "parameters": [{ "name": "flashSaleId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "operationId": "getFlashSale", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
     },
     "/coupons/available": {
       "get": { "operationId": "listAvailableCoupons", "tags": ["Discovery"], "responses": { "200": { "$ref": "#/components/responses/List" } } }

@@ -1,9 +1,22 @@
 import { Router } from 'express';
 import { env } from '../config/env.js';
 import { createBannerRouter } from '../modules/admin/presentation/banner.routes.js';
-import { listLiveBanners } from '../modules/admin/public/index.js';
+import { createCmsRouter, createStaticPageRouter } from '../modules/admin/presentation/cms.routes.js';
+import {
+  HOME_BRAND_TABS as BRAND_TABS,
+  applyBrandTabOverrides,
+  applyCategoryTabOverrides,
+  arrangeHomeSections,
+  getPublishedPage,
+  getPublishedSections,
+  listLiveBanners,
+} from '../modules/admin/public/index.js';
 import { createCampaignRouter } from '../modules/coupon/presentation/campaign.routes.js';
+import { createCouponRouter } from '../modules/coupon/presentation/coupon.routes.js';
+import { createSellerCouponRouter } from '../modules/coupon/presentation/sellerCoupon.routes.js';
+import { createAudienceReachRouter, createDealRouter } from '../modules/coupon/presentation/deal.routes.js';
 import { createCustomerFlashSaleRouter, createCustomerPromotionRouter } from '../modules/coupon/presentation/customerCampaign.routes.js';
+import { createCustomerCouponRouter } from '../modules/coupon/presentation/customerCoupon.routes.js';
 import { createSellerCampaignRouter } from '../modules/coupon/presentation/sellerCampaign.routes.js';
 import { listHomeCampaignSections } from '../modules/coupon/public/index.js';
 import { createSettingsRouter } from '../modules/admin/presentation/settings.routes.js';
@@ -12,10 +25,12 @@ import { createAuthRouter } from '../modules/identity/presentation/auth.routes.j
 import { createCustomerAuthRouter } from '../modules/identity/presentation/customerAuth.routes.js';
 import { createCustomerAddressRouter } from '../modules/customer/presentation/address.routes.js';
 import { createCustomerPrivacyRouter } from '../modules/customer/presentation/privacy.routes.js';
+import { createCustomerWishlistRouter } from '../modules/wishlist/presentation/wishlist.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
 import { createPiiRouter } from '../modules/identity/presentation/pii.routes.js';
+import { createAdminCustomersRouter } from '../modules/identity/presentation/adminCustomers.routes.js';
 import { createRoleRouter } from '../modules/identity/presentation/roles.routes.js';
 import { createRegistrationRouter } from '../modules/identity/presentation/registration.routes.js';
 import { createSellerApplicationsRouter } from '../modules/identity/presentation/sellerApplications.routes.js';
@@ -27,6 +42,7 @@ import { createSellerCatalogRouter } from '../modules/category/presentation/sell
 import { createCustomerProductRouter, createCustomerSearchRouter } from '../modules/product/presentation/customerCatalog.routes.js';
 import { listHomeProductFeed, listHomeSections } from '../modules/product/public/index.js';
 import { createListingRouter } from '../modules/product/presentation/listing.routes.js';
+import { createInventoryRouter } from '../modules/product/presentation/inventory.routes.js';
 import { createOfferAdminRouter, createProductReviewRouter } from '../modules/product/presentation/review.routes.js';
 import { createBannerAdAdminRouter, createBannerAdSellerRouter } from '../modules/bannerAd/presentation/bannerAd.routes.js';
 import { listLiveAdBanners, registerBannerAdWebhooks } from '../modules/bannerAd/public/index.js';
@@ -36,30 +52,18 @@ import { createBrandRouter } from '../modules/catalog/presentation/brand.routes.
 import { createSizeChartRouter } from '../modules/catalog/presentation/sizeChart.routes.js';
 import { createPaymentWebhookRouter } from '../modules/payment/presentation/payment.webhook.routes.js';
 import { createAuditRouter } from '../modules/system/presentation/audit.routes.js';
+import { createLookupRouter } from '../modules/system/presentation/lookup.routes.js';
 import { createCustomerMediaRouter, createUploadRouter } from '../modules/system/presentation/upload.routes.js';
 import { createSystemRouter } from '../modules/system/presentation/system.routes.js';
 import { metricsHandler } from '../infrastructure/observability/metrics.js';
 import { ROLES } from '../shared/constants/roles.js';
 import { objectIdSchema } from '../shared/validators/common.js';
 import { optionalAuthenticate } from '../shared/middleware/authenticate.js';
+import { notifyAdminOnWrite } from '../infrastructure/realtime/adminEvents.js';
 import { notifyCatalogOnWrite, onCatalogChange } from '../infrastructure/realtime/catalogEvents.js';
 import { ttlMemo } from '../shared/utils/ttlMemo.js';
 import { ipAllowlist } from '../shared/middleware/ipAllowlist.js';
 import { authRateLimiter } from '../shared/middleware/rateLimit.js';
-
-// Fixed storefront switch in the home header (no admin screen manages it yet); same shape as the app's mock.
-const BRAND_TABS = [
-  {
-    id: 'arise', label: 'Arise', icon: 'sunrise', badge: 'MARKET',
-    activeBg: '#FFE11B', activeText: '#002F6C', activeIcon: '#002F6C',
-    badgeBg: '#002F6C', badgeText: '#FFE11B', gradient: ['#FFE11B', '#FFC200'],
-  },
-  {
-    id: 'value365', label: 'Deals', icon: 'percent', badge: '365 DEALS',
-    activeBg: '#D32F2F', activeText: '#FFFFFF', activeIcon: '#FFD700',
-    badgeBg: '#FFD700', badgeText: '#8B0000', gradient: ['#E52E2E', '#900C1F'],
-  },
-];
 
 // Reserved first tab: the home feed itself. Real category ids are ObjectIds, so it cannot collide.
 const HOME_TAB = { id: 'foryou', label: 'For You', icon: 'shopping-bag', gradient: ['#FFCB9D', '#FFFFFF'] };
@@ -74,7 +78,11 @@ const INVITE_AUDIENCES = ['seller', 'admin'];
 
 // Every query below is a database round trip; the home screen is hit on every tab switch, so a page is
 // built once per 15s per category (all four reads in parallel) and shared by concurrent callers.
-const homeTabs = ttlMemo(() => listHomeCategoryTabs(), 15_000);
+// The console's Home layout page decides the header tabs (label, colour, order, visibility) and, once a layout is
+// published, which home sections appear and in what order. Until then the built-in defaults apply unchanged.
+const homeTabs = ttlMemo(async () => applyCategoryTabOverrides(await listHomeCategoryTabs()), 15_000);
+const homeBrandTabs = ttlMemo(() => applyBrandTabOverrides(BRAND_TABS), 15_000);
+const homeLayout = ttlMemo(() => getPublishedSections(), 15_000);
 const homeCampaigns = ttlMemo(() => listHomeCampaignSections(), 15_000);
 const homePage = ttlMemo(async (categoryId) => {
   const [hero, feed, ads, tabs] = await Promise.all([
@@ -86,7 +94,7 @@ const homePage = ttlMemo(async (categoryId) => {
   ]);
   return { hero, feed, ads, tabs };
 }, 15_000);
-for (const memo of [homeTabs, homePage, homeCampaigns]) onCatalogChange(memo.clear);
+for (const memo of [homeTabs, homeBrandTabs, homeLayout, homePage, homeCampaigns]) onCatalogChange(memo.clear);
 
 export function createRoutes() {
   const root = Router();
@@ -95,7 +103,10 @@ export function createRoutes() {
   // Admin edits (products, campaigns, banners, categories, ...) and seller listing/campaign edits change what shoppers
   // see: every successful write there clears the home caches and pushes a refetch hint to customer apps.
   root.use('/api/admin/v1', notifyCatalogOnWrite);
-  root.use(['/api/seller/v1/listings', '/api/seller/v1/campaigns'], notifyCatalogOnWrite);
+  root.use(['/api/seller/v1/listings', '/api/seller/v1/inventory', '/api/seller/v1/campaigns', '/api/seller/v1/coupons'], notifyCatalogOnWrite);
+  // Other open admin consoles refetch these pages when a colleague changes them (events: marketing:changed, cms:changed).
+  root.use(['/api/admin/v1/coupons', '/api/admin/v1/deals', '/api/seller/v1/coupons'], notifyAdminOnWrite('marketing'));
+  root.use(['/api/admin/v1/cms', '/api/admin/v1/static-pages'], notifyAdminOnWrite('cms'));
 
   root.use('/health', system);
   root.get('/metrics', metricsHandler); // bearer-token protected; 404 when METRICS_TOKEN is unset
@@ -125,20 +136,24 @@ export function createRoutes() {
       const requested = req.query.categoryId;
       const categoryId = typeof requested === 'string' && requested !== HOME_TAB.id ? requested : null;
       const valid = !categoryId || objectIdSchema.safeParse(categoryId).success;
-      const [{ hero, feed, ads, tabs }, extras, campaigns] = await Promise.all([
+      const [{ hero, feed, ads, tabs }, extras, campaigns, brandTabs, layout] = await Promise.all([
         valid ? homePage(categoryId) : homeTabs().then((headerTabs) => ({ hero: [], feed: [], ads: [], tabs: headerTabs })),
         // Recently viewed / suggested / brand spotlight belong to the main For You page; the first is per customer.
         valid && !categoryId ? listHomeSections({ userId: req.auth?.role === ROLES.CUSTOMER ? req.auth.userId : null }) : { recentlyViewed: [], suggested: [], brands: [] },
         // Admin campaigns placed on the home page: the flash-sale banner and the Top Value Deals cards.
-        valid && !categoryId ? homeCampaigns() : { flashSale: null, topValueDeals: [] },
+        valid && !categoryId ? homeCampaigns() : { flashSales: [], topValueDeals: [] },
+        homeBrandTabs(),
+        // Only the main For You page follows the published home layout; category pages keep their own hero + feed.
+        !categoryId ? homeLayout() : null,
       ]);
-      const sections = [
+      const built = [
         ...(hero.length ? [{ id: 'hero', type: 'HERO', status: 'READY', items: hero }] : []),
         ...(extras.recentlyViewed.length ? [{ id: 'recently-viewed', type: 'RECENTLY_VIEWED', status: 'READY', items: extras.recentlyViewed }] : []),
         ...(ads.length ? [{ id: 'promo-carousel', type: 'PROMO_CAROUSEL', status: 'READY', items: ads }] : []),
         ...(extras.suggested.length ? [{ id: 'suggested', type: 'SUGGESTED_PRODUCTS', status: 'READY', items: extras.suggested }] : []),
-        ...(campaigns.flashSale ? [{ id: 'flash-sale', type: 'FLASH_SALE', status: 'READY', items: [], metadata: campaigns.flashSale }] : []),
-        ...(campaigns.topValueDeals.length ? [{ id: 'top-value-deals', type: 'TOP_VALUE_DEALS', status: 'READY', items: campaigns.topValueDeals }] : []),
+        // One section per campaign, so the published layout can place each flash sale / deal on its own.
+        ...campaigns.flashSales.map((sale) => ({ id: `flash-sale-${sale.id}`, type: 'FLASH_SALE', campaignId: sale.id, status: 'READY', items: [sale] })),
+        ...campaigns.topValueDeals.map((deal) => ({ id: `top-value-deal-${deal.id}`, type: 'TOP_VALUE_DEALS', campaignId: deal.id, status: 'READY', items: [deal] })),
         ...(extras.brands.length ? [{ id: 'brand-spotlight', type: 'BRAND_SPOTLIGHT', status: 'READY', items: extras.brands }] : []),
         ...(feed.length ? [{ id: 'product-feed', type: 'PRODUCT_FEED', status: 'READY', items: feed }] : []),
       ];
@@ -146,10 +161,20 @@ export function createRoutes() {
         data: {
           version: '1',
           generatedAt: new Date().toISOString(),
-          header: { searchPlaceholders: ['Search products'], brandTabs: BRAND_TABS, categoryTabs: [HOME_TAB, ...tabs] },
-          sections,
+          header: { searchPlaceholders: ['Search products'], brandTabs, categoryTabs: [HOME_TAB, ...tabs] },
+          sections: arrangeHomeSections(built, layout),
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+  // Policy pages (privacy, terms, return/shipping/seller policy) as the admin last published them.
+  root.get('/api/customer/v1/pages/:slug', async (req, res, next) => {
+    try {
+      const page = await getPublishedPage(req.params.slug);
+      if (!page) return res.status(404).json({ error: { message: 'That page is not available.' } });
+      res.json({ data: page });
     } catch (error) {
       next(error);
     }
@@ -159,9 +184,11 @@ export function createRoutes() {
   root.use('/api/customer/v1/search', createCustomerSearchRouter());
   root.use('/api/customer/v1/media', createCustomerMediaRouter());
   root.use('/api/customer/v1/flash-sales', createCustomerFlashSaleRouter());
+  root.use('/api/customer/v1/coupons', createCustomerCouponRouter());
   root.use('/api/customer/v1/promotions', createCustomerPromotionRouter({ brandTabs: BRAND_TABS }));
   root.use('/api/customer/v1', createCustomerAddressRouter());
   root.use('/api/customer/v1', createCustomerPrivacyRouter());
+  root.use('/api/customer/v1', createCustomerWishlistRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();
@@ -193,10 +220,17 @@ export function createRoutes() {
   }
   root.use('/api/admin/v1/admin-users', createAdminUsersRouter());
   root.use('/api/admin/v1/roles', createRoleRouter());
+  root.use('/api/admin/v1/customers', createAdminCustomersRouter());
   root.use('/api/admin/v1/admin/settings', createSettingsRouter());
   root.use('/api/admin/v1/banners', createBannerRouter());
   root.use('/api/admin/v1/banner-ads', createBannerAdAdminRouter());
+  root.use('/api/admin/v1/campaigns/reach', createAudienceReachRouter()); // before the campaign router: "reach" is not an id
   root.use('/api/admin/v1/campaigns', createCampaignRouter());
+  root.use('/api/admin/v1/coupons', createCouponRouter());
+  root.use('/api/admin/v1/deals', createDealRouter());
+  root.use('/api/admin/v1/cms', createCmsRouter());
+  root.use('/api/admin/v1/static-pages', createStaticPageRouter());
+  root.use('/api/admin/v1/lookups', createLookupRouter());
   root.use('/api/admin/v1/categories', createCategoryRouter());
   root.use('/api/admin/v1/attributes', createAttributeRouter());
   root.use('/api/admin/v1/attribute-sets', createAttributeSetRouter());
@@ -210,8 +244,10 @@ export function createRoutes() {
   root.use('/api/seller/v1/settings', createSellerSettingsRouter());
   root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
   root.use('/api/seller/v1/listings', createListingRouter());
+  root.use('/api/seller/v1/inventory', createInventoryRouter());
   root.use('/api/seller/v1/banner-ads', createBannerAdSellerRouter());
   root.use('/api/seller/v1/campaigns', createSellerCampaignRouter());
+  root.use('/api/seller/v1/coupons', createSellerCouponRouter());
   registerBannerAdWebhooks();
 
   const webhooks = Router();

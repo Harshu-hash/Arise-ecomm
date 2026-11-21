@@ -85,3 +85,14 @@ function defaultCodeForStatus(status) {
   if (status >= 500) return 'SERVER_ERROR';
   return 'REQUEST_FAILED';
 }
+
+/**
+ * Shows a server validation failure on an antd form: inline under each field (server names are mapped to the
+ * form's own field names via `aliases`, e.g. valuePaise → valueRupees) and as one toast with the first message,
+ * so nothing is swallowed when a field is not on screen.
+ */
+export function showFieldErrors(form, message, error, aliases = {}) {
+  const entries = Object.entries(error.fieldErrors ?? {});
+  form.setFields(entries.map(([name, errors]) => ({ name: aliases[name] ?? name, errors: [].concat(errors) })));
+  message.error(entries.flatMap(([, errors]) => errors)[0] ?? error.message);
+}

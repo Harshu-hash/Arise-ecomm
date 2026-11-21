@@ -1,9 +1,9 @@
 import { App, Button, DatePicker, Drawer, Flex, Form, Input, InputNumber, Select, Switch, Tabs } from 'antd';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { ApiError } from '@core/api/errors';
+import { ApiError, showFieldErrors } from '@core/api/errors';
 import { dayjs } from '@core/utils/date';
-import { marketingApi, marketingKeys } from '../api/marketing.api';
+import { marketingApi } from '../api/marketing.api';
 import AudiencePicker from './AudiencePicker';
 import CouponPerformancePanel from './CouponPerformancePanel';
 import CouponTestTool from './CouponTestTool';
@@ -15,17 +15,18 @@ const TYPES = [
   { value: 'BXGY', label: 'Buy X, get Y free' },
 ];
 
+const MAX_DAYS = 366; // keep in step with the server's MAX_COUPON_DAYS
+// Server field names → the form's own (the form edits rupees and one validity range).
+const FIELD_ALIASES = { valuePaise: 'valueRupees', maxDiscountPaise: 'maxDiscountRupees', minCartPaise: 'minCartRupees', budgetPaise: 'budgetRupees', startsAt: 'validity', endsAt: 'validity' };
+
 /** Create or edit a coupon, with its performance and test tool alongside once it exists. */
 export default function CouponFormDrawer({ coupon, open, onClose, onSaved }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const type = Form.useWatch('type', form);
-
-  const segments = useQuery({
-    queryKey: marketingKeys.segments({}),
-    queryFn: () => marketingApi.segments({ pageSize: 100 }),
-    enabled: open,
-  });
+  // A started coupon keeps its start date; once redeemed, its discount is frozen too (the server enforces both).
+  const startLocked = Boolean(coupon) && !['DRAFT', 'SCHEDULED'].includes(coupon.status);
+  const valueLocked = Boolean(coupon?.totalRedemptions);
 
   useEffect(() => {
     if (!open) return;
@@ -63,16 +64,13 @@ export default function CouponFormDrawer({ coupon, open, onClose, onSaved }) {
   });
   const update = useMutation({
     mutationFn: (payload) => marketingApi.updateCoupon(coupon.id, payload),
-    onSuccess: () => { message.success('Saved'); onSaved(); },
+    onSuccess: () => { message.success(coupon.status === 'DRAFT' ? 'Saved — the coupon is now live' : 'Saved'); onSaved(); },
     onError: (e) => handleError(e),
   });
 
   function handleError(e) {
-    if (e instanceof ApiError && e.fieldErrors) {
-      form.setFields(Object.entries(e.fieldErrors).map(([name, errors]) => ({ name, errors: [errors] })));
-      return;
-    }
-    message.error(e.message);
+    if (e instanceof ApiError && e.fieldErrors) showFieldErrors(form, message, e, FIELD_ALIASES);
+    else message.error(e.message);
   }
 
   const submit = async () => {
@@ -82,7 +80,7 @@ export default function CouponFormDrawer({ coupon, open, onClose, onSaved }) {
       type: v.type,
       valuePct: v.type === 'PERCENT' ? v.valuePct : undefined,
       valuePaise: v.type === 'FLAT' ? Math.round(v.valueRupees * 100) : undefined,
-      maxDiscountPaise: v.maxDiscountRupees ? Math.round(v.maxDiscountRupees * 100) : undefined,
+      maxDiscountPaise: v.type === 'PERCENT' ? (v.maxDiscountRupees ? Math.round(v.maxDiscountRupees * 100) : null) : undefined, // null clears an old cap
       buyQty: v.type === 'BXGY' ? v.buyQty : undefined,
       getQty: v.type === 'BXGY' ? v.getQty : undefined,
       minCartPaise: Math.round((v.minCartRupees ?? 0) * 100),
@@ -115,7 +113,10 @@ export default function CouponFormDrawer({ coupon, open, onClose, onSaved }) {
             children: (
               <Form form={form} layout="vertical">
                 <Flex gap={8}>
-                  <Form.Item name="code" label="Code" style={{ flex: '1 1 160px' }} rules={[{ required: true, message: 'Required' }]}>
+                  <Form.Item
+                    name="code" label="Code" style={{ flex: '1 1 160px' }}
+                    rules={[{ required: true, message: 'Required' }, { pattern: /^[A-Za-z0-9_-]{3,20}$/, message: '3–20 letters, numbers, - or _' }]}
+                  >
                     <Input className="mono" style={{ textTransform: 'uppercase' }} disabled={Boolean(coupon)} />
                   </Form.Item>
                   <Form.Item name="type" label="Discount type" style={{ flex: '1 1 200px' }} rules={[{ required: true }]}>
@@ -123,64 +124,91 @@ export default function CouponFormDrawer({ coupon, open, onClose, onSaved }) {
                   </Form.Item>
                 </Flex>
 
-                <Form.Item name="name" label="Name shown to customers" rules={[{ required: true, message: 'Required' }]}>
-                  <Input placeholder="50% off your first order" />
+                <Form.Item name="name" label="Name shown to customers" rules={[{ required: true, whitespace: true, message: 'Required' }, { max: 80 }]}>
+                  <Input placeholder="50% off your first order" maxLength={80} />
                 </Form.Item>
-                <Form.Item name="description" label="Description">
-                  <Input.TextArea rows={2} />
+                <Form.Item name="description" label="Description" rules={[{ max: 300 }]}>
+                  <Input.TextArea rows={2} maxLength={300} />
                 </Form.Item>
-                <Form.Item name="terms" label="Terms">
-                  <Input.TextArea rows={2} />
+                <Form.Item name="terms" label="Terms" rules={[{ max: 1000 }]}>
+                  <Input.TextArea rows={2} maxLength={1000} />
                 </Form.Item>
 
                 {type === 'PERCENT' && (
                   <Flex gap={8}>
-                    <Form.Item name="valuePct" label="Percentage off" style={{ flex: 1 }} rules={[{ required: true }]}>
-                      <InputNumber min={1} max={100} addonAfter="%" style={{ width: '100%' }} />
+                    <Form.Item name="valuePct" label="Percentage off" style={{ flex: 1 }} rules={[{ required: true }, { type: 'integer', message: 'Use a whole number' }]}>
+                      <InputNumber min={1} max={100} addonAfter="%" style={{ width: '100%' }} disabled={valueLocked} />
                     </Form.Item>
                     <Form.Item name="maxDiscountRupees" label="Max discount (₹)" style={{ flex: 1 }}>
-                      <InputNumber min={0} style={{ width: '100%' }} />
+                      <InputNumber min={1} style={{ width: '100%' }} disabled={valueLocked} />
                     </Form.Item>
                   </Flex>
                 )}
                 {type === 'FLAT' && (
                   <Form.Item name="valueRupees" label="Amount off (₹)" rules={[{ required: true }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                    <InputNumber min={1} style={{ width: '100%' }} disabled={valueLocked} />
                   </Form.Item>
                 )}
                 {type === 'BXGY' && (
                   <Flex gap={8}>
                     <Form.Item name="buyQty" label="Buy" style={{ flex: 1 }} rules={[{ required: true }]}>
-                      <InputNumber min={1} style={{ width: '100%' }} />
+                      <InputNumber min={1} max={10} style={{ width: '100%' }} disabled={valueLocked} />
                     </Form.Item>
                     <Form.Item name="getQty" label="Get free" style={{ flex: 1 }} rules={[{ required: true }]}>
-                      <InputNumber min={1} style={{ width: '100%' }} />
+                      <InputNumber min={1} max={10} style={{ width: '100%' }} disabled={valueLocked} />
                     </Form.Item>
                   </Flex>
                 )}
 
-                <Form.Item name="minCartRupees" label="Minimum cart value (₹)">
+                <Form.Item
+                  name="minCartRupees" label="Minimum cart value (₹)" dependencies={['valueRupees', 'type']}
+                  rules={[({ getFieldValue }) => ({
+                    validator: (_rule, min) => (getFieldValue('type') === 'FLAT' && min && getFieldValue('valueRupees') > min
+                      ? Promise.reject(new Error('Cannot be below the amount off'))
+                      : Promise.resolve()),
+                  })]}
+                >
                   <InputNumber min={0} style={{ width: '100%' }} />
                 </Form.Item>
 
                 <Form.Item name="audience" label="Audience">
-                  <AudiencePicker segments={segments.data?.data} />
+                  <AudiencePicker />
                 </Form.Item>
 
                 <Flex gap={8}>
                   <Form.Item name="totalLimit" label="Total redemptions" style={{ flex: 1 }} rules={[{ required: true }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                    <InputNumber min={Math.max(1, coupon?.totalRedemptions ?? 1)} max={10_000_000} style={{ width: '100%' }} />
                   </Form.Item>
-                  <Form.Item name="perUserLimit" label="Per customer" style={{ flex: 1 }} rules={[{ required: true }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                  <Form.Item
+                    name="perUserLimit" label="Per customer" style={{ flex: 1 }} dependencies={['totalLimit']}
+                    rules={[{ required: true }, ({ getFieldValue }) => ({
+                      validator: (_rule, limit) => (limit > getFieldValue('totalLimit') ? Promise.reject(new Error('Cannot exceed total redemptions')) : Promise.resolve()),
+                    })]}
+                  >
+                    <InputNumber min={1} max={1000} style={{ width: '100%' }} />
                   </Form.Item>
                   <Form.Item name="budgetRupees" label="Budget cap (₹)" style={{ flex: 1 }} rules={[{ required: true }]}>
-                    <InputNumber min={1} style={{ width: '100%' }} />
+                    <InputNumber min={Math.max(1, Math.ceil((coupon?.budgetUsedPaise ?? 0) / 100))} style={{ width: '100%' }} />
                   </Form.Item>
                 </Flex>
 
-                <Form.Item name="validity" label="Validity" rules={[{ required: true }]}>
-                  <DatePicker.RangePicker style={{ width: '100%' }} />
+                <Form.Item
+                  name="validity" label="Validity" extra={startLocked ? 'The start date is fixed once a coupon has started.' : undefined}
+                  rules={[
+                    { required: true, message: 'Choose the dates' },
+                    { validator: (_rule, range) => {
+                      if (!range?.[1]) return Promise.resolve();
+                      if (range[1].endOf('day').isBefore(dayjs())) return Promise.reject(new Error('The end date is in the past'));
+                      if (range[1].diff(range[0], 'day') > MAX_DAYS) return Promise.reject(new Error(`At most ${MAX_DAYS} days`));
+                      return Promise.resolve();
+                    } },
+                  ]}
+                >
+                  <DatePicker.RangePicker
+                    style={{ width: '100%' }}
+                    disabled={[startLocked, false]}
+                    disabledDate={(date) => date.isBefore(dayjs().startOf('day'))}
+                  />
                 </Form.Item>
 
                 <Flex gap={24}>

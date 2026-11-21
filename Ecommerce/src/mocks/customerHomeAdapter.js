@@ -1,6 +1,5 @@
 import { AxiosError } from 'axios';
 import {
-  AD_TILES,
   BRAND_TABS,
   BRANDS_SPOTLIGHT,
   CATEGORY_TABS,
@@ -90,12 +89,12 @@ const homeEnvelope = () => ({
         status: 'READY',
         items: RECENTLY_VIEWED.map(imageItem),
       },
-      { id: 'flash-sale', type: 'FLASH_SALE', status: 'READY', items: [] },
+      // One section per flash-sale campaign, each placed on its own by the admin's layout.
       {
-        id: 'ad-tiles',
-        type: 'AD_TILES',
+        id: 'flash-sale-flash-current',
+        type: 'FLASH_SALE',
         status: 'READY',
-        items: AD_TILES.map(imageItem),
+        items: [{ id: 'flash-current', title: 'Flash Sale', subtitle: "Up to 70% off — grab it before it's gone", endsAt: '2027-01-01T00:00:00.000Z' }],
       },
       {
         id: 'suggested',
@@ -108,6 +107,12 @@ const homeEnvelope = () => ({
         type: 'BRAND_SPOTLIGHT',
         status: 'READY',
         items: BRANDS_SPOTLIGHT.map(imageItem),
+      },
+      {
+        id: 'flash-sale-flash-weekend',
+        type: 'FLASH_SALE',
+        status: 'READY',
+        items: [{ id: 'flash-weekend', title: 'Weekend Flash Sale', subtitle: 'Up to 50% off electronics', endsAt: '2027-01-01T00:00:00.000Z' }],
       },
       {
         id: 'top-deals',

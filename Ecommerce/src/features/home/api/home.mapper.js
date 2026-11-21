@@ -1,10 +1,10 @@
 import { z } from 'zod';
 import {
-  adTileSchema,
   appConfigResponseSchema,
   bannerItemSchema,
   brandSpotlightSchema,
   dealCardSchema,
+  flashSaleItemSchema,
   homeResponseSchema,
   productCardSchema,
   recentlyViewedItemSchema,
@@ -16,7 +16,6 @@ export const HOME_SECTION_TYPES = Object.freeze({
   hero: 'HERO',
   promoCarousel: 'PROMO_CAROUSEL',
   recentlyViewed: 'RECENTLY_VIEWED',
-  adTiles: 'AD_TILES',
   flashSale: 'FLASH_SALE',
   suggestedProducts: 'SUGGESTED_PRODUCTS',
   brandSpotlight: 'BRAND_SPOTLIGHT',
@@ -41,51 +40,48 @@ const mapProduct = item => ({
   aspectRatio: item.aspectRatio,
 });
 
+const withImage = item => ({ ...item, image: item.imageUrl });
+// Sections the admin arranges, rendered in the order the server sends them (hero and ad banners stay pinned on top).
+const ORDERED_SECTIONS = {
+  [HOME_SECTION_TYPES.recentlyViewed]: { schema: recentlyViewedItemSchema, map: withImage },
+  [HOME_SECTION_TYPES.flashSale]: { schema: flashSaleItemSchema, map: item => item },
+  [HOME_SECTION_TYPES.suggestedProducts]: { schema: productCardSchema, map: mapProduct },
+  [HOME_SECTION_TYPES.brandSpotlight]: { schema: brandSpotlightSchema, map: withImage },
+  [HOME_SECTION_TYPES.topValueDeals]: { schema: dealCardSchema, map: withImage },
+  [HOME_SECTION_TYPES.productFeed]: { schema: productCardSchema, map: mapProduct },
+};
+
 export const mapHomeResponse = payload => {
   const data = homeResponseSchema.parse(payload).data;
-  const readySections = new Map(
-    data.sections
-      .filter(section => section.status === 'READY')
-      .map(section => [section.type, section]),
-  );
+  const ready = data.sections.filter(section => section.status === 'READY');
+  const pinned = type => ready.find(section => section.type === type);
   const failedSections = data.sections
     .filter(section => section.status === 'ERROR')
     .map(section => ({ id: section.id, type: section.type, message: section.errorMessage }));
-  const section = type => readySections.get(type);
+
+  const sections = [];
+  for (const section of ready) {
+    const known = ORDERED_SECTIONS[section.type];
+    if (!known) continue;
+    const items = parseItems(section, known.schema).map(known.map);
+    const previous = sections[sections.length - 1];
+    // Each deal campaign arrives as its own section; deals placed next to each other share one rail.
+    if (section.type === HOME_SECTION_TYPES.topValueDeals && previous?.type === section.type) {
+      previous.items.push(...items);
+    } else {
+      sections.push({ id: section.id, type: section.type, items });
+    }
+  }
 
   return {
     version: data.version,
     generatedAt: data.generatedAt,
     header: data.header,
-    heroBanners: parseItems(section(HOME_SECTION_TYPES.hero), bannerItemSchema).map(mapBanner),
-    adBanners: parseItems(section(HOME_SECTION_TYPES.promoCarousel), bannerItemSchema).map(
+    heroBanners: parseItems(pinned(HOME_SECTION_TYPES.hero), bannerItemSchema).map(mapBanner),
+    adBanners: parseItems(pinned(HOME_SECTION_TYPES.promoCarousel), bannerItemSchema).map(
       mapBanner,
     ),
-    recentlyViewed: parseItems(
-      section(HOME_SECTION_TYPES.recentlyViewed),
-      recentlyViewedItemSchema,
-    ).map(item => ({ ...item, image: item.imageUrl })),
-    adTiles: parseItems(section(HOME_SECTION_TYPES.adTiles), adTileSchema).map(item => ({
-      ...item,
-      image: item.imageUrl,
-    })),
-    showFlashSale: Boolean(section(HOME_SECTION_TYPES.flashSale)),
-    // Title/subtitle of the admin's flash-sale campaign; absent for older responses, where the banner keeps its default text.
-    flashSale: section(HOME_SECTION_TYPES.flashSale)?.metadata ?? null,
-    suggestedProducts: parseItems(
-      section(HOME_SECTION_TYPES.suggestedProducts),
-      productCardSchema,
-    ).map(mapProduct),
-    brandsSpotlight: parseItems(
-      section(HOME_SECTION_TYPES.brandSpotlight),
-      brandSpotlightSchema,
-    ).map(item => ({ ...item, image: item.imageUrl })),
-    topValueDeals: parseItems(section(HOME_SECTION_TYPES.topValueDeals), dealCardSchema).map(
-      item => ({ ...item, image: item.imageUrl }),
-    ),
-    productFeed: parseItems(section(HOME_SECTION_TYPES.productFeed), productCardSchema).map(
-      mapProduct,
-    ),
+    sections: sections.filter(section => section.items.length > 0),
     failedSections,
   };
 };

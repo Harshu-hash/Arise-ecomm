@@ -5,6 +5,8 @@ import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import { cmsApi, cmsKeys } from '../api/cms.api';
 
+const MAX_BODY = 100_000; // keep in step with the server's MAX_PAGE_BODY
+
 /**
  * Editing a static page. The body is plain text in a textarea rather than a
  * rich-text toolbar — there is no TipTap-class editor wired into this panel
@@ -34,7 +36,7 @@ export default function StaticPageEditorDrawer({ pageId, onClose, onSaved }) {
   const save = useMutation({
     mutationFn: () => cmsApi.updateStaticPage(pageId, { body, materialChange, note }),
     onSuccess: () => { message.success('Published'); onSaved(); onClose(); },
-    onError: (e) => message.error(e.message),
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
   });
 
   const page = query.data?.data;
@@ -47,7 +49,7 @@ export default function StaticPageEditorDrawer({ pageId, onClose, onSaved }) {
       title={page?.title ?? 'Static page'}
       extra={
         <>
-          <Button type="primary" onClick={() => save.mutate()} loading={save.isPending}>Publish</Button>
+          <Button type="primary" onClick={() => save.mutate()} loading={save.isPending} disabled={!body.trim() || body.length > MAX_BODY}>Publish</Button>
         </>
       }
     >
@@ -56,7 +58,11 @@ export default function StaticPageEditorDrawer({ pageId, onClose, onSaved }) {
 
       {page ? (
         <Flex vertical gap={12}>
-          <Input.TextArea value={body} onChange={(e) => setBody(e.target.value)} autoSize={{ minRows: 10, maxRows: 24 }} />
+          <Input.TextArea
+            value={body} onChange={(e) => setBody(e.target.value)} autoSize={{ minRows: 10, maxRows: 24 }}
+            status={body.trim() ? undefined : 'error'} placeholder="Write the page here — it cannot be published empty."
+            showCount maxLength={MAX_BODY}
+          />
 
           <Flex vertical gap={4}>
             <Flex justify="space-between" align="center">

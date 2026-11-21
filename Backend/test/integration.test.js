@@ -1232,34 +1232,34 @@ test('campaigns: seller enters products, admin approves, customers see them at t
     const response = await fetch(`http://127.0.0.1:${server.address().port}/api/customer/v1${path}`);
     return { status: response.status, body: await response.json() };
   };
-  // being placed in the flash rail is not enough: the admin must choose it as the home flash sale
-  assert.equal((await get('/flash-sales/current')).status, 404);
+  // being placed in the flash rail is not enough: the admin must choose it as a home flash sale
+  assert.equal((await get(`/flash-sales/${campaign.id}`)).status, 404);
   assert.ok(!(await get('/home')).body.data.sections.some((section) => section.type === 'FLASH_SALE'));
   const chosen = await admin.setHomeFlashSale(campaign.id, true, actor);
   assert.equal(chosen.homeFlashSale, true);
-  assert.equal((await get('/flash-sales/current')).body.data.items.length, 1);
+  assert.equal((await get(`/flash-sales/${campaign.id}`)).body.data.items.length, 1);
   await admin.changeCampaignStatus(campaign.id, 'SCHEDULED', actor);
   await admin.changeCampaignStatus(campaign.id, 'ACTIVE', actor);
   await admin.changeCampaignStatus(campaign.id, 'PAUSED', actor); // a paused campaign leaves the shelf
-  assert.equal((await get('/flash-sales/current')).status, 404);
+  assert.equal((await get(`/flash-sales/${campaign.id}`)).status, 404);
   await admin.changeCampaignStatus(campaign.id, 'ACTIVE', actor);
-  // a second campaign taking the slot replaces the first; a draft cannot take it
+  // a second campaign can hold the slot too, alongside the first, without replacing it; a draft cannot take it
   const other = await admin.createCampaign({ name: 'Camp Other', type: 'OFFER', customerSection: 'OFFERS_PAGE', tagline: '', minDiscountPct: 10, startsAt: new Date(), endsAt: new Date(Date.now() + 3_600_000), submissionDeadline: null }, actor);
   await assert.rejects(admin.setHomeFlashSale(other.id, true, actor), { code: 'CAMPAIGN_NOT_ELIGIBLE' });
   await admin.changeCampaignStatus(other.id, 'OPEN', actor);
-  assert.equal((await admin.setHomeFlashSale(other.id, true, actor)).replacedCampaign, 'Camp Flash');
-  assert.equal((await get('/flash-sales/current')).status, 404); // Camp Other has no approved products
-  await admin.setHomeFlashSale(campaign.id, true, actor);
+  await admin.setHomeFlashSale(other.id, true, actor);
+  assert.equal((await get(`/flash-sales/${other.id}`)).status, 404); // Camp Other has no approved products
+  assert.equal((await get(`/flash-sales/${campaign.id}`)).status, 200); // Camp Flash keeps its own slot
 
-  const flash = (await get('/flash-sales/current')).body.data;
+  const flash = (await get(`/flash-sales/${campaign.id}`)).body.data;
   assert.deepEqual(flash.items.map((item) => [item.name, item.pricePaise, item.mrpPaise, item.discountPct]), [['Camp Shoe', 1000, 1800, 44]]);
   const flashSection = (await get('/home')).body.data.sections.find((section) => section.type === 'FLASH_SALE');
-  assert.deepEqual([flashSection.metadata.title, flashSection.metadata.subtitle], ['Camp Flash', 'Go']); // the banner carries the campaign's own name and tagline
+  assert.deepEqual(flashSection.items.map((item) => [item.title, item.subtitle]), [['Camp Flash', 'Go']]); // the banner carries the campaign's own name and tagline
   assert.deepEqual((await get('/promotions')).body.data.items.map((item) => [item.title, item.tag]), [['Camp Flash', 'FLASH DEAL']]); // the Deals tab lists every live campaign
 
   // withdrawing takes it off the shelf at once, and the seller can enter it again
   await seller.withdrawEntry('s1', entry.id);
-  assert.equal((await get('/flash-sales/current')).status, 404);
+  assert.equal((await get(`/flash-sales/${campaign.id}`)).status, 404);
   assert.equal((await enter('s1', 900))[0].status, 'PENDING');
 });
 
@@ -1407,4 +1407,208 @@ test('customer privacy: schedules deletion once and anonymizes due accounts', op
   assert.equal((await AuthSession.findOne({ userId: String(id) }).lean()).revokedReason, 'account_deleted');
   assert.equal((await AccountDeletion.findOne({ customerId: id }).lean()).status, 'COMPLETED');
   await assert.rejects(stat(joinPath(process.env.UPLOAD_DIR, avatarKey)), { code: 'ENOENT' });
+});
+
+test('wishlist: saves live products once, reports stock, hides delisted ones and is wiped with the account', opts, async () => {
+  const wishlist = await import('../src/modules/wishlist/application/wishlist.service.js');
+  const { WishlistItem } = await import('../src/modules/wishlist/infrastructure/persistence/wishlistItem.model.js');
+  const { catalogChanged } = await import('../src/infrastructure/realtime/catalogEvents.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  const { Product } = await import('../src/modules/product/infrastructure/persistence/product.model.js');
+  const { Offer } = await import('../src/modules/product/infrastructure/persistence/offer.model.js');
+  const { Variant } = await import('../src/modules/product/infrastructure/persistence/variant.model.js');
+  await Promise.all([Category.init(), Product.init(), Offer.init(), Variant.init(), WishlistItem.init()]);
+
+  const _id = new mongoose.Types.ObjectId();
+  await Category.create({ _id, name: 'Wish Root', nameKey: 'wish root', slug: 'wish-root', parentId: null, rootId: _id, level: 1, sortOrder: 1 });
+  const listed = async (title, stock) => {
+    const product = await Product.create({
+      title, status: 'LIVE', categoryId: _id, rootCategoryId: _id, categoryPath: 'Wish Root', brandName: 'Acme',
+      images: ['public/products/s1/w.png'], createdBySellerId: 's1',
+    });
+    const variant = await Variant.create({ productId: product._id, sku: `WISH-${title}`, label: 'One', weightG: 100, dimsCm: { l: 1, w: 1, h: 1 } });
+    await Offer.create({ productId: product._id, variantId: variant._id, sellerId: 's1', sellingPricePaise: 900, mrpPaise: 1200, stock, status: 'LIVE' });
+    return String(product._id);
+  };
+  const lamp = await listed('Wish Lamp', 4);
+  const mug = await listed('Wish Mug', 0);
+  catalogChanged();
+
+  const customer = String(new mongoose.Types.ObjectId());
+  assert.deepEqual(await wishlist.addToWishlist(customer, lamp), { productId: lamp, wishlisted: true });
+  await wishlist.addToWishlist(customer, mug);
+  await wishlist.addToWishlist(customer, lamp); // saving again keeps one entry
+  await assert.rejects(wishlist.addToWishlist(customer, String(new mongoose.Types.ObjectId())), { code: 'PRODUCT_NOT_FOUND' });
+
+  const list = await wishlist.listWishlist(customer);
+  assert.deepEqual(list.items.map((item) => [item.name, item.pricePaise, item.available]), [['Wish Mug', 900, false], ['Wish Lamp', 900, true]]); // newest first
+  assert.equal(list.total, 2);
+  assert.equal((await wishlist.listWishlist(String(new mongoose.Types.ObjectId()))).total, 0); // someone else's is separate
+
+  // a delisted product drops out of the list but is kept, and shows again once it is back
+  await Product.updateOne({ _id: mug }, { $set: { status: 'NEEDS_CHANGES' } });
+  catalogChanged();
+  assert.deepEqual((await wishlist.listWishlist(customer)).items.map((item) => item.name), ['Wish Lamp']);
+  assert.equal(await WishlistItem.countDocuments({ customerId: customer }), 2);
+
+  assert.deepEqual(await wishlist.removeFromWishlist(customer, lamp), { productId: lamp, wishlisted: false });
+  assert.deepEqual(await wishlist.removeFromWishlist(customer, lamp), { productId: lamp, wishlisted: false }); // already gone is fine
+  await wishlist.deleteCustomerWishlist(customer);
+  assert.equal(await WishlistItem.countDocuments({ customerId: customer }), 0);
+});
+
+test('customer coupons: lists only usable coupons, public ones to anyone and targeted ones to their customer', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { listAvailableCoupons } = await import('../src/modules/coupon/application/customerCoupon.service.js');
+  const { Coupon } = await import('../src/modules/coupon/infrastructure/persistence/coupon.model.js');
+  await Coupon.init();
+
+  const hour = 3_600_000;
+  const now = Date.now();
+  const me = new mongoose.Types.ObjectId();
+  const base = {
+    type: 'FLAT', valuePaise: 5_000, minCartPaise: 19_900, totalLimit: 100, perUserLimit: 1, budgetPaise: 1_000_000,
+    startsAt: new Date(now - hour), endsAt: new Date(now + 48 * hour), createdBy: 'admin-1',
+  };
+  const make = (code, over = {}) => Coupon.create({ ...base, code, name: code, ...over });
+  await make('CUSTPUBLIC', { endsAt: new Date(now + 24 * hour) });
+  await make('CUSTNEW', { audience: { type: 'NEW' }, description: 'Welcome gift' });
+  await make('CUSTMINE', { audience: { type: 'CUSTOM', customerIds: [me] }, visibility: 'HIDDEN' });
+  await make('CUSTSELLER', { sellerId: String(new mongoose.Types.ObjectId()), fundedBy: 'SELLER' });
+  // none of these can be used right now
+  await make('CUSTHIDDEN', { visibility: 'HIDDEN' });
+  await make('CUSTOTHER', { audience: { type: 'CUSTOM', customerIds: [new mongoose.Types.ObjectId()] } });
+  await make('CUSTDRAFT', { state: 'DRAFT' });
+  await make('CUSTPAUSED', { state: 'PAUSED' });
+  await make('CUSTSOON', { startsAt: new Date(now + hour) });
+  await make('CUSTOVER', { startsAt: new Date(now - 3 * hour), endsAt: new Date(now - hour) });
+  await make('CUSTUSEDUP', { totalLimit: 2, totalRedemptions: 2 });
+  await make('CUSTBROKE', { budgetUsedPaise: 1_000_000 });
+
+  const codes = async (customerId) => (await listAvailableCoupons(customerId)).items.map((item) => item.code).filter((code) => code.startsWith('CUST'));
+  assert.deepEqual(await codes(null), ['CUSTPUBLIC', 'CUSTNEW', 'CUSTSELLER']); // soonest-ending first
+  assert.deepEqual((await codes(String(me))).sort(), ['CUSTMINE', 'CUSTNEW', 'CUSTPUBLIC', 'CUSTSELLER']);
+
+  const byCode = new Map((await listAvailableCoupons(String(me))).items.map((item) => [item.code, item]));
+  assert.deepEqual(byCode.get('CUSTPUBLIC'), {
+    id: byCode.get('CUSTPUBLIC').id, code: 'CUSTPUBLIC', title: 'CUSTPUBLIC', description: 'Flat ₹50 off on orders above ₹199',
+    expiresAt: byCode.get('CUSTPUBLIC').expiresAt, eligibilityStatus: 'UNKNOWN',
+  });
+  assert.equal(byCode.get('CUSTNEW').description, 'Welcome gift · On your first order');
+  assert.equal(byCode.get('CUSTSELLER').description, 'Flat ₹50 off on orders above ₹199 · Only on items from one seller');
+
+  // signed out works too, over HTTP
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/customer/v1/coupons/available`);
+  assert.equal(response.status, 200);
+  assert.ok((await response.json()).data.items.some((item) => item.code === 'CUSTPUBLIC' && typeof item.expiresAt === 'string'));
+});
+
+test('seller stock: lists only own offers, edits self-ship stock once per version, keeps a ledger', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { Offer } = await import('../src/modules/product/infrastructure/persistence/offer.model.js');
+  const { StockMovement } = await import('../src/modules/product/infrastructure/persistence/stockMovement.model.js');
+  await Promise.all([Offer.init(), StockMovement.init()]);
+
+  const sellerA = String(new mongoose.Types.ObjectId());
+  const sellerB = String(new mongoose.Types.ObjectId());
+  const offer = (sellerId, productTitle, stock, over = {}) => Offer.create({
+    productId: new mongoose.Types.ObjectId(), variantId: new mongoose.Types.ObjectId(), sellerId, productTitle, stock,
+    sku: `SKU-${productTitle.toUpperCase()}`, sellingPricePaise: 900, mrpPaise: 1200, status: 'LIVE', ...over,
+  });
+  const mug = await offer(sellerA, 'Mug', 3, { variantLabel: 'Blue' });
+  await offer(sellerA, 'Lamp', 40);
+  const kettle = await offer(sellerA, 'Kettle', 8, { fulfillmentType: 'ARISE' });
+  const other = await offer(sellerB, 'Vase', 5);
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const users = new Map([[sellerA, String(new mongoose.Types.ObjectId())], [sellerB, String(new mongoose.Types.ObjectId())]]);
+  const tokenOf = (sellerId) => signAccessToken({ sub: users.get(sellerId), role: 'SELLER', sellerId });
+  const call = async (path, { method = 'GET', body, sellerId = sellerA, key } = {}) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/seller/v1/inventory${path}`, {
+      method,
+      headers: { authorization: `Bearer ${tokenOf(sellerId)}`, 'content-type': 'application/json', ...(key ? { 'idempotency-key': key } : {}) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+
+  const list = await call('?sort=-sellable');
+  assert.equal(list.status, 200);
+  assert.deepEqual(list.body.data.map((row) => [row.productTitle, row.sellable, row.available, row.lowStock]), [['Lamp', 40, 40, false], ['Kettle', 8, 8, true], ['Mug', 3, 3, true]]);
+  assert.deepEqual(list.body.meta.counts, { skus: 3, unitsSellable: 51, lowStock: 2, aged: 0 });
+  assert.equal(list.body.meta.total, 3);
+  assert.deepEqual((await call('?lowStock=true&fulfillmentType=SELLER')).body.data.map((row) => row.productTitle), ['Mug']);
+  assert.deepEqual((await call('?q=mug')).body.data.map((row) => row.sku), ['SKU-MUG']);
+  assert.deepEqual((await call('?aged=true')).body.data, []);
+  assert.deepEqual((await call('/recommendations')).body.data, []);
+
+  const edit = { sellable: 12, version: 1, note: 'Cycle count' };
+  const updated = await call(`/${mug.id}/stock`, { method: 'PATCH', body: edit, key: `inventory-stock:${mug.id}:1:12` });
+  assert.equal(updated.status, 200);
+  assert.deepEqual([updated.body.data.sellable, updated.body.data.version], [12, 2]);
+  const replay = await call(`/${mug.id}/stock`, { method: 'PATCH', body: edit, key: `inventory-stock:${mug.id}:1:12` });
+  assert.deepEqual([replay.status, replay.body.data.version], [200, 2]); // same request again changes nothing
+  const stale = await call(`/${mug.id}/stock`, { method: 'PATCH', body: { ...edit, sellable: 2 }, key: `inventory-stock:${mug.id}:1:2` });
+  assert.deepEqual([stale.status, stale.body.error.code, stale.body.error.details.current.sellable], [409, 'VERSION_CONFLICT', 12]);
+  assert.equal((await call(`/${mug.id}/stock`, { method: 'PATCH', body: { ...edit, sellable: -1 }, key: 'inventory-stock-neg' })).status, 422);
+
+  const fba = await call(`/${kettle.id}/stock`, { method: 'PATCH', body: edit, key: `inventory-stock:${kettle.id}:1:12` });
+  assert.deepEqual([fba.status, fba.body.error.code], [409, 'FBA_STOCK_IMMUTABLE']);
+  assert.equal((await call(`/${other.id}/stock`, { method: 'PATCH', body: edit, key: `inventory-stock:${other.id}:1:12` })).status, 404);
+  assert.equal((await Offer.findById(other.id).lean()).stock, 5); // another seller's stock is untouched
+
+  const ledger = await call(`/${mug.id}/ledger`);
+  assert.deepEqual(ledger.body.data.entries.map((e) => [e.type, e.qty, e.balanceAfter, e.note]), [['ADJUSTMENT', 9, 12, 'Cycle count']]);
+  assert.equal(ledger.body.data.inventory.sellable, 12);
+  assert.equal((await call(`/${mug.id}/ledger`, { sellerId: sellerB })).status, 404);
+  assert.deepEqual((await call('', { sellerId: sellerB })).body.data.map((row) => row.productTitle), ['Vase']);
+});
+
+test('category commission: children inherit it, and changing it needs the finance permission', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  await Promise.all([User.init(), Category.init()]);
+
+  const catalog = ['catalog.category.view', 'catalog.category.create', 'catalog.category.edit'];
+  const finance = await User.create({ role: 'ADMIN', email: 'commission-finance@arise.test', status: 'ACTIVE', permissions: [...catalog, 'finance.commission.edit'] });
+  const editor = await User.create({ role: 'ADMIN', email: 'commission-editor@arise.test', status: 'ACTIVE', permissions: catalog });
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const call = async (path, { method = 'GET', body, as = finance } = {}) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/admin/v1/categories${path}`, {
+      method,
+      headers: { authorization: `Bearer ${signAccessToken({ sub: String(as._id), role: 'ADMIN' })}`, 'content-type': 'application/json' },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+
+  const root = (await call('/', { method: 'POST', body: { name: 'Commission Root', commissionPct: 12.5 } })).body.data;
+  assert.equal(root.commissionPct, 12.5);
+  const child = (await call('/', { method: 'POST', body: { name: 'Commission Child', parentId: root.id }, as: editor })).body.data;
+  assert.equal(child.commissionPct, 12.5); // inherited, no finance permission needed
+  assert.equal((await call('/', { method: 'POST', body: { name: 'Commission Set', parentId: root.id, commissionPct: 5 }, as: editor })).status, 403);
+
+  // the editor can still save the form (which sends the unchanged rate) but not change the rate
+  const saved = await call(`/${child.id}`, { method: 'PATCH', body: { name: 'Commission Kid', commissionPct: 12.5, version: child.version }, as: editor });
+  assert.deepEqual([saved.status, saved.body.data.name], [200, 'Commission Kid']);
+  const denied = await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct: 8, version: saved.body.data.version }, as: editor });
+  assert.deepEqual([denied.status, denied.body.error.code], [403, 'FORBIDDEN']);
+  const changed = await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct: 8.25, version: saved.body.data.version } });
+  assert.deepEqual([changed.status, changed.body.data.commissionPct], [200, 8.25]);
+
+  for (const commissionPct of [-1, 41, 2.555]) {
+    assert.equal((await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct, version: changed.body.data.version } })).status, 422);
+  }
+  assert.ok((await call(`/${child.id}`)).body.meta.allowedActions.includes('EDIT_COMMISSION'));
+  assert.ok(!(await call(`/${child.id}`, { as: editor })).body.meta.allowedActions.includes('EDIT_COMMISSION'));
 });
