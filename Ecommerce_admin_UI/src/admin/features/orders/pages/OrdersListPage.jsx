@@ -6,13 +6,18 @@ import FilterBar from '@ui/components/FilterBar';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import { queryClient } from '@core/api/queryClient';
 import useListQuery from '@ui/hooks/useListQuery';
+import useRealtime from '@ui/hooks/useRealtime';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { orderKeys } from '../api/orders.api';
 import { ORDER_TABS, orderColumns, orderFilterSchema } from '../orderColumns';
 
 export default function OrdersListPage() {
   const navigate = useNavigate();
+  // Any order changing anywhere (placed, accepted, shipped, delivered, cancelled) refreshes the list and its tab counts at once.
+  const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['orders'] });
+  useRealtime('admin', { 'order:changed': refreshOrders, 'session:ready': refreshOrders });
   const state = useUrlTableState({ defaultSort: '-placedAt' });
 
   const tabCodes = ORDER_TABS.find((t) => t.key === state.tab)?.codes;

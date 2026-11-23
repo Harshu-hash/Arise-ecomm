@@ -26,6 +26,17 @@ import { createCustomerAuthRouter } from '../modules/identity/presentation/custo
 import { createCustomerAddressRouter } from '../modules/customer/presentation/address.routes.js';
 import { createCustomerPrivacyRouter } from '../modules/customer/presentation/privacy.routes.js';
 import { createCustomerWishlistRouter } from '../modules/wishlist/presentation/wishlist.routes.js';
+import { createCustomerCartRouter } from '../modules/cart/presentation/cart.routes.js';
+import { registerOrderWebhooks } from '../modules/order/public/index.js';
+import { createAdminInvoiceRouter, createSellerInvoiceRouter } from '../modules/order/presentation/invoice.routes.js';
+import { createAdminOrderRouter } from '../modules/order/presentation/adminOrder.routes.js';
+import { createSellerOrderRouter } from '../modules/order/presentation/sellerOrder.routes.js';
+import { createAdminReturnRouter } from '../modules/order/presentation/adminReturn.routes.js';
+import { createAdminPayoutHoldRouter, createAdminSettlementRouter, createAdminWalletRouter, createAdminWithdrawalRouter } from '../modules/settlement/presentation/adminSettlement.routes.js';
+import { createSellerSettlementRouter, createSellerWalletRouter } from '../modules/settlement/presentation/sellerWallet.routes.js';
+import { createSellerReturnRouter } from '../modules/order/presentation/sellerReturn.routes.js';
+import { createCustomerNotificationRouter, createSellerAlertRouter } from '../modules/notification/presentation/notification.routes.js';
+import { createCustomerOrderRouter } from '../modules/order/presentation/order.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
@@ -50,6 +61,7 @@ import { createMediaRouter } from '../modules/media/presentation/media.routes.js
 import { createAttributeRouter, createAttributeSetRouter } from '../modules/attribute/presentation/attribute.routes.js';
 import { createBrandRouter } from '../modules/catalog/presentation/brand.routes.js';
 import { createSizeChartRouter } from '../modules/catalog/presentation/sizeChart.routes.js';
+import { createShippingWebhookRouter } from '../modules/shipping/presentation/shipping.webhook.routes.js';
 import { createPaymentWebhookRouter } from '../modules/payment/presentation/payment.webhook.routes.js';
 import { createAuditRouter } from '../modules/system/presentation/audit.routes.js';
 import { createLookupRouter } from '../modules/system/presentation/lookup.routes.js';
@@ -189,6 +201,9 @@ export function createRoutes() {
   root.use('/api/customer/v1', createCustomerAddressRouter());
   root.use('/api/customer/v1', createCustomerPrivacyRouter());
   root.use('/api/customer/v1', createCustomerWishlistRouter());
+  root.use('/api/customer/v1', createCustomerCartRouter());
+  root.use('/api/customer/v1', createCustomerOrderRouter());
+  root.use('/api/customer/v1', createCustomerNotificationRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();
@@ -227,6 +242,12 @@ export function createRoutes() {
   root.use('/api/admin/v1/campaigns/reach', createAudienceReachRouter()); // before the campaign router: "reach" is not an id
   root.use('/api/admin/v1/campaigns', createCampaignRouter());
   root.use('/api/admin/v1/coupons', createCouponRouter());
+  root.use('/api/admin/v1/orders', createAdminOrderRouter());
+  root.use('/api/admin/v1/returns', createAdminReturnRouter());
+  root.use('/api/admin/v1/invoices', createAdminInvoiceRouter());
+  root.use('/api/admin/v1/settlements', createAdminSettlementRouter());
+  root.use('/api/admin/v1/withdrawals', createAdminWithdrawalRouter());
+  root.use('/api/admin/v1/seller-wallets', createAdminWalletRouter());
   root.use('/api/admin/v1/deals', createDealRouter());
   root.use('/api/admin/v1/cms', createCmsRouter());
   root.use('/api/admin/v1/static-pages', createStaticPageRouter());
@@ -236,6 +257,7 @@ export function createRoutes() {
   root.use('/api/admin/v1/attribute-sets', createAttributeSetRouter());
   root.use('/api/admin/v1/brands', createBrandRouter());
   root.use('/api/admin/v1/size-charts', createSizeChartRouter());
+  root.use('/api/admin/v1/sellers', createAdminPayoutHoldRouter()); // before the seller applications router: it only answers POST /:id/payout-hold
   root.use('/api/admin/v1/sellers', createSellerApplicationsRouter());
   root.use('/api/admin/v1/products', createProductReviewRouter());
   root.use('/api/admin/v1/offers', createOfferAdminRouter());
@@ -245,13 +267,21 @@ export function createRoutes() {
   root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
   root.use('/api/seller/v1/listings', createListingRouter());
   root.use('/api/seller/v1/inventory', createInventoryRouter());
+  root.use('/api/seller/v1/orders', createSellerOrderRouter());
+  root.use('/api/seller/v1/returns', createSellerReturnRouter());
+  root.use('/api/seller/v1/finance/invoices', createSellerInvoiceRouter());
+  root.use('/api/seller/v1/finance', createSellerWalletRouter());
+  root.use('/api/seller/v1/settlements', createSellerSettlementRouter());
+  root.use('/api/seller/v1/dashboard', createSellerAlertRouter());
   root.use('/api/seller/v1/banner-ads', createBannerAdSellerRouter());
   root.use('/api/seller/v1/campaigns', createSellerCampaignRouter());
   root.use('/api/seller/v1/coupons', createSellerCouponRouter());
   registerBannerAdWebhooks();
+  registerOrderWebhooks();
 
   const webhooks = Router();
   webhooks.use('/payments', createPaymentWebhookRouter());
+  webhooks.use('/shipping', createShippingWebhookRouter());
   root.use('/webhooks/v1', webhooks);
 
   return root;

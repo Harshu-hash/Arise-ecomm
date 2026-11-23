@@ -1,4 +1,5 @@
 import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { getUnsellableSellerIds } from '../../identity/public/index.js';
 import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { getLiveProductCards } from '../../product/public/index.js';
 import { CAMPAIGN_STATUS as C, SUBMISSION_STATUS as S } from '../domain/constants/campaign.js';
@@ -17,7 +18,8 @@ const liveNow = (now) => ({ status: { $in: [C.OPEN, C.SCHEDULED, C.ACTIVE] }, st
 
 /** Per campaign id: its visible entries as cards at the deal price, best discount first. */
 async function entriesByCampaign(campaignIds) {
-  const entries = await CampaignSubmission.find({ campaignId: { $in: campaignIds }, status: S.APPROVED, stockCommitted: { $gt: 0 } })
+  // A seller who may not sell right now (suspended, on holiday) takes their entries off the shelf too.
+  const entries = await CampaignSubmission.find({ campaignId: { $in: campaignIds }, status: S.APPROVED, stockCommitted: { $gt: 0 }, sellerId: { $nin: await getUnsellableSellerIds() } })
     .sort({ discountPct: -1, _id: 1 })
     .lean();
   const cards = await getLiveProductCards(entries.map((entry) => entry.productId));
@@ -159,3 +161,42 @@ export async function listPromotionProducts(campaignId, { cursor, limit }, now =
   const { entries } = await livePromotion(campaignId, now);
   return { items: entries.slice(cursor, cursor + limit).map(productCard), nextCursor: cursor + limit < entries.length ? String(cursor + limit) : null };
 }
+
+/**
+ * The campaign deal price in force for each seller+product pair (keyed "sellerId:productId"): the lowest approved price
+ * from a campaign running now, with the units still committed at that price. Pairs with no live deal are absent.
+ * shortcut: committed units are read here but not held while a customer pays, so the last deal units can be oversold;
+ * checkout must hold them (like stock) before the deal price is promised to more than one shopper.
+ */
+export async function getCampaignDealPrices(pairs, now = new Date()) {
+  if (!pairs.length) return new Map();
+  const campaigns = await Campaign.find(liveNow(now), 'name').lean();
+  if (!campaigns.length) return new Map();
+  const entries = await CampaignSubmission.find({
+    campaignId: { $in: campaigns.map((campaign) => campaign._id) },
+    status: S.APPROVED,
+    stockCommitted: { $gt: 0 },
+    $or: pairs.map(({ sellerId, productId }) => ({ sellerId, productId })),
+  }).lean();
+  const names = new Map(campaigns.map((campaign) => [String(campaign._id), campaign.name]));
+  const best = new Map();
+  for (const entry of entries) {
+    const key = `${entry.sellerId}:${entry.productId}`;
+    if (best.get(key)?.dealPricePaise <= entry.dealPricePaise) continue;
+    best.set(key, {
+      submissionId: String(entry._id),
+      campaignId: String(entry.campaignId),
+      campaignName: names.get(String(entry.campaignId)),
+      dealPricePaise: entry.dealPricePaise,
+      mrpPaise: entry.mrpPaise,
+      remainingUnits: entry.stockCommitted,
+    });
+  }
+  return best;
+}
+
+/**
+ * The deal price of one variant: the campaign discounts the product by a fixed share of MRP (deal price / MRP at entry),
+ * so each variant gets that same share off its own MRP instead of one flat price for all sizes.
+ */
+export const dealPriceForVariant = (deal, variantMrpPaise) => Math.round((variantMrpPaise * deal.dealPricePaise) / deal.mrpPaise);

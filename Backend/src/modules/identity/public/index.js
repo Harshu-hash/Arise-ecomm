@@ -14,6 +14,6 @@ export {
   assertActiveCustomer,
 } from '../application/customerDeletion.service.js';
 
-export { getSellerOwnerEmail, getSellerSummaries, getUserSummaries } from '../application/sellerLookup.service.js';
+export { getSellerOwnerEmail, getSellerPayoutProfiles, getSellerPickupProfile, setSellerPayoutHold, getSellerTaxProfile,getSellerSummaries, setSellerPickupLocationName, getUnsellableSellerIds, getUserSummaries } from '../application/sellerLookup.service.js';
 
-export { countCustomers, findCustomers, getCustomer } from '../application/customerLookup.service.js';
+export { countCustomers, findCustomers, getCustomer, getCustomerContact } from '../application/customerLookup.service.js';

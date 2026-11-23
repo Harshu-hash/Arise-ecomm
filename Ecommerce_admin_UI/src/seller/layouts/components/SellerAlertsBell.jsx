@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '@core/api/axiosInstance';
 import { queryClient } from '@core/api/queryClient';
 import DateText from '@ui/components/DateText';
+import useRealtime from '@ui/hooks/useRealtime';
 
 const SEVERITY_COLOR = {
   error: 'var(--ant-color-error)',
@@ -19,6 +20,8 @@ const SEVERITY_COLOR = {
  */
 export default function SellerAlertsBell() {
   const navigate = useNavigate();
+  const refreshAlerts = () => queryClient.invalidateQueries({ queryKey: ['seller', 'dashboard', 'alerts'] });
+  useRealtime('seller', { 'notification:changed': refreshAlerts, 'session:ready': refreshAlerts });
 
   const { data } = useQuery({
     queryKey: ['seller', 'dashboard', 'alerts'],

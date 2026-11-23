@@ -43,7 +43,8 @@ const ReturnsPage = lazy(() => import('@seller/features/returns/pages/ReturnsPag
 const ReturnDetailPage = lazy(() => import('@seller/features/returns/pages/ReturnDetailPage'));
 
 /* Payments */
-const PaymentsPage = lazy(() => import('@seller/features/finance/pages/PaymentsPage'));
+const WalletPage = lazy(() => import('@seller/features/finance/pages/WalletPage'));
+const InvoicesPage = lazy(() => import('@seller/features/finance/pages/InvoicesPage'));
 const SettlementsPage = lazy(() => import('@seller/features/finance/pages/SettlementsPage'));
 
 /* Support & account */
@@ -53,6 +54,7 @@ const CustomerComplaintsPage = lazy(() => import('@seller/features/support/pages
 const CustomerComplaintDetailPage = lazy(() => import('@seller/features/support/pages/CustomerComplaintDetailPage'));
 const ProfilePage = lazy(() => import('@seller/features/settings/pages/ProfilePage'));
 const BankPickupPage = lazy(() => import('@seller/features/settings/pages/BankPickupPage'));
+const PickupAddressPage = lazy(() => import('@seller/features/settings/pages/PickupAddressPage'));
 const NotFoundPage = lazy(() => import('@seller/features/system/pages/NotFoundPage'));
 
 /** Every seller navigation destination is backed by a production screen. */
@@ -84,8 +86,9 @@ const ROUTES = [
   { path: '/returns/:id', element: <ReturnDetailPage /> },
 
   // Payments
-  { path: '/payments', element: <PaymentsPage /> },
+  { path: '/payments', element: <WalletPage /> },
   { path: '/payments/settlements', element: <SettlementsPage /> },
+  { path: '/payments/invoices', element: <InvoicesPage /> },
 
   // Support & account
   { path: '/support', element: <SupportPage /> },
@@ -94,6 +97,7 @@ const ROUTES = [
   { path: '/support/:id', element: <TicketDetailPage /> },
   { path: '/settings/profile', element: <ProfilePage /> },
   { path: '/settings/bank', element: <BankPickupPage /> },
+  { path: '/settings/address', element: <PickupAddressPage /> },
 ];
 
 export const router = createBrowserRouter(

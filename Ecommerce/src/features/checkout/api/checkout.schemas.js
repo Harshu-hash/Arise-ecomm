@@ -23,6 +23,7 @@ const checkoutTotalsSchema = z.object({
   couponDiscountPaise: z.number().int().nonnegative(),
   deliveryFeePaise: z.number().int().nonnegative(),
   platformFeePaise: z.number().int().nonnegative(),
+  codFeePaise: z.number().int().nonnegative().default(0), // cash-on-delivery handling fee, only once COD is chosen
   taxPaise: z.number().int().nonnegative(),
   walletCreditPaise: z.number().int().nonnegative(),
   payablePaise: z.number().int().nonnegative(),

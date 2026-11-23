@@ -9,7 +9,7 @@ import ShipmentCard from './ShipmentCard';
 
 /** Items, payment, returns, timeline and notes for one order. */
 export default function OrderTabs({
-  meta, canCancel, canReturn, selectedIds, onToggleItem, onReturn, onAddNote, addingNote,
+  meta, canCancel, canReturn, selectedIds, onToggleItem, onReturn, onAddNote, addingNote, onChangeStatus,
 }) {
   const { message } = App.useApp();
   const navigate = useNavigate();
@@ -37,6 +37,7 @@ export default function OrderTabs({
                   selectedIds={selectedIds}
                   onToggleItem={onToggleItem}
                   onReturn={canReturn ? onReturn : null}
+                  onChangeStatus={onChangeStatus}
                 />
               ))}
             </div>

@@ -1,6 +1,7 @@
 import { Image, Space, Tag, Tooltip, Typography } from 'antd';
 import { slaCountdown } from '@core/utils/date';
 import DateText from '@ui/components/DateText';
+import CampaignTag from '@ui/components/CampaignTag';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
 
@@ -129,14 +130,19 @@ export const productColumns = [
     render: (min, row) =>
       min === null ? (
         MUTED_DASH
-      ) : min === row.maxPricePaise ? (
-        <MoneyText paise={min} />
       ) : (
-        <Space size={2}>
-          <MoneyText paise={min} />
-          <Typography.Text type="secondary" style={{ fontSize: 11 }}>–</Typography.Text>
-          <MoneyText paise={row.maxPricePaise} />
-        </Space>
+        <>
+          {min === row.maxPricePaise ? (
+            <MoneyText paise={min} />
+          ) : (
+            <Space size={2}>
+              <MoneyText paise={min} />
+              <Typography.Text type="secondary" style={{ fontSize: 11 }}>–</Typography.Text>
+              <MoneyText paise={row.maxPricePaise} />
+            </Space>
+          )}
+          <div><CampaignTag campaign={row.campaign} /></div>
+        </>
       ),
   },
   {

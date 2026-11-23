@@ -7,7 +7,7 @@ import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import PressableScale from '../../../shared/ui/PressableScale';
-import CouponSection from '../../cart/components/CouponSection';
+import CouponSection, { CouponSheet } from '../../cart/components/CouponSection';
 import { haptics } from '../../../utils/haptics';
 import { useGetCartQuery, useUpdateCartItemMutation } from '@features/cart';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
@@ -27,6 +27,7 @@ const MIN_QTY = 1;
 
 const CheckoutScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const [couponSheetOpen, setCouponSheetOpen] = useState(false);
   const directPurchase = Boolean(route?.params?.items?.length);
   const [directItems, setDirectItems] = useState(route?.params?.items ?? []);
   const { data: cart, error, isLoading, refetch } = useGetCartQuery();
@@ -283,7 +284,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
 
         {/* Coupon */}
-        {!directPurchase ? <CouponSection cartId={cart.id} /> : null}
+        {!directPurchase ? <CouponSection onOpen={() => setCouponSheetOpen(true)} /> : null}
 
         {/* Price details */}
         <View style={styles.sectionCard}>
@@ -377,6 +378,15 @@ const CheckoutScreen = ({ navigation, route }) => {
           <Icon name="arrow-right" size={16} color={COLORS.textPrimary} />
         </PressableScale>
       </View>
+
+      {/* at the screen's top level so it covers the whole screen, not just the coupon card */}
+      {!directPurchase && cart ? (
+        <CouponSheet
+          cartId={cart.id}
+          visible={couponSheetOpen}
+          onClose={() => setCouponSheetOpen(false)}
+        />
+      ) : null}
     </View>
   );
 };

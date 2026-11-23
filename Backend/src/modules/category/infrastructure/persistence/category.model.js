@@ -15,8 +15,9 @@ const categorySchema = new mongoose.Schema(
     gated: { type: Boolean, default: false },
     codAllowed: { type: Boolean, default: true },
     gstRate: { type: Number, enum: [0, 5, 12, 18, 28], default: 18 },
-    // Percent of a sale's price Arise keeps as commission on listings in this category (up to 2 decimals).
-    commissionPct: { type: Number, min: 0, max: 40, default: 0 },
+    // Percent of a sale's price Arise keeps as commission (up to 2 decimals). null = not set here: the nearest category
+    // above that has one applies (bottom-most set rate wins).
+    commissionPct: { type: Number, min: 0, max: 40, default: null },
     hsnCode: { type: String, trim: true, maxlength: 20, default: null },
     attributeSetId: { type: mongoose.Schema.Types.ObjectId, default: null },
     imageUrl: { type: String, trim: true, maxlength: 2048, default: null },

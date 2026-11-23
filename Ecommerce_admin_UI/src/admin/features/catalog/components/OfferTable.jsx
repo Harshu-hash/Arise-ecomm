@@ -4,6 +4,7 @@ import { useMutation } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { queryClient } from '@core/api/queryClient';
 import { discountPct } from '@core/utils/money';
+import CampaignTag from '@ui/components/CampaignTag';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
 import { catalogApi } from '../api/catalog.api';
@@ -93,6 +94,7 @@ export default function OfferTable({ offers, productId }) {
           render: (v, row) => (
             <div>
               <MoneyText paise={v} strong type={row.priceAboveMrp ? 'danger' : undefined} />
+              <div><CampaignTag campaign={row.campaign} /></div>
               {row.priceAboveMrp && (
                 <div>
                   <Typography.Text type="danger" style={{ fontSize: 11 }}>above MRP</Typography.Text>

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useSelector } from 'react-redux';
 import {
   View,
@@ -32,7 +32,7 @@ import {
   useSaveCartItemForLaterMutation,
   useUpdateCartItemMutation,
 } from '../api/cart.query';
-import CouponSection from '../components/CouponSection';
+import CouponSection, { CouponSheet } from '../components/CouponSection';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
 
@@ -65,6 +65,7 @@ const SUGGESTED_PRODUCTS = [
 
 const CartScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const [couponSheetOpen, setCouponSheetOpen] = useState(false);
   const toast = useToast();
   const isAuthenticated = useSelector(selectIsAuthenticated);
   const { data: cart, error, isLoading, isFetching, refetch } = useGetCartQuery();
@@ -342,7 +343,7 @@ const CartScreen = ({ navigation }) => {
             )}
 
             <View style={{ marginHorizontal: SPACING.l }}>
-              <CouponSection cartId={cart.id} />
+              <CouponSection onOpen={() => setCouponSheetOpen(true)} />
             </View>
 
             <View style={styles.priceDetailsCard}>
@@ -418,6 +419,15 @@ const CartScreen = ({ navigation }) => {
             <Icon name="arrow-right" size={16} color={COLORS.textPrimary} />
           </PressableScale>
         </View>
+      ) : null}
+
+      {/* at the screen's top level so it covers the whole screen, not just the coupon card */}
+      {cart ? (
+        <CouponSheet
+          cartId={cart.id}
+          visible={couponSheetOpen}
+          onClose={() => setCouponSheetOpen(false)}
+        />
       ) : null}
     </View>
   );

@@ -21,6 +21,7 @@ import {
   useUpdateCheckoutPaymentMethodMutation,
 } from '@features/checkout';
 import {
+  useConfirmPaymentMutation,
   useCreateOrderMutation,
   useCreatePaymentIntentMutation,
   useLazyGetPaymentQuery,
@@ -46,6 +47,7 @@ const PaymentMethodScreen = ({ navigation, route }) => {
   const [updateCheckoutPaymentMethod] = useUpdateCheckoutPaymentMethodMutation();
   const [createPaymentIntent] = useCreatePaymentIntentMutation();
   const [getPayment] = useLazyGetPaymentQuery();
+  const [confirmPayment] = useConfirmPaymentMutation();
   const [createOrder] = useCreateOrderMutation();
 
   const grandTotal = checkoutSession?.totals.payable ?? 0;
@@ -67,13 +69,30 @@ const PaymentMethodScreen = ({ navigation, route }) => {
       }).unwrap();
       let payment = intent;
       if (intent.status === 'REQUIRES_ACTION') {
-        if (!intent.providerAction.url) {
-          throw new Error('The payment provider did not return a secure action URL.');
+        const { sdk, type, url } = intent.providerAction;
+        if (type === 'SDK' && sdk) {
+          // Razorpay's sheet returns a signed result; the server verifies it, so a tampered result cannot mark a payment paid.
+          // loaded here, not at the top, so the app still starts on a build that does not have the native module yet
+          const RazorpayCheckout = require('react-native-razorpay').default;
+          const result = await RazorpayCheckout.open({
+            key: sdk.keyId,
+            order_id: sdk.orderId,
+            amount: sdk.amountPaise,
+            currency: sdk.currency,
+            name: 'Arise',
+            prefill: { contact: checkoutSession.address.phone },
+          });
+          payment = await confirmPayment({
+            paymentId: intent.id,
+            razorpayPaymentId: result.razorpay_payment_id,
+            razorpayOrderId: result.razorpay_order_id,
+            razorpaySignature: result.razorpay_signature,
+          }).unwrap();
+        } else if (type !== 'SDK' && url) {
+          await Linking.openURL(url);
+        } else {
+          throw new Error('The payment provider did not return a way to pay.');
         }
-        if (intent.providerAction.type === 'SDK') {
-          throw new Error('This payment method requires a provider SDK that is not enabled.');
-        }
-        await Linking.openURL(intent.providerAction.url);
       }
       for (let attempt = 0; payment.status !== 'SUCCEEDED' && attempt < 20; attempt += 1) {
         if (['FAILED', 'CANCELLED'].includes(payment.status)) break;
@@ -153,6 +172,10 @@ const PaymentMethodScreen = ({ navigation, route }) => {
             onPress={() => {
               haptics.selection();
               setSelected(m.id);
+              // cash on delivery changes the total (handling fee), so the server re-prices for the chosen method
+              updateCheckoutPaymentMethod({ sessionId: checkoutSession.id, paymentMethod: m.id })
+                .unwrap()
+                .catch(() => {});
             }}
           >
             <View style={styles.methodIconCircle}>
@@ -163,7 +186,9 @@ const PaymentMethodScreen = ({ navigation, route }) => {
               <Text style={styles.methodSubtitle}>
                 {m.id === 'wallet'
                   ? 'Available store credit will be validated at payment'
-                  : m.subtitle}
+                  : m.id === 'cod'
+                    ? `${m.subtitle}. ${checkoutSession.totals.codFee ? `Includes ₹${checkoutSession.totals.codFee} handling fee` : "A small handling fee applies"}`
+                    : m.subtitle}
               </Text>
             </View>
             <View style={[styles.radio, selected === m.id && styles.radioActive]}>

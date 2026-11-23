@@ -22,7 +22,7 @@ export function inheritedCategoryValues(parent, input) {
     gated: value('gated', false),
     codAllowed: value('codAllowed', true),
     gstRate: value('gstRate', 18),
-    commissionPct: value('commissionPct', 0),
+    commissionPct: input.commissionPct ?? null, // never copied from the parent: unset means "inherit", resolved on read
     hsnCode: value('hsnCode', null),
     attributeSetId: value('attributeSetId', null),
   };

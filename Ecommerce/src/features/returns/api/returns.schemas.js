@@ -58,5 +58,19 @@ export const returnRequestSchema = z.object({
     amountPaise: z.number().int().nonnegative(),
     destination: z.enum(['ORIGINAL_PAYMENT', 'BANK_ACCOUNT', 'STORE_CREDIT']),
   }),
+  // for the status screen (optional: the fixture API does not send them)
+  orderNumber: z.string().optional(),
+  productName: z.string().optional(),
+  imageUrl: z.string().nullable().optional(),
+  courier: z.object({ name: z.string().nullable(), awb: z.string() }).nullable().optional(),
+  outcomeNote: z.string().nullable().optional(),
+  canCancel: z.boolean().optional(),
+  timeline: z.array(z.object({ status: z.string(), label: z.string(), at: z.string() })).optional(),
+  journey: z
+    .array(z.object({ status: z.string(), label: z.string(), state: z.enum(['DONE', 'CURRENT', 'PENDING', 'FAILED']), at: z.string().nullable() }))
+    .optional(),
 });
 export const returnResponseSchema = apiEnvelope(returnRequestSchema);
+export const returnListResponseSchema = apiEnvelope(
+  z.object({ items: z.array(returnRequestSchema), total: z.number().int().nonnegative(), nextCursor: z.string().nullable() }),
+);

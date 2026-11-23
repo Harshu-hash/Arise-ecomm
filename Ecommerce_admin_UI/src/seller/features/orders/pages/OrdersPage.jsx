@@ -2,6 +2,7 @@ import { App, Flex, Space, Tag, Typography } from 'antd';
 import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
+import { downloadBlob } from '@core/utils/misc';
 import { statusOptions } from '@ui/constants/statusMaps';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
@@ -11,12 +12,16 @@ import StatusTag from '@ui/components/StatusTag';
 import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { ACTION_LABELS, orderKeys, ordersApi } from '../api/orders.api';
+import useRealtime from '@ui/hooks/useRealtime';
 import { makeOrderColumns } from '../orderColumns';
 
 export default function OrdersPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  // A new order, or a courier/customer change to one, shows up here at once; a reconnect refetches what was missed.
+  const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['seller', 'orders'] });
+  useRealtime('seller', { 'order:changed': refreshOrders, 'session:ready': refreshOrders });
   const state = useUrlTableState({ defaultSort: '-placedAt', defaultTab: 'NEW' });
   const [pendingId, setPendingId] = useState(null);
 
@@ -119,7 +124,7 @@ export default function OrdersPage() {
         onRowClick={(row) => navigate(`/orders/${row.id}`)}
         selection={{
           getCheckboxProps: (row) => ({
-            disabled: row.fulfillmentType === 'ARISE' || !row.nextAction,
+            disabled: row.fulfillmentType === 'ARISE' || (!row.nextAction && !row.invoiceNo), // invoiced parcels can be selected to print
           }),
         }}
         bulkActions={[
@@ -130,22 +135,23 @@ export default function OrdersPage() {
             onClick: ({ selection }) => bulkMut.mutate({ action: 'confirm', selection }),
           },
           {
-            key: 'pack',
-            label: 'Pack & invoice',
+            key: 'ready-to-ship',
+            label: 'Ready to ship',
             perm: 'orders.order.process',
-            onClick: ({ selection }) => bulkMut.mutate({ action: 'pack', selection }),
+            onClick: ({ selection }) => bulkMut.mutate({ action: 'ready-to-ship', selection }),
           },
           {
-            key: 'manifest',
-            label: 'Label & manifest',
-            perm: 'orders.order.process',
-            onClick: ({ selection }) => bulkMut.mutate({ action: 'manifest', selection }),
-          },
-          {
-            key: 'dispatch',
-            label: 'Mark dispatched',
-            perm: 'orders.order.process',
-            onClick: ({ selection }) => bulkMut.mutate({ action: 'dispatch', selection }),
+            key: 'print-invoices',
+            label: 'Print invoices',
+            onClick: async ({ selection }) => {
+              const ids = Array.isArray(selection) ? selection : selection?.ids;
+              if (!ids?.length) return message.info('Tick the orders to print; "select all matching" is not supported here.');
+              try {
+                downloadBlob(await ordersApi.printInvoices(ids), 'invoices.pdf');
+              } catch {
+                message.error('None of the selected orders has an invoice yet: it is issued when an order is ready to ship.');
+              }
+            },
           },
         ]}
         emptyProps={{

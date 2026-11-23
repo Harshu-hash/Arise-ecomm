@@ -30,6 +30,7 @@ import { lookupHandlers } from './lookups';
 import { notificationHandlers } from './notifications';
 import { orderHandlers } from './orders';
 import { settlementHandlers } from './settlements';
+import { withdrawalHandlers } from './withdrawals';
 import { piiHandlers } from './pii';
 import { productHandlers } from './products';
 import { reasonHandlers } from './reasons';
@@ -112,6 +113,7 @@ export const handlers = [
   ...financeConfigHandlers,
   ...financeHandlers,
   ...settlementHandlers,
+  ...withdrawalHandlers,
   ...walletHandlers,
   ...sellerOpsHandlers,
   ...sellerHandlers,

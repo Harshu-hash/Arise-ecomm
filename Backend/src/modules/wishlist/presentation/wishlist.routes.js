@@ -5,7 +5,7 @@ import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
-import { addToWishlist, listWishlist, removeFromWishlist } from '../application/wishlist.service.js';
+import { addToWishlist, listWishlist, moveWishlistItemToCart, removeFromWishlist } from '../application/wishlist.service.js';
 
 const itemBody = z.object({ productId: objectIdSchema }).strict();
 const itemParams = z.object({ productId: objectIdSchema });
@@ -28,6 +28,9 @@ export function createCustomerWishlistRouter() {
     sendCommand(res, await addToWishlist(req.auth.userId, req.body.productId), { status: 201 })));
   router.delete('/wishlist/items/:productId', ...customerOnly, validate({ params: itemParams }), route(async (req, res) =>
     sendCommand(res, await removeFromWishlist(req.auth.userId, req.params.productId))));
+
+  router.post('/wishlist/:productId/move-to-cart', ...customerOnly, validate({ params: itemParams }), route(async (req, res) =>
+    sendCommand(res, await moveWishlistItemToCart(req.auth.userId, req.params.productId))));
 
   return router;
 }

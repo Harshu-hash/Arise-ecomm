@@ -1,5 +1,5 @@
 import { ClockCircleOutlined } from '@ant-design/icons';
-import { Avatar, Button, Flex, Tag, Tooltip, Typography } from 'antd';
+import { Avatar, Button, Flex, Space, Tag, Tooltip, Typography } from 'antd';
 import DateText from '@ui/components/DateText';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
@@ -117,17 +117,32 @@ export function makeOrderColumns({ onAction, pendingId }) {
         }
         if (!row.nextAction) return <Typography.Text type="secondary">—</Typography.Text>;
         return (
-          <Button
-            size="small"
-            type="primary"
-            loading={pendingId === row.id}
-            onClick={(e) => {
-              e.stopPropagation();
-              onAction(row, row.nextAction);
-            }}
-          >
-            {ACTION_LABELS[row.nextAction]}
-          </Button>
+          <Space size={6} wrap>
+            <Button
+              size="small"
+              type="primary"
+              loading={pendingId === row.id}
+              onClick={(e) => {
+                e.stopPropagation();
+                onAction(row, row.nextAction);
+              }}
+            >
+              {ACTION_LABELS[row.nextAction]}
+            </Button>
+            {/* Testing without a Shiprocket account; only in dev builds, and the server refuses it in production. */}
+            {import.meta.env.DEV && row.nextAction === 'ready-to-ship' && (
+              <Button
+                size="small"
+                loading={pendingId === row.id}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onAction(row, 'mock-ready-to-ship');
+                }}
+              >
+                {ACTION_LABELS['mock-ready-to-ship']}
+              </Button>
+            )}
+          </Space>
         );
       },
     },

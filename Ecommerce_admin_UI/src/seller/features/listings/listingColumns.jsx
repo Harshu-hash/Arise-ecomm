@@ -1,6 +1,7 @@
 import { CrownFilled } from '@ant-design/icons';
 import { Avatar, Button, Flex, Modal, Table, Tag, Tooltip, Typography } from 'antd';
 import { useState } from 'react';
+import CampaignTag from '@ui/components/CampaignTag';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
 
@@ -51,6 +52,7 @@ function VariantsCell({ count, row }) {
                 render: (_, v) => (
                   <>
                     <MoneyText paise={v.sellingPricePaise} strong />
+                    <div><CampaignTag campaign={v.campaign} /></div>
                     {v.mrpPaise > v.sellingPricePaise && (
                       <div>
                         <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>
@@ -102,6 +104,7 @@ export const listingColumns = [
           <Typography.Text type="secondary" style={{ fontSize: 12 }}>
             {[row.brandName, row.variantLabel, row.sku].filter(Boolean).join(' · ')}
           </Typography.Text>
+          {row.campaign && <div><CampaignTag campaign={row.campaign} /></div>}
         </div>
       </Flex>
     ),

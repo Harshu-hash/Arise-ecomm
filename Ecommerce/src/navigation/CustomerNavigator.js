@@ -20,6 +20,7 @@ import PaymentMethodScreen from '@features/payment/screens/PaymentMethodScreen';
 import OrderPlacedScreen from '@features/orders/screens/OrderPlacedScreen';
 import MyOrdersScreen from '@features/orders/screens/MyOrdersScreen';
 import OrderDetailScreen from '@features/orders/screens/OrderDetailScreen';
+import ReturnDetailScreen from '@features/returns/screens/ReturnDetailScreen';
 import TrackingScreen from '@features/tracking/screens/TrackingScreen';
 import ProfileScreen from '@features/profile/screens/ProfileScreen';
 import AccountSettingsScreen from '@features/profile/screens/AccountSettingsScreen';
@@ -81,6 +82,7 @@ const ProtectedOrderHelp = withAuthGuard(OrderHelpScreen);
 const ProtectedOrderIssue = withAuthGuard(OrderIssueScreen);
 const ProtectedCancelOrder = withAuthGuard(CancelOrderScreen);
 const ProtectedReturnReplace = withAuthGuard(ReturnReplaceScreen);
+const ProtectedReturnDetail = withAuthGuard(ReturnDetailScreen);
 const ProtectedRaiseTicket = withAuthGuard(RaiseTicketScreen);
 const ProtectedMyTickets = withAuthGuard(MyTicketsScreen);
 const ProtectedTicketDetail = withAuthGuard(TicketDetailScreen);
@@ -142,6 +144,7 @@ const CustomerNavigator = () => (
     <Stack.Screen name="OrderIssue" component={ProtectedOrderIssue} />
     <Stack.Screen name="CancelOrder" component={ProtectedCancelOrder} />
     <Stack.Screen name="ReturnReplace" component={ProtectedReturnReplace} />
+    <Stack.Screen name="ReturnDetail" component={ProtectedReturnDetail} />
     <Stack.Screen name="RaiseTicket" component={ProtectedRaiseTicket} />
     <Stack.Screen name="MyTickets" component={ProtectedMyTickets} />
     <Stack.Screen name="TicketDetail" component={ProtectedTicketDetail} />

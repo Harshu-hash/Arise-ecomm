@@ -10,7 +10,12 @@ const RETURN_TYPES = [
  * beneath it, which is why return window and GST sit here rather than on the
  * product.
  */
-export default function CategoryPolicyFields({ hsnOptions = [], canEditCommission = false }) {
+export default function CategoryPolicyFields({ hsnOptions = [], canEditCommission = false, inheritedCommission = null, ownCommission = null }) {
+  const commissionHint = ownCommission != null
+    ? 'Applies here and below, unless a lower category sets its own.'
+    : inheritedCommission?.source
+      ? `Using ${inheritedCommission.pct}% from “${inheritedCommission.source.name}”. Set a rate to override it.`
+      : 'No rate set on this or any category above: counts as 0%.';
   return (
     <>
       <Row gutter={12}>
@@ -55,10 +60,9 @@ export default function CategoryPolicyFields({ hsnOptions = [], canEditCommissio
           <Form.Item
             name="commissionPct"
             label="Commission"
-            rules={[{ required: true, message: 'Enter a commission rate (0 for none).' }]}
-            extra={canEditCommission ? 'Arise’s share of each sale here.' : 'Needs the Commission & fees edit permission.'}
+            extra={canEditCommission ? commissionHint : `${commissionHint} Changing it needs the Commission & fees edit permission.`}
           >
-            <InputNumber min={0} max={40} step={0.5} precision={2} disabled={!canEditCommission} style={{ width: '100%' }} addonAfter="%" />
+            <InputNumber min={0} max={40} step={0.5} precision={2} placeholder="Inherit" disabled={!canEditCommission} style={{ width: '100%' }} addonAfter="%" />
           </Form.Item>
         </Col>
       </Row>

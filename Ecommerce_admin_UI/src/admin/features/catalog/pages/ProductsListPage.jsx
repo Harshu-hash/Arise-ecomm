@@ -2,6 +2,7 @@ import { Flex, Space, Tag, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import DataTable from '@ui/components/DataTable/DataTable';
 import FilterBar from '@ui/components/FilterBar';
+import CampaignTag from '@ui/components/CampaignTag';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
@@ -87,6 +88,7 @@ export default function ProductsListPage() {
             </Flex>
             <Space size={8} wrap>
               {row.minPricePaise !== null && <MoneyText paise={row.minPricePaise} strong />}
+              <CampaignTag campaign={row.campaign} />
               <Tag color={row.totalStock === 0 ? 'red' : undefined} style={{ marginInlineEnd: 0 }}>
                 {row.totalStock} in stock
               </Tag>

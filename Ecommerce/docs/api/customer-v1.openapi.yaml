@@ -124,8 +124,20 @@
       "patch": { "operationId": "updateCartItem", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "409": { "$ref": "#/components/responses/Error" } } },
       "delete": { "operationId": "removeCartItem", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" } } }
     },
+    "/cart/items/{cartItemId}/save-for-later": {
+      "parameters": [{ "$ref": "#/components/parameters/CartItemId" }],
+      "post": { "operationId": "saveCartItemForLater", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/cart/saved/{cartItemId}/move-to-cart": {
+      "parameters": [{ "$ref": "#/components/parameters/CartItemId" }],
+      "post": { "operationId": "moveSavedItemToCart", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" }, "404": { "$ref": "#/components/responses/Error" }, "409": { "$ref": "#/components/responses/Error" } } }
+    },
+    "/coupons/eligible": {
+      "get": { "operationId": "listEligibleCoupons", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
     "/cart/coupon": {
-      "put": { "operationId": "applyCartCoupon", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "422": { "$ref": "#/components/responses/ValidationError" } } },
+      "post": { "operationId": "applyCartCouponByPost", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } },
+      "put": { "operationId": "applyCartCoupon", "tags": ["Cart"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Cart" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } },
       "delete": { "operationId": "removeCartCoupon", "tags": ["Cart"], "responses": { "200": { "$ref": "#/components/responses/Cart" } } }
     },
     "/addresses": {

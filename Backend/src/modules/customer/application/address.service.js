@@ -120,3 +120,17 @@ export async function deleteAddress(customerId, addressId) {
   });
   return { deleted: true, addressId };
 }
+
+/** One of the customer's saved addresses as { id, label, isDefault, name, phone, line, city, state, pincode }, or null. */
+export async function getAddress(customerId, addressId) {
+  const book = await AddressBook.findOne({ customerId }).lean();
+  const address = book?.addresses.find((entry) => String(entry._id) === String(addressId));
+  return address ? serialize(address) : null;
+}
+
+/** The customer's default address, or their only one, or null. */
+export async function getDefaultAddress(customerId) {
+  const book = await AddressBook.findOne({ customerId }).lean();
+  const address = book?.addresses.find((entry) => entry.isDefault) ?? (book?.addresses.length === 1 ? book.addresses[0] : null);
+  return address ? serialize(address) : null;
+}

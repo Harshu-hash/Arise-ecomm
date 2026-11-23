@@ -14,6 +14,8 @@ import { linking } from '../navigation/linking';
 import { navigationRef } from '../navigation/navigationRef';
 import { store } from '@store';
 import { SessionBootstrap } from './bootstrap';
+import PushRegistration from '@features/notifications/PushRegistration';
+import OrderUpdates from '@features/orders/OrderUpdates';
 import ErrorBoundary from './errorBoundary';
 import { NetworkStatusProvider, OfflineBanner } from '@core/network';
 import { startCatalogUpdates } from '@core/realtime/catalogUpdates';
@@ -30,6 +32,8 @@ const App = () => {
               <ThemeProvider>
                 <StatusBarManager barStyle="dark-content" themeColor={COLORS.surface} />
                 <OfflineBanner />
+                <PushRegistration />
+                <OrderUpdates />
                 <SessionBootstrap>
                   <ToastProvider>
                     <BrandSwitchLoaderProvider>

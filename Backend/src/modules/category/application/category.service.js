@@ -35,7 +35,7 @@ export function serializeCategory(row, rootName = null) {
     gated: row.gated,
     codAllowed: row.codAllowed,
     gstRate: row.gstRate,
-    commissionPct: row.commissionPct ?? 0,
+    commissionPct: row.commissionPct ?? null,
     hsnCode: row.hsnCode ?? null,
     attributeSetId: id(row.attributeSetId),
     imageUrl: row.imageUrl ?? null,
@@ -102,14 +102,25 @@ export async function findCategoryForCatalog(categoryId) {
 }
 
 /** A leaf category as a new product/listing needs it: policy snapshot plus its breadcrumb path. */
+/**
+ * The commission that applies given a category and its ancestors (nearest first): the bottom-most one with a rate set
+ * wins, and `source` says which. No rate anywhere up the tree means 0% from no category.
+ */
+function effectiveCommission(chain) {
+  const node = chain.find((row) => row.commissionPct != null);
+  return node ? { pct: node.commissionPct, source: { id: id(node._id), name: node.name } } : { pct: 0, source: null };
+}
+
 export async function getCategoryForListing(categoryId) {
   const category = await Category.findOne({ _id: categoryId, level: MAX_CATEGORY_LEVEL, status: 'ACTIVE' }).lean();
   if (!category) return null;
   const names = [category.name];
-  let parent = category.parentId ? await Category.findById(category.parentId, 'name parentId').lean() : null;
+  const chain = [category];
+  let parent = category.parentId ? await Category.findById(category.parentId, 'name parentId commissionPct').lean() : null;
   while (parent) {
     names.unshift(parent.name);
-    parent = parent.parentId ? await Category.findById(parent.parentId, 'name parentId').lean() : null;
+    chain.push(parent);
+    parent = parent.parentId ? await Category.findById(parent.parentId, 'name parentId commissionPct').lean() : null;
   }
   return {
     id: id(category._id),
@@ -119,7 +130,7 @@ export async function getCategoryForListing(categoryId) {
     attributeSetId: id(category.attributeSetId),
     hsnCode: category.hsnCode,
     gstRate: category.gstRate,
-    commissionPct: category.commissionPct ?? 0,
+    commissionPct: effectiveCommission(chain).pct,
     returnWindowDays: category.returnWindowDays,
     returnTypes: category.returnTypes,
     gated: category.gated,
@@ -138,11 +149,13 @@ export async function getCategory(categoryId, scope) {
   assertInScope(category, scope);
 
   const ancestors = [];
+  const above = []; // nearest first, with the fields the commission lookup needs
   let parentId = category.parentId;
   while (parentId) {
-    const parent = await Category.findById(parentId, 'name parentId').lean();
+    const parent = await Category.findById(parentId, 'name parentId commissionPct').lean();
     if (!parent) break;
     ancestors.unshift({ id: id(parent._id), name: parent.name });
+    above.push(parent);
     parentId = parent.parentId;
   }
   const [childCount, descendantIds] = await Promise.all([
@@ -160,6 +173,8 @@ export async function getCategory(categoryId, scope) {
     data: serializeCategory(category, await rootNameFor(category)),
     meta: {
       ancestors,
+      // What this category would use if it had no rate of its own, so the editor can show it.
+      inheritedCommission: effectiveCommission(above),
       childCount,
       liveListingsInSubtree: stats.liveListings,
       canDelete: childCount === 0 && stats.liveListings === 0 && stats.productCount === 0,
@@ -170,7 +185,7 @@ export async function getCategory(categoryId, scope) {
 }
 
 export async function createCategory(input, { scope, actor, canEditCommission = false }) {
-  if (input.commissionPct !== undefined && !canEditCommission) {
+  if (input.commissionPct != null && !canEditCommission) {
     throw new ForbiddenError('Setting a commission rate needs the "Commission & fees: edit rules" permission.');
   }
   const parent = input.parentId ? await Category.findById(input.parentId).lean() : null;
@@ -240,7 +255,7 @@ export async function updateCategory(categoryId, input, { scope, actor, canEditC
   if (!before) throw new NotFoundError('Category not found.');
   assertInScope(before, scope);
   // The editor sends every field on save, so only an actual change of rate needs the finance permission.
-  if (input.commissionPct !== undefined && input.commissionPct !== (before.commissionPct ?? 0) && !canEditCommission) {
+  if (input.commissionPct !== undefined && input.commissionPct !== (before.commissionPct ?? null) && !canEditCommission) {
     throw new ForbiddenError('Changing the commission rate needs the "Commission & fees: edit rules" permission.');
   }
   if (before.version !== input.version) {
@@ -438,4 +453,25 @@ export async function visibleCategoryIds(categoryId = null) {
   const walk = (list) => list.forEach((node) => { ids.push(id(node._id)); walk(node.children); });
   walk(nodes);
   return ids;
+}
+
+/**
+ * GST, HSN and the commission that apply to each category, for pricing an order: the leaf's own GST/HSN, and the
+ * commission from the nearest category up the tree that sets one. Returns Map(categoryId -> { gstRate, hsnCode, commissionPct }).
+ */
+export async function getCategoryTerms(categoryIds) {
+  const terms = new Map();
+  for (const categoryId of new Set(categoryIds.map(String))) {
+    const leaf = await Category.findById(categoryId, 'gstRate hsnCode parentId commissionPct').lean();
+    if (!leaf) continue;
+    const chain = [leaf];
+    for (let parentId = leaf.parentId; parentId; ) {
+      const parent = await Category.findById(parentId, 'parentId commissionPct name').lean();
+      if (!parent) break;
+      chain.push(parent);
+      parentId = parent.parentId;
+    }
+    terms.set(categoryId, { gstRate: leaf.gstRate, hsnCode: leaf.hsnCode, commissionPct: effectiveCommission(chain).pct });
+  }
+  return terms;
 }

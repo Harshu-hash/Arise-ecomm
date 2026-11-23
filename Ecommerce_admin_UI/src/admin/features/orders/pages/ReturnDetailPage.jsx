@@ -28,6 +28,8 @@ const ACTION_LABEL = {
   RECORD_QC: ['qc', 'Record QC'],
   CONVERT_TO_REFUND: ['convert-to-refund', 'Convert to refund'],
   OVERRIDE_REJECTION: ['override-rejection', 'Override seller rejection'],
+  CANCEL_RETURN: ['cancel', 'Cancel return'],
+  RETRY_REFUND: ['retry-refund', 'Retry refund'],
 };
 
 export default function ReturnDetailPage() {
@@ -98,8 +100,8 @@ export default function ReturnDetailPage() {
             {allowedActions.map((a) => (
               <Button
                 key={a}
-                danger={a === 'REJECT'}
-                type={a === 'APPROVE' || a === 'RECORD_QC' ? 'primary' : 'default'}
+                danger={a === 'REJECT' || a === 'CANCEL_RETURN'}
+                type={a === 'APPROVE' || a === 'RECORD_QC' || a === 'RETRY_REFUND' ? 'primary' : 'default'}
                 onClick={() => setModal(a)}
               >
                 {ACTION_LABEL[a][1]}
@@ -125,13 +127,15 @@ export default function ReturnDetailPage() {
       )}
       {refund && (
         <Alert
-          type={refund.status === 'PENDING_DETAILS' ? 'warning' : 'info'}
+          type={refund.status === 'PENDING_DETAILS' ? 'warning' : refund.status === 'FAILED' ? 'error' : 'info'}
           showIcon
           message={`Refund ${refund.id} — ${refund.status.replace(/_/g, ' ').toLowerCase()}`}
           description={
             refund.status === 'PENDING_DETAILS'
               ? 'This was a cash-on-delivery order, so there is no card to refund. It is waiting on the customer’s bank details.'
-              : <MoneyText paise={refund.amountPaise} strong />
+              : refund.status === 'FAILED' && refund.failureReason
+                ? <Space direction="vertical" size={2}><MoneyText paise={refund.amountPaise} strong /><span>Razorpay said: {refund.failureReason}</span><span>Fix that, then use “Retry refund”.</span></Space>
+                : <MoneyText paise={refund.amountPaise} strong />
           }
         />
       )}
@@ -192,7 +196,7 @@ export default function ReturnDetailPage() {
         onCancel={() => setModal(null)}
         onConfirm={(values) => act.mutate({ action: ACTION_LABEL[modal][0], payload: values })}
         loading={act.isPending}
-        danger={modal === 'REJECT'}
+        danger={modal === 'REJECT' || modal === 'CANCEL_RETURN'}
         title={modal ? `${ACTION_LABEL[modal][1]}?` : ''}
         description={row.productName}
         impact={
@@ -200,12 +204,16 @@ export default function ReturnDetailPage() {
             ? 'A reverse pickup is arranged. The refund is released only after QC passes at the origin.'
             : modal === 'REJECT'
               ? 'The customer keeps the item and gets no refund. They are told why.'
-              : modal === 'CONVERT_TO_REFUND'
+              : modal === 'RETRY_REFUND'
+                ? 'The refund is sent to the customer’s original payment method again. It can never be paid twice.'
+                : modal === 'CANCEL_RETURN'
+                ? 'The return is closed and any courier pickup cancelled. No refund is made. The customer and seller are told why, and the customer can request the return again while its window is open.'
+                : modal === 'CONVERT_TO_REFUND'
                 ? 'The replacement is cancelled and the customer gets their money back instead.'
                 : undefined
         }
-        reasonRequired={['REJECT', 'CONVERT_TO_REFUND', 'OVERRIDE_REJECTION'].includes(modal)}
-        reasonLabel={modal === 'REJECT' ? 'Why are you rejecting this?' : 'Reason'}
+        reasonRequired={['REJECT', 'CONVERT_TO_REFUND', 'OVERRIDE_REJECTION', 'CANCEL_RETURN'].includes(modal)}
+        reasonLabel={modal === 'REJECT' ? 'Why are you rejecting this?' : modal === 'CANCEL_RETURN' ? 'Why are you cancelling this return?' : 'Reason'}
         showNote={false}
         confirmLabel={modal ? ACTION_LABEL[modal][1] : ''}
       />

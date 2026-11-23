@@ -78,6 +78,11 @@ const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
       </View>
 
       <PriceBlock price={product.price} mrp={product.mrp} style={styles.priceBlock} />
+      {product.campaign ? (
+        <Text style={styles.campaignNote} numberOfLines={1}>
+          {`Extra ${product.campaign.extraOffPct}% off · ${product.campaign.name}`}
+        </Text>
+      ) : null}
       <Text style={styles.delivery}>{`Delivery by ${product.deliveryDate}`}</Text>
     </TouchableOpacity>
   );
@@ -674,6 +679,12 @@ const styles = StyleSheet.create({
     marginLeft: 2,
   },
   priceBlock: {
+    marginBottom: 2,
+  },
+  campaignNote: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: COLORS.offerRed,
     marginBottom: 2,
   },
   delivery: {

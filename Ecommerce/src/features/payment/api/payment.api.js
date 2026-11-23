@@ -19,7 +19,12 @@ export const paymentApi = baseApi.injectEndpoints({
       transformResponse: mapPayment,
     }),
     confirmPayment: builder.mutation({
-      query: paymentId => ({ url: PAYMENT_ENDPOINTS.confirm(paymentId), method: 'POST' }),
+      // The signed result Razorpay's SDK gave this device; the server verifies it before marking the payment paid.
+      query: ({ paymentId, ...result }) => ({
+        url: PAYMENT_ENDPOINTS.confirm(paymentId),
+        method: 'POST',
+        data: result,
+      }),
       transformResponse: mapPayment,
     }),
     getPayment: builder.query({

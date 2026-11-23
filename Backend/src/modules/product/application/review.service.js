@@ -7,6 +7,7 @@ import { getSizeChartForDisplay } from '../../catalog/public/index.js';
 import { getCategoryForListing } from '../../category/public/index.js';
 import { getSellerOwnerEmail, getSellerSummaries } from '../../identity/public/index.js';
 import { urlForKey } from '../../media/public/index.js';
+import { campaignByOffer } from './customerCatalog.service.js';
 import { nextStatusForDecision } from '../domain/services/productRules.js';
 import { Offer } from '../infrastructure/persistence/offer.model.js';
 import { Product } from '../infrastructure/persistence/product.model.js';
@@ -36,7 +37,7 @@ const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SORT_FIELDS = ['title', 'status', 'createdAt', 'updatedAt'];
 
 /** One row of the admin products table — a product with its offers rolled up, no fictional buy-box math. */
-function serializeProductRow(product, offerStats) {
+function serializeProductRow(product, offerStats, campaign = null) {
   const stats = offerStats ?? { count: 0, totalStock: 0, minPrice: null, maxPrice: null, assured: false };
   return {
     id: id(product._id),
@@ -45,6 +46,7 @@ function serializeProductRow(product, offerStats) {
     brandName: product.brandName,
     categoryPath: product.categoryPath,
     status: product.status,
+    campaign,
     minPricePaise: stats.minPrice,
     maxPricePaise: stats.maxPrice,
     totalStock: stats.totalStock,
@@ -88,10 +90,13 @@ export async function listProductsForAdmin(query) {
       },
     },
   ]);
+  const liveOffers = await Offer.find({ productId: { $in: productIds }, status: 'LIVE' }).lean();
+  const campaigns = await campaignByOffer(liveOffers);
+  const campaignByProduct = new Map(liveOffers.filter((o) => campaigns.has(String(o._id))).map((o) => [id(o.productId), campaigns.get(String(o._id))]));
   const statsByProductId = new Map(offerStats.map((row) => [id(row._id), { ...row, assured: Boolean(row.assured) }]));
 
   return {
-    data: products.map((product) => serializeProductRow(product, statsByProductId.get(id(product._id)))),
+    data: products.map((product) => serializeProductRow(product, statsByProductId.get(id(product._id)), campaignByProduct.get(id(product._id)))),
     meta: { page: query.page, pageSize: query.pageSize, total, totalPages: Math.max(1, Math.ceil(total / query.pageSize)) },
   };
 }
@@ -112,7 +117,7 @@ export async function getProductForAdmin(productId) {
     getSizeChartForDisplay(product.sizeChartId),
   ]);
 
-  const sellerById = await getSellerSummaries(offers.map((o) => o.sellerId));
+  const [sellerById, campaigns] = await Promise.all([getSellerSummaries(offers.map((o) => o.sellerId)), campaignByOffer(offers.filter((o) => o.status === 'LIVE'))]);
   const variantById = new Map(variants.map((v) => [id(v._id), v]));
   const offerRows = offers.map((offer) => {
     const seller = sellerById.get(String(offer.sellerId));
@@ -127,6 +132,7 @@ export async function getProductForAdmin(productId) {
       sellingPricePaise: offer.sellingPricePaise,
       mrpPaise: offer.mrpPaise,
       priceAboveMrp,
+      campaign: campaigns.get(id(offer._id)) ?? null,
       stock: offer.stock,
       fulfillmentType: offer.fulfillmentType,
       // No logistics SLA integration yet.

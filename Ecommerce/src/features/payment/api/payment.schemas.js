@@ -21,6 +21,15 @@ export const paymentSchema = z.object({
     type: z.enum(['NONE', 'REDIRECT', 'UPI_INTENT', 'SDK']),
     url: z.string().url().nullable(),
     returnUrl: z.string().nullable().optional(),
+    sdk: z
+      .object({
+        provider: z.literal('RAZORPAY'),
+        keyId: z.string().min(1),
+        orderId: z.string().min(1),
+        amountPaise: z.number().int().positive(),
+        currency: z.literal('INR'),
+      })
+      .optional(),
   }),
 });
 export const paymentResponseSchema = apiEnvelope(paymentSchema);
@@ -72,7 +81,7 @@ export const orderResponseSchema = apiEnvelope(
     paymentMethod: z.string().min(1),
     paymentStatus: z.enum(['PAID', 'COD_PENDING']),
     amountPaise: z.number().int().nonnegative(),
-    deliveryCode: z.string().length(4),
+    deliveryCode: z.string().length(4).nullable(), // no delivery OTP yet: the server sends null
     address: addressDtoSchema,
     items: z.array(orderItemSchema).min(1),
   }),

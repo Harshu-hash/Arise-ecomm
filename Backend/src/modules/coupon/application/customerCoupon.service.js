@@ -1,6 +1,9 @@
+import mongoose from 'mongoose';
 import { getSellerSummaries } from '../../identity/public/index.js';
-import { COUPON_STATE } from '../domain/constants/coupon.js';
+import { COUPON_STATE, COUPON_STATUS } from '../domain/constants/coupon.js';
+import { evaluateCoupon, statusExpr } from '../domain/services/couponRules.js';
 import { Coupon } from '../infrastructure/persistence/coupon.model.js';
+import { getCustomerCouponHistory } from './couponRedemption.service.js';
 
 const MAX_LISTED = 50;
 const rupees = (paise) => `₹${(paise / 100).toLocaleString('en-IN')}`;
@@ -56,4 +59,46 @@ export async function listAvailableCoupons(customerId = null, now = new Date()) 
       };
     }),
   };
+}
+
+/**
+ * What coupons would do for a cart, by the same rule checkout will use (evaluateCoupon), so a coupon can never look fine
+ * in the cart and be refused at payment. `lines` are { productId, sellerId, unitPricePaise, quantity }.
+ * With `code`: just that coupon (an unlisted one can still be redeemed by its code); without: every coupon this customer
+ * can see, best saving first. Returns { code, type, description, minimumSubtotalPaise, applicable, discountPaise, reasons,
+ * belowMinimum } per coupon; an unknown or not-running code returns nothing.
+ * The customer's real history (orders placed, times each coupon was used) feeds the first-order and per-customer limits.
+ */
+export async function evaluateCouponsForCart(customerId, lines, { code = null, now = new Date() } = {}) {
+  const customerObjectId = mongoose.Types.ObjectId.isValid(customerId) ? new mongoose.Types.ObjectId(customerId) : null;
+  const match = code
+    ? { code: String(code).trim().toUpperCase() }
+    : { $or: [{ visibility: 'PUBLIC', 'audience.type': { $in: ['ALL', 'NEW'] } }, ...(customerObjectId ? [{ 'audience.type': 'CUSTOM', 'audience.customerIds': customerObjectId }] : [])] };
+  // Aggregation, so the running status comes from the one definition the admin console uses.
+  const running = await Coupon.aggregate([
+    { $match: match },
+    { $addFields: { status: statusExpr(now) } },
+    { $match: { status: COUPON_STATUS.ACTIVE } },
+    { $limit: MAX_LISTED },
+  ]);
+  const history = await getCustomerCouponHistory(customerId);
+  const cart = {
+    customer: { id: String(customerId), ordersCount: history.ordersCount },
+    items: lines.map((line) => ({ productId: line.productId, sellerId: line.sellerId, pricePaise: line.unitPricePaise, qty: line.quantity })),
+  };
+  return running
+    .map((coupon) => {
+      const result = evaluateCoupon(coupon, { ...cart, redeemedByCustomer: history.redeemed.get(String(coupon._id)) ?? 0 }, now);
+      return {
+        code: coupon.code,
+        type: coupon.type,
+        description: coupon.description || offerSummary(coupon),
+        minimumSubtotalPaise: coupon.minCartPaise,
+        applicable: result.applicable,
+        discountPaise: result.discountPaise,
+        reasons: result.reasons,
+        belowMinimum: coupon.minCartPaise > 0 && result.basisPaise < coupon.minCartPaise,
+      };
+    })
+    .sort((a, b) => b.discountPaise - a.discountPaise);
 }

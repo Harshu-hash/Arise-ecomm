@@ -41,6 +41,7 @@ export const SECTION_SCHEMAS = {
 
   fees: z.object({
     platformFeePaise: paiseSchema,
+    deliveryFeePaise: paiseSchema,
     deliveryFeeFreeThresholdPaise: paiseSchema,
     codConvenienceFeePaise: paiseSchema,
   }).strict(),
@@ -52,7 +53,7 @@ export const SECTION_SCHEMAS = {
   }).strict(),
 
   tax: z.object({
-    invoiceSeriesPrefix: z.string().trim().regex(/^[A-Z0-9/-]{1,20}$/, 'Use A-Z, 0-9, / or -.'),
+    invoiceSeriesPrefix: z.string().trim().regex(/^[A-Z0-9]{1,4}$/, 'Use 1 to 4 letters or digits: GST allows invoice numbers of at most 16 characters.'),
     hsnDefaultRatePct: pct,
   }).strict(),
 
@@ -61,6 +62,20 @@ export const SECTION_SCHEMAS = {
     payoutCycleDay: z.enum(['MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY', 'SUNDAY']),
     reserveHoldPctNewSellers: pct,
   }).strict(),
+
+  settlement: z.object({
+    holdBufferDays: int(0, 60), // extra days after the return window before a delivered item's money can be paid out
+    closingFeePaise: paiseSchema, // flat fee per delivered item
+    collectionFeePct: z.number().min(0).max(100), // payment collection cost, % of the sale
+    gstOnFeesPct: z.number().min(0).max(100),
+    tcsPct: z.number().min(0).max(100),
+    tdsPct: z.number().min(0).max(100),
+    minWithdrawalPaise: paiseSchema,
+    maxWithdrawalPaise: paiseSchema, // per request
+    dailyWithdrawalLimitPaise: paiseSchema, // per seller per day; 0 = no daily limit
+    maxOpenWithdrawals: int(1, 20), // requests a seller may have waiting at once
+    newSellerDays: int(0, 3650),
+  }).strict().refine((v) => v.minWithdrawalPaise <= v.maxWithdrawalPaise, { path: ['maxWithdrawalPaise'], message: 'Must be at least the minimum withdrawal.' }),
 
   approvalThresholds: z.object({
     defaultRefundLimitPaise: paiseSchema,

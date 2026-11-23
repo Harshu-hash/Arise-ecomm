@@ -7,6 +7,9 @@ import { TMP_DIR } from '../infrastructure/storage/local.storage.js';
 import { enqueueWebhookReceipt } from '../infrastructure/queue/webhook.queue.js';
 import { RECEIPT_STATUS, WebhookReceipt } from '../infrastructure/webhooks/webhookReceipt.model.js';
 import { processDueAccountDeletions } from '../modules/customer/application/privacy.service.js';
+import { autoApproveOverdueReturns, autoPassOverdueQc, chasePickups } from '../modules/order/public/index.js';
+import { expireStaleReservations } from '../modules/product/public/index.js';
+import { accrueMissing, releaseDue } from '../modules/settlement/public/index.js';
 
 const STALE_RECEIPT_MS = 2 * 60_000;
 const MAX_RECEIPT_ATTEMPTS = 24; // stop re-driving poison events; they stay FAILED for alerting/manual replay
@@ -52,7 +55,25 @@ async function cleanUploadTmp() {
   if (removed) logger.info({ removed }, 'Removed stale upload temp files');
 }
 
+async function expireStockHolds() {
+  const expired = await expireStaleReservations();
+  if (expired) logger.info({ expired }, 'Gave back expired stock holds');
+}
+
+async function enforceReturnDeadlines() {
+  const [approved, passed, pickups] = [await autoApproveOverdueReturns(), await autoPassOverdueQc(), await chasePickups()];
+  if (approved || passed || pickups.booked || pickups.chased || pickups.lapsed) logger.info({ approved, passed, ...pickups }, 'Settled returns the seller did not decide or check, and chased pickups');
+}
+
+async function releaseWalletMoney() {
+  const [credited, released] = [await accrueMissing(), await releaseDue()];
+  if (credited || released) logger.info({ credited, released }, 'Credited missed deliveries and released settled money to seller wallets');
+}
+
 export async function maintenanceJobProcessor(job) {
+  if (job.name === MAINTENANCE_JOBS.WALLET_RELEASE) return releaseWalletMoney();
+  if (job.name === MAINTENANCE_JOBS.RETURN_DECISION_DEADLINE) return enforceReturnDeadlines();
+  if (job.name === MAINTENANCE_JOBS.STOCK_RESERVATION_EXPIRY) return expireStockHolds();
   if (job.name === MAINTENANCE_JOBS.WEBHOOK_SWEEP) return sweepWebhooks();
   if (job.name === MAINTENANCE_JOBS.OUTBOX_CLEANUP) return cleanOutbox();
   if (job.name === MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP) return cleanUploadTmp();

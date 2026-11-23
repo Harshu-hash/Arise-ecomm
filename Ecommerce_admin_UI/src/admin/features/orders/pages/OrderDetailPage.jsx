@@ -5,15 +5,18 @@ import { useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { queryClient } from '@core/api/queryClient';
+import useRealtime from '@ui/hooks/useRealtime';
 import AuditDrawer from '@ui/components/AuditDrawer';
 import DateText from '@ui/components/DateText';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import ParcelStatusModal from '../components/ParcelStatusModal';
 import { orderKeys, ordersApi } from '../api/orders.api';
 import OrderActionModals from '../components/OrderActionModals';
 import OrderTabs from '../components/OrderTabs';
+import InvoiceList from '../../finance/components/InvoiceList';
 import { AddressPanel, CustomerPanel, PriceBreakdown } from '../components/OrderSidePanels';
 
 export default function OrderDetailPage() {
@@ -23,6 +26,10 @@ export default function OrderDetailPage() {
   const [modal, setModal] = useState(null);
   const [selectedIds, setSelectedIds] = useState([]);
   const [returnItem, setReturnItem] = useState(null);
+  const [statusParcel, setStatusParcel] = useState(null);
+
+  const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['orders'] });
+  useRealtime('admin', { 'order:changed': refreshOrders, 'session:ready': refreshOrders });
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: orderKeys.detail(id),
@@ -80,6 +87,16 @@ export default function OrderDetailPage() {
     },
   });
 
+  const overrideStatus = useMutation({
+    mutationFn: ({ shipment, values }) => ordersApi.setParcelStatus(id, shipment.id, values),
+    onSuccess: () => {
+      invalidate();
+      setStatusParcel(null);
+      message.success('Status changed. The customer and seller have been updated.');
+    },
+    onError: (e) => message.error(e.message),
+  });
+
   const release = useMutation({
     mutationFn: () => ordersApi.release(id),
     onSuccess: () => {
@@ -99,7 +116,7 @@ export default function OrderDetailPage() {
   if (error) return <ErrorState error={error} onRetry={refetch} title="Could not load this order" />;
 
   const order = data.data;
-  const { items, shipments, allowedActions, refunds, customer } = data.meta;
+  const { items, shipments, allowedActions, refunds, customer, invoices = [] } = data.meta;
   const selectedItems = items.filter((i) => selectedIds.includes(i.id));
 
   // Rough client-side estimate; the server computes the authoritative figure.
@@ -180,6 +197,7 @@ export default function OrderDetailPage() {
             }}
             onAddNote={(text) => addNote.mutate(text)}
             addingNote={addNote.isPending}
+            onChangeStatus={allowedActions.includes('OVERRIDE_STATUS') ? setStatusParcel : null}
           />
         </Col>
 
@@ -188,9 +206,17 @@ export default function OrderDetailPage() {
             <PriceBreakdown order={order} />
             <CustomerPanel customer={customer} />
             <AddressPanel order={order} />
+            <InvoiceList invoices={invoices} onChanged={invalidate} />
           </Flex>
         </Col>
       </Row>
+
+      <ParcelStatusModal
+        shipment={statusParcel}
+        loading={overrideStatus.isPending}
+        onCancel={() => setStatusParcel(null)}
+        onConfirm={(shipment, values) => overrideStatus.mutate({ shipment, values })}
+      />
 
       <OrderActionModals
         which={modal}

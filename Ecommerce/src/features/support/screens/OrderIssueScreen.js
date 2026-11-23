@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -7,12 +7,13 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import { useGetOrderQuery } from '@features/orders';
+import { useGetOrderInvoicesQuery, useGetOrderQuery } from '@features/orders';
 
 const OrderIssueScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const orderId = route?.params?.orderId || route?.params?.order?.id;
   const { data: order, error, isLoading, refetch } = useGetOrderQuery(orderId, { skip: !orderId });
+  const { data: invoices = [] } = useGetOrderInvoicesQuery(orderId, { skip: !orderId });
 
   if (isLoading) return <FullScreenLoader message="Loading order..." />;
   if (error || !order) {
@@ -59,12 +60,15 @@ const OrderIssueScreen = ({ navigation, route }) => {
       onPress: () =>
         navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'refund' }),
     },
+    // Opens the first invoice; the order screen lists them all. Before the seller ships there is none, so it goes to support.
     {
       id: 'invoice',
       icon: 'file-text',
       label: 'Download invoice',
       onPress: () =>
-        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
+        invoices[0]
+          ? Linking.openURL(invoices[0].downloadUrl).catch(() => {})
+          : navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
     },
     {
       id: 'other',

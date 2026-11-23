@@ -53,8 +53,9 @@ const StaticPagesPage = lazy(() => import('@admin/features/cms/pages/StaticPages
 /* Finance */
 const PaymentsPage = lazy(() => import('@admin/features/finance/pages/PaymentsPage'));
 const RefundsPage = lazy(() => import('@admin/features/finance/pages/RefundsPage'));
+const InvoicesPage = lazy(() => import('@admin/features/finance/pages/InvoicesPage'));
 const SellerSettlementsPage = lazy(() => import('@admin/features/finance/pages/SellerSettlementsPage'));
-const BulkSettlementPage = lazy(() => import('@admin/features/finance/pages/BulkSettlementPage'));
+const WithdrawalsPage = lazy(() => import('@admin/features/finance/pages/WithdrawalsPage'));
 
 /* Catalog */
 const ProductsListPage = lazy(() => import('@admin/features/catalog/pages/ProductsListPage'));
@@ -118,8 +119,9 @@ const ROUTES = [
   // Finance
   { path: '/finance/payments', element: <PaymentsPage /> },
   { path: '/finance/refunds', element: <RefundsPage /> },
+  { path: '/finance/invoices', element: <InvoicesPage /> },
   { path: '/finance/payouts', element: <SellerSettlementsPage /> },
-  { path: '/finance/payouts/bulk', element: <BulkSettlementPage /> },
+  { path: '/finance/withdrawals', element: <WithdrawalsPage /> },
 
   // Reviews & support
   { path: '/reviews', element: <ReviewsPage /> },

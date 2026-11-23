@@ -15,6 +15,8 @@ const offerSchema = new mongoose.Schema(
     mrpPaise: { type: Number, min: 0, required: true },
     taxCode: { type: String, trim: true, maxlength: 20, default: null },
     stock: { type: Number, min: 0, default: 0 },
+    // Units held for checkouts in progress (see stockReservation.service). Shoppers can buy stock - reserved.
+    reserved: { type: Number, min: 0, default: 0 },
     fulfillmentType: { type: String, enum: ['SELLER', 'ARISE'], default: 'SELLER' },
     status: { type: String, enum: ['DRAFT', 'QC_PENDING', 'LIVE', 'NEEDS_CHANGES', 'REJECTED', 'INACTIVE'], default: 'QC_PENDING' },
     buyBoxWinner: { type: Boolean, default: false },

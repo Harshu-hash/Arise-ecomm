@@ -92,6 +92,23 @@ export const sellerSettingsHandlers = [
   }),
 
   /* --------------------------------------------------------- bank & pickup */
+  mswHttp.get(`${SELLER_BASE}/settings/address`, async ({ request }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const a = c.seller?.pickupAddress ?? {};
+    return ok({ address: a.address ?? null, locality: a.locality ?? null, city: a.city ?? c.seller?.city ?? null, state: a.state ?? c.seller?.state ?? null, pincode: a.pincode ?? null, contact: { name: c.user.name ?? null, phone: c.user.phone ?? '9800000000', email: c.user.email ?? null }, registeredWithCourier: false });
+  }),
+
+  mswHttp.put(`${SELLER_BASE}/settings/address`, async ({ request }) => {
+    const c = ctx(request);
+    if (c.response) return c.response;
+    const body = await request.json();
+    if (String(body?.address ?? '').trim().length < 10 || !/\d/.test(body.address)) return badRequest('Enter the full address with a house, flat or road number.', 'ADDRESS_INVALID');
+    update('sellers', c.seller.id, { pickupAddress: body });
+    scheduleSave();
+    return ok({ ...body, contact: { name: c.user.name ?? null, phone: c.user.phone ?? '9800000000', email: c.user.email ?? null }, registeredWithCourier: false });
+  }),
+
   mswHttp.get(`${SELLER_BASE}/settings/bank`, async ({ request }) => {
     const c = ctx(request);
     if (c.response) return c.response;

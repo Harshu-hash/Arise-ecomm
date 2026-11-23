@@ -110,6 +110,7 @@ export default function CategoryEditor({ categoryId, onSelect }) {
   });
 
   const watchedSetId = Form.useWatch('attributeSetId', form);
+  const watchedCommission = Form.useWatch('commissionPct', form);
 
   if (isLoading) return <FullPageSpinner label="Loading category…" />;
   if (error) return <ErrorState error={error} onRetry={refetch} title="Could not load this category" />;
@@ -180,6 +181,8 @@ export default function CategoryEditor({ categoryId, onSelect }) {
       <Form form={form} layout="vertical" requiredMark={false} onFinish={(v) => save.mutate(v)}>
         <CategoryPolicyFields
           canEditCommission={allowedActions.includes('EDIT_COMMISSION')}
+          inheritedCommission={data.meta.inheritedCommission}
+          ownCommission={watchedCommission}
           hsnOptions={(hsn.data?.data ?? []).map((h) => ({
             value: h.code,
             label: `${h.code} — ${h.description} (${h.gstRate}%)`,

@@ -9,6 +9,7 @@ import MaskedValue from '@ui/components/MaskedValue';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
 import ConfirmActionModal from '@ui/components/ConfirmActionModal';
+import SellerWalletPanel from './SellerWalletPanel';
 import VerificationPanel from './VerificationPanel';
 
 /** Metric against the threshold sellers are actually managed to. */
@@ -228,6 +229,7 @@ export default function SellerTabs({ seller, meta, onAddNote, addingNote, onDeci
             />
           ),
         },
+        { key: 'wallet', label: 'Wallet', children: <SellerWalletPanel seller={seller} /> },
         {
           key: 'notes',
           label: `Notes (${notes.length})`,

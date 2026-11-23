@@ -65,6 +65,7 @@ export const SETTINGS_SECTIONS = [
     label: 'Fees',
     values: {
       platformFeePaise: 500,
+      deliveryFeePaise: 4000,
       deliveryFeeFreeThresholdPaise: 499_00,
       codConvenienceFeePaise: 1500,
     },

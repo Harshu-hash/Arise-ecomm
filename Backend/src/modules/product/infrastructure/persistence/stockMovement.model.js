@@ -5,7 +5,7 @@ const stockMovementSchema = new mongoose.Schema(
   {
     offerId: { type: mongoose.Schema.Types.ObjectId, required: true, immutable: true },
     sellerId: { type: String, required: true, immutable: true },
-    type: { type: String, enum: ['ADJUSTMENT', 'LISTING_EDIT'], required: true, immutable: true },
+    type: { type: String, enum: ['ADJUSTMENT', 'LISTING_EDIT', 'SALE', 'CANCELLATION', 'RTO', 'RETURN'], required: true, immutable: true },
     qty: { type: Number, required: true, immutable: true },
     balanceAfter: { type: Number, required: true, immutable: true },
     note: { type: String, default: null, immutable: true },

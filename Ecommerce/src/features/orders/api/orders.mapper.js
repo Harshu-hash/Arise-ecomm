@@ -32,6 +32,8 @@ export const mapOrder = order => {
     mrp: toRupees(item.mrpPaise),
     canCancel: item.canCancel,
     canReturn: item.canReturn,
+    returnId: item.returnId ?? null,
+    returnStatus: item.returnStatus ?? null,
   }));
   const totals = Object.fromEntries(
     Object.entries(order.totals).map(([key, value]) => [key.replace('Paise', ''), toRupees(value)]),

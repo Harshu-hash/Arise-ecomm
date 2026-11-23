@@ -22,6 +22,12 @@ export const ordersApi = baseApi.injectEndpoints({
       transformResponse: mapTimeline,
       providesTags: (_, __, orderId) => [{ type: 'Shipment', id: orderId }],
     }),
+    // Tax invoices and credit notes of an order: only exist once a seller has made a parcel ready to ship. Each has a short-lived link a browser can open.
+    getOrderInvoices: builder.query({
+      query: orderId => ({ url: ORDER_ENDPOINTS.invoices(orderId) }),
+      transformResponse: payload => payload.data,
+      providesTags: (_, __, orderId) => [{ type: 'Order', id: orderId }],
+    }),
     cancelOrder: builder.mutation({
       query: ({ orderId, reason, comment }) => ({
         url: ORDER_ENDPOINTS.cancel(orderId),
@@ -39,6 +45,7 @@ export const ordersApi = baseApi.injectEndpoints({
 });
 export const {
   useCancelOrderMutation,
+  useGetOrderInvoicesQuery,
   useGetOrderQuery,
   useGetOrdersQuery,
   useGetOrderTimelineQuery,

@@ -297,8 +297,15 @@ const ProductDetailContent = ({ product, navigation }) => {
         v => v.size === selectedSize && (!v.color || !selectedColor || v.color === selectedColor),
       ) ?? null
     : null;
+  // What goes in the cart: the picked variant, or for a product with no sizes the one that matches the colour.
+  // The server picks the seller and checks stock; with no variant it takes the product's cheapest.
+  const cartVariant =
+    activeVariant ??
+    product.variants.find(v => !v.size && (!v.color || v.color === selectedColor)) ??
+    null;
   const price = activeVariant?.price ?? product.price;
   const mrp = activeVariant?.mrp ?? product.mrp;
+  const campaign = activeVariant ? activeVariant.campaign : product.campaign;
   const productImages = product.images?.length ? product.images : [product.image].filter(Boolean);
   const gallery = activeVariant?.images.length ? activeVariant.images : productImages;
   useEffect(() => setActiveImage(0), [activeVariant?.id]);
@@ -387,13 +394,7 @@ const ProductDetailContent = ({ product, navigation }) => {
       return;
     }
     try {
-      await addCartItem({
-        productId: product.id,
-        variantId: variantLabel.toLowerCase().replace(/[\s,]+/g, '-'),
-        variantLabel,
-        offerId: `offer-${product.id}`,
-        quantity: 1,
-      }).unwrap();
+      await addCartItem({ productId: product.id, variantId: cartVariant?.id, quantity: 1 }).unwrap();
       haptics.medium();
       setAddedToBag(true);
       toast.show('Added to cart', { icon: 'shopping-cart' });
@@ -648,7 +649,13 @@ const ProductDetailContent = ({ product, navigation }) => {
                 </View>
               ) : null}
             </View>
-            <Text style={styles.salePrice}>Sale Price Live</Text>
+            {campaign ? (
+              <Text style={styles.salePrice}>
+                Extra {campaign.extraOffPct}% off on {campaign.name} · {formatINR(price)} is your price with this offer
+              </Text>
+            ) : (
+              <Text style={styles.salePrice}>Sale Price Live</Text>
+            )}
           </View>
 
           {/* Mega deal */}

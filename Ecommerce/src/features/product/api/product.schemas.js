@@ -1,7 +1,11 @@
 import { z } from 'zod';
 import { apiEnvelope } from '@features/auth/api/auth.schemas';
 
+// Set when a running campaign is what makes the price lower than the shelf price.
+const campaignSchema = z.object({ name: z.string(), extraOffPct: z.number().int().positive() });
+
 export const productCardDtoSchema = z.object({
+  campaign: campaignSchema.nullable().optional(),
   id: z.string().min(1),
   name: z.string().min(1),
   brand: z.string(),
@@ -57,6 +61,7 @@ export const productDetailResponseSchema = apiEnvelope(
           size: z.string().nullable().optional(),
           pricePaise: z.number().int().nonnegative(),
           mrpPaise: z.number().int().positive(),
+          campaign: campaignSchema.nullable().optional(),
           stock: z.number().int().nonnegative(),
           images: z.array(z.string().url()).default([]),
         }),

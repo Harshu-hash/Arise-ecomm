@@ -44,8 +44,10 @@ const sellerSchema = new mongoose.Schema(
       branch: { type: String, default: null },
     },
     bankOk: { type: Boolean, default: false },
+    pickupLocationName: { type: String, default: null }, // the seller's pickup location on Shiprocket, created on their first shipment
     logoKey: { type: String, default: null }, // public upload key (UPLOAD_PURPOSES.STORE_LOGO)
     vacationMode: { type: Boolean, default: false }, // holiday mode toggled by the seller
+    payoutHold: { on: { type: Boolean, default: false }, reason: { type: String, default: null } }, // admin: no settlement is paid out while on
     // Per-document admin decision (approve/reject + why), one entry per DOCUMENT_TYPE.
     documentDecisions: {
       tradeLicense: {

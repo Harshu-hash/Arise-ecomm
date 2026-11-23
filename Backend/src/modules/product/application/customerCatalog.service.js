@@ -2,6 +2,8 @@ import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { attributeSetDetails } from '../../attribute/public/index.js';
 import { getBrandImages, getSizeChartForDisplay } from '../../catalog/public/index.js';
 import { getCategoryForListing, visibleCategoryIds } from '../../category/public/index.js';
+import { dealPriceForVariant, getCampaignDealPrices } from '../../coupon/public/index.js';
+import { getUnsellableSellerIds } from '../../identity/public/index.js';
 import { urlForKey } from '../../media/public/index.js';
 import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { onCatalogChange } from '../../../infrastructure/realtime/catalogEvents.js';
@@ -10,6 +12,7 @@ import { Offer } from '../infrastructure/persistence/offer.model.js';
 import { Product } from '../infrastructure/persistence/product.model.js';
 import { RecentView } from '../infrastructure/persistence/recentView.model.js';
 import { Variant } from '../infrastructure/persistence/variant.model.js';
+import { availableUnits } from '../domain/services/stockRules.js';
 
 // Customer read model. A product is shown only once an admin approved it (Product LIVE),
 // it has at least one LIVE offer, an image, and its category is visible to customers.
@@ -42,13 +45,37 @@ const leafName = (path) => (path ?? '').split(' › ').pop();
 
 /** The shopper-facing price: cheapest LIVE offer, preferring ones that are in stock. */
 export function bestOffer(offers) {
-  const inStock = offers.filter((offer) => offer.stock > 0);
+  const inStock = offers.filter((offer) => availableUnits(offer) > 0);
   return (inStock.length ? inStock : offers).reduce((best, offer) => (offer.sellingPricePaise < best.sellingPricePaise ? offer : best));
+}
+
+/**
+ * Offers priced as the shopper will actually pay: a running campaign's deal price replaces the shelf price when lower
+ * (the same rule the cart uses), and the offer carries `campaign` { name, extraOffPct } so the app can say why.
+ * Note: coupon <-> product import each other; fine because both only call across at request time.
+ */
+export async function withCampaignPrices(offers) {
+  const deals = await getCampaignDealPrices(offers.map(({ sellerId, productId }) => ({ sellerId, productId })));
+  if (!deals.size) return offers;
+  return offers.map((offer) => {
+    const deal = deals.get(`${offer.sellerId}:${offer.productId}`);
+    const dealPricePaise = deal && dealPriceForVariant(deal, offer.mrpPaise);
+    if (!deal || dealPricePaise >= offer.sellingPricePaise) return offer;
+    const extraOffPct = Math.round(((offer.sellingPricePaise - dealPricePaise) / offer.sellingPricePaise) * 100);
+    return { ...offer, sellingPricePaise: dealPricePaise, campaign: { name: deal.campaignName, extraOffPct, pricePaise: dealPricePaise } };
+  });
+}
+
+/** Offer id -> the campaign it is currently priced by, for the admin and seller screens (which keep showing the shelf price). */
+export async function campaignByOffer(offers) {
+  const priced = await withCampaignPrices(offers);
+  return new Map(priced.filter((offer) => offer.campaign).map((offer) => [String(offer._id), offer.campaign]));
 }
 
 function toCard(product, offers) {
   const best = bestOffer(offers);
   return {
+    campaign: best.campaign ?? null,
     id: String(product._id),
     name: product.title,
     brand: product.brandName ?? '',
@@ -61,7 +88,7 @@ function toCard(product, offers) {
     rating: null,
     ratingCount: 0,
     assured: offers.some((offer) => offer.ariseAssured),
-    inStock: offers.some((offer) => offer.stock > 0),
+    inStock: offers.some((offer) => availableUnits(offer) > 0),
   };
 }
 
@@ -70,7 +97,8 @@ async function liveCards(filter) {
     .sort({ createdAt: -1, _id: -1 })
     .limit(MAX_CANDIDATES)
     .lean();
-  const offers = await Offer.find({ productId: { $in: products.map((p) => p._id) }, status: 'LIVE' }).lean();
+  // Offers of sellers who may not sell right now (suspended, on holiday, ...) are not on the shelf; a product left with none disappears.
+  const offers = await withCampaignPrices(await Offer.find({ productId: { $in: products.map((p) => p._id) }, status: 'LIVE', sellerId: { $nin: await getUnsellableSellerIds() } }).lean());
   const byProduct = new Map();
   for (const offer of offers) {
     const key = String(offer.productId);
@@ -151,7 +179,7 @@ export async function getCustomerProduct(productId) {
   if (!product) throw notFound();
   if (!(await visibleCategoryIds()).includes(String(product.categoryId))) throw notFound();
   const [offers, variants, category, sizeChart] = await Promise.all([
-    Offer.find({ productId: product._id, status: 'LIVE' }).lean(),
+    Offer.find({ productId: product._id, status: 'LIVE', sellerId: { $nin: await getUnsellableSellerIds() } }).lean().then(withCampaignPrices),
     Variant.find({ productId: product._id }).lean(),
     getCategoryForListing(product.categoryId),
     getSizeChartForDisplay(product.sizeChartId),
@@ -191,7 +219,8 @@ export async function getCustomerProduct(productId) {
       size: attributeValues([variant], /size/i)[0] ?? null,
       pricePaise: best.sellingPricePaise,
       mrpPaise: Math.max(best.mrpPaise, best.sellingPricePaise, 1),
-      stock: own.reduce((total, offer) => total + offer.stock, 0),
+      campaign: best.campaign ?? null,
+      stock: own.reduce((total, offer) => total + availableUnits(offer), 0),
       images: variant.images.map((key) => urlForKey(key, 'PRODUCT_IMAGE')),
     }];
   });
@@ -210,7 +239,7 @@ export async function getCustomerProduct(productId) {
     productCode: product.productCode,
     manufacturer: product.manufacturer,
     countryOfOrigin: product.countryOfOrigin,
-    available: offers.some((offer) => offer.stock > 0),
+    available: offers.some((offer) => availableUnits(offer) > 0),
     sizeChart,
     specifications,
   };
@@ -293,4 +322,73 @@ export async function listHomeSections({ userId = null, suggestedLimit = 10, bra
 export async function getLiveProductCards(productIds) {
   const wanted = new Set(productIds.map(String));
   return new Map((await catalogSnapshot()).filter((card) => wanted.has(card.id)).map((card) => [card.id, card]));
+}
+
+/**
+ * The offers a shopper could buy right now, by offer id: a LIVE offer of a LIVE product with a photo in a visible category.
+ * Offers that fail any of that are simply absent. Always current (not the cached snapshot). Whether the seller may sell
+ * is the caller's to check; `sellerId` comes with each offer for that.
+ */
+export async function getPurchasableOffers(offerIds) {
+  const offers = await Offer.find({ _id: { $in: offerIds }, status: 'LIVE' }).lean();
+  if (!offers.length) return new Map();
+  const [products, variants, visible] = await Promise.all([
+    Product.find({ _id: { $in: [...new Set(offers.map((offer) => String(offer.productId)))] }, status: 'LIVE' }, 'title brandName categoryId categoryPath images returnPolicy').lean(),
+    Variant.find({ _id: { $in: offers.map((offer) => offer.variantId) } }, 'label images weightG').lean(),
+    visibleCategoryIds(),
+  ]);
+  const visibleSet = new Set(visible);
+  const productById = new Map(products.map((product) => [String(product._id), product]));
+  const variantById = new Map(variants.map((variant) => [String(variant._id), variant]));
+  return new Map(offers.flatMap((offer) => {
+    const product = productById.get(String(offer.productId));
+    const variant = variantById.get(String(offer.variantId));
+    const imageKey = variant?.images?.[0] ?? product?.images?.[0];
+    if (!product || !visibleSet.has(String(product.categoryId)) || !imageKey) return [];
+    return [[String(offer._id), {
+      offerId: String(offer._id),
+      productId: String(offer.productId),
+      variantId: String(offer.variantId),
+      sellerId: offer.sellerId,
+      categoryId: String(product.categoryId),
+      name: product.title,
+      brand: product.brandName ?? '',
+      category: leafName(product.categoryPath),
+      assured: Boolean(offer.ariseAssured),
+      variantLabel: variant?.label || 'Standard',
+      weightG: variant?.weightG ?? 500,
+      // days after delivery the customer may return it; 0 = not returnable. 7 is the product schema's default for rows older than the field.
+      returnWindowDays: product.returnPolicy ? (product.returnPolicy.type === 'RETURN' ? product.returnPolicy.windowDays : 0) : 7, // replacement-only needs replacements, which are not built
+      imageUrl: urlForKey(imageKey, 'PRODUCT_IMAGE'),
+      pricePaise: offer.sellingPricePaise,
+      mrpPaise: Math.max(offer.mrpPaise, offer.sellingPricePaise, 1),
+      availableUnits: availableUnits(offer),
+    }]];
+  }));
+}
+
+/** What a courier needs to know about variants: Map(variantId -> { sku, weightG, dimsCm: { l, w, h } }). */
+export async function getVariantShippingSpecs(variantIds) {
+  const rows = await Variant.find({ _id: { $in: variantIds } }, 'sku weightG dimsCm').lean();
+  return new Map(rows.map((row) => [String(row._id), { sku: row.sku, weightG: row.weightG, dimsCm: row.dimsCm }]));
+}
+
+/** The variant of a product with this label (the app names variants by label), or null when there is none. */
+export async function findVariantIdByLabel(productId, label) {
+  return (await Variant.findOne({ productId, label }, '_id').lean())?._id ?? null;
+}
+
+/**
+ * The offer a shopper gets when they add a product (or one of its variants) without choosing a seller: the cheapest one on
+ * sale from a seller who may sell, preferring offers with stock. null when nothing is on sale. The cart still checks the
+ * result like any other line, so this only picks; it never promises.
+ */
+export async function pickOfferId({ productId, variantId = null }) {
+  const offers = await Offer.find({
+    productId,
+    status: 'LIVE',
+    ...(variantId ? { variantId } : {}),
+    sellerId: { $nin: await getUnsellableSellerIds() },
+  }).lean();
+  return offers.length ? String(bestOffer(offers)._id) : null;
 }

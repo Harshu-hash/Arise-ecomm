@@ -8,6 +8,7 @@ import {
   Image,
   Animated,
   Easing,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
@@ -16,7 +17,7 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import { useGetOrderQuery, useGetOrderTimelineQuery } from '../api/orders.query';
+import { useGetOrderInvoicesQuery, useGetOrderQuery, useGetOrderTimelineQuery } from '../api/orders.query';
 
 /** Press feedback wrapper: scales down on press-in, springs back on release. */
 const Bouncy = ({ onPress, style, wrapperStyle, children }) => {
@@ -50,6 +51,7 @@ const OrderDetailScreen = ({ navigation, route }) => {
   const orderId = route?.params?.orderId || route?.params?.order?.id;
   const { data: order, error, isLoading, refetch } = useGetOrderQuery(orderId, { skip: !orderId });
   const { data: timeline = [] } = useGetOrderTimelineQuery(orderId, { skip: !orderId });
+  const { data: invoices = [] } = useGetOrderInvoicesQuery(orderId, { skip: !orderId });
 
   // Staggered section entrance on mount.
   const cardAnims = useRef([0, 1, 2, 3, 4].map(() => new Animated.Value(0))).current;
@@ -256,6 +258,28 @@ const OrderDetailScreen = ({ navigation, route }) => {
           </View>
         </Animated.View>
 
+        {/* Tax invoices and credit notes: they exist once a seller has made a parcel ready to ship */}
+        <Animated.View style={[styles.sectionCard, cardStyle(cardAnims[4])]}>
+          <Text style={styles.sectionTitle}>Invoices</Text>
+          {invoices.length ? (
+            invoices.map(doc => (
+              <TouchableOpacity
+                key={doc.id}
+                style={styles.priceRow}
+                onPress={() => Linking.openURL(doc.downloadUrl).catch(() => {})}
+              >
+                <Text style={styles.priceLabel}>
+                  {doc.type === 'CREDIT_NOTE' ? 'Credit note' : doc.kind === 'PLATFORM_FEE' ? 'Platform fee invoice' : `Invoice · ${doc.supplierName}`}
+                  {`\n${doc.number}`}
+                </Text>
+                <Icon name="download" size={18} color={COLORS.primary} />
+              </TouchableOpacity>
+            ))
+          ) : (
+            <Text style={styles.priceLabel}>Your invoice is issued when the seller ships your order.</Text>
+          )}
+        </Animated.View>
+
         {/* Actions */}
         <Animated.View style={[styles.actionsRow, cardStyle(cardAnims[4])]}>
           {order.canCancel ? (
@@ -267,6 +291,20 @@ const OrderDetailScreen = ({ navigation, route }) => {
               }
             >
               <Text style={[styles.outlineBtnText, { color: COLORS.error }]}>Cancel Order</Text>
+            </Bouncy>
+          ) : null}
+          {order.items.find(item => item.returnId) ? (
+            <Bouncy
+              style={styles.outlineBtn}
+              wrapperStyle={styles.outlineBtnWrapper}
+              onPress={() =>
+                navigation &&
+                navigation.navigate('ReturnDetail', {
+                  returnId: order.items.find(item => item.returnId).returnId,
+                })
+              }
+            >
+              <Text style={styles.outlineBtnText}>View Return Status</Text>
             </Bouncy>
           ) : null}
           {order.canReturn ? (

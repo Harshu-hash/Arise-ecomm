@@ -64,6 +64,15 @@ const schema = z.object({
   RAZORPAY_KEY_SECRET: optionalString,
   RAZORPAY_WEBHOOK_SECRET: optionalString,
 
+  // Shiprocket (API-user login; the token is fetched and cached by the adapter)
+  SHIPROCKET_EMAIL: optionalString,
+  SHIPROCKET_PASSWORD: optionalString,
+  SHIPROCKET_API_URL: z.string().default('https://apiv2.shiprocket.in/v1/external'),
+  SHIPROCKET_WEBHOOK_TOKEN: optionalString, // Shiprocket sends it as the x-api-key header on tracking webhooks
+
+  // Firebase Cloud Messaging: the service-account JSON (one line) from Firebase console > Project settings > Service accounts.
+  FCM_SERVICE_ACCOUNT_JSON: optionalString,
+
   // File uploads on local disk (dev: ./uploads, production: /var/www/uploads)
   UPLOAD_DIR: z.string().default('uploads'),
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024), // images & PDFs

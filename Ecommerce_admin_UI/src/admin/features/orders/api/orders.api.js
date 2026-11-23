@@ -3,6 +3,7 @@ import { api } from '@core/api/axiosInstance';
 export const ordersApi = {
   list: (params) => api.get('/orders', params),
   detail: (id) => api.get(`/orders/${id}`),
+  setParcelStatus: (id, parcelId, payload) => api.post(`/orders/${id}/parcels/${parcelId}/status`, payload),
   cancelItems: (id, payload) => api.post(`/orders/${id}/cancel-items`, payload),
   hold: (id, payload) => api.post(`/orders/${id}/hold`, payload),
   release: (id) => api.post(`/orders/${id}/release`, {}),

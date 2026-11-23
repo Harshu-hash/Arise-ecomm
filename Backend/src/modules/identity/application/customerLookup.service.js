@@ -19,6 +19,12 @@ export async function findCustomers({ q, ids, limit }) {
 /** How many of these ids are real, active customers (audience validation and reach estimates). */
 export const countCustomers = (ids) => User.countDocuments({ ...CUSTOMER, ...(ids ? { _id: { $in: ids } } : {}) });
 
+/** A customer's name and email for sending them mail; never to join on. */
+export async function getCustomerContact(id) {
+  const user = await User.findOne({ ...CUSTOMER, _id: id }, 'name email').lean();
+  return user ? { name: user.name ?? null, email: user.email ?? null } : null;
+}
+
 export async function getCustomer(id) {
   const user = await User.findOne({ ...CUSTOMER, _id: id }, 'name email phone').lean();
   return user ? label(user) : null;

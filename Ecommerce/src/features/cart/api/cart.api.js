@@ -2,9 +2,10 @@ import { baseApi } from '@core/api/baseApi';
 import { CART_ENDPOINTS } from './cart.endpoints';
 import { mapCart, mapEligibleCoupons } from './cart.mapper';
 
-const cartMutation = (builder, query) =>
+const cartMutation = (builder, query, extra = {}) =>
   builder.mutation({
     query,
+    ...extra,
     transformResponse: mapCart,
     invalidatesTags: (_, error) =>
       error
@@ -31,7 +32,22 @@ export const cartApi = baseApi.injectEndpoints({
       url: CART_ENDPOINTS.item(cartItemId),
       method: 'PATCH',
       data: { quantity },
-    })),
+    }), {
+      // Show the new quantity at once; the server's cart then corrects totals, or the change is undone if refused.
+      async onQueryStarted({ cartItemId, quantity }, { dispatch, queryFulfilled }) {
+        const patch = dispatch(
+          cartApi.util.updateQueryData('getCart', undefined, draft => {
+            const item = draft.items.find(entry => entry.id === cartItemId);
+            if (item) item.qty = quantity;
+          }),
+        );
+        try {
+          await queryFulfilled;
+        } catch {
+          patch.undo();
+        }
+      },
+    }),
     removeCartItem: cartMutation(builder, cartItemId => ({
       url: CART_ENDPOINTS.item(cartItemId),
       method: 'DELETE',

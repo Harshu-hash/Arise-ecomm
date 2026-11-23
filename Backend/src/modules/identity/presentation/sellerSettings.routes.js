@@ -12,11 +12,20 @@ import { sellerScope } from '../../../shared/policies/ownership.js';
 import { decryptField } from '../../../shared/utils/crypto.js';
 import { signFileToken } from '../../../shared/utils/signedUrl.js';
 import { accountNumberSchema, ifscSchema } from '../../../shared/validators/common.js';
-import { clearBank, getBank, logoUrlOf, issueStepUpToken, setBank, setVacationMode, updateProfile } from '../application/sellerSettings.service.js';
+import { clearBank, getBank, getPickupAddress, logoUrlOf, setPickupAddress, setGstin, issueStepUpToken, setBank, setVacationMode, updateProfile } from '../application/sellerSettings.service.js';
 import { Seller } from '../infrastructure/persistence/seller.model.js';
 
 const profileBody = z.object({ storeName: z.string().trim().min(2).max(120), logoKey: z.string().max(300).nullable().optional() });
+const gstinBody = z.object({ gstin: z.string().trim().toUpperCase().regex(/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/, 'Enter a valid 15-character GSTIN.').nullable() }).strict();
 const vacationBody = z.object({ on: z.boolean() });
+// The courier refuses a first line under 10 characters or without a house, flat or road number, so ask for that here.
+const addressBody = z.object({
+  address: z.string().trim().min(10, 'Enter the full address: house or flat number, building and road (at least 10 characters).').max(200).regex(/\d/, 'Include a house, flat or road number.'),
+  locality: z.string().trim().max(100).default(''),
+  city: z.string().trim().min(2, 'Enter the city.').max(80),
+  state: z.string().trim().min(2, 'Enter the state.').max(80),
+  pincode: z.string().trim().regex(/^[1-9]\d{5}$/, 'Enter a valid 6-digit pincode.'),
+}).strict();
 const reauthBody = z.object({ password: z.string().min(1).max(256) });
 const bankBody = z.object({
   accountHolder: z.string().trim().min(1).max(100),
@@ -105,6 +114,9 @@ export function createSellerSettingsRouter() {
   const actorOf = (req) => ({ userId: req.auth.userId, role: req.auth.role, sellerId: req.auth.sellerId });
 
   router.patch('/profile', ownerOnly, validate({ body: profileBody }), run((req) => updateProfile(sellerScope(req), req.body, actorOf(req))));
+  router.put('/gstin', ownerOnly, validate({ body: gstinBody }), run((req) => setGstin(sellerScope(req), req.body.gstin, actorOf(req))));
+  router.get('/address', run((req) => getPickupAddress(sellerScope(req))));
+  router.put('/address', ownerOnly, validate({ body: addressBody }), run((req) => setPickupAddress(sellerScope(req), req.body, actorOf(req))));
   router.post('/vacation', ownerOnly, validate({ body: vacationBody }), run((req) => setVacationMode(sellerScope(req), req.body.on, actorOf(req))));
 
   router.post(

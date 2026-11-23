@@ -1,4 +1,4 @@
-import { api } from '@core/api/axiosInstance';
+import { api, http } from '@core/api/axiosInstance';
 
 export const financeApi = {
   overview: () => api.get('/finance/overview'),
@@ -14,25 +14,17 @@ export const financeApi = {
   retryRefund: (id) => api.post(`/refunds/${id}/retry`, {}),
   switchRefundMode: (id, payload) => api.post(`/refunds/${id}/mode`, payload),
 
-  // Per-order-item seller settlements (the payout flow). A seller is paid for
-  // one delivered item once its return window closes; see the settlements mock.
+  // Seller money: each delivered item (read only) credits the seller's wallet; sellers withdraw it and an admin approves and pays each request.
   settlements: (params) => api.get('/settlements', params),
   settlementSummary: () => api.get('/settlements/summary'),
   settlement: (id) => api.get(`/settlements/${id}`),
-  setSettlementIssues: (id, issues) => api.patch(`/settlements/${id}/issues`, { issues }),
-  reviewSettlement: (id) => api.post(`/settlements/${id}/review`, {}),
-  paySettlement: (id, payload) => api.post(`/settlements/${id}/pay`, payload),
-  retrySettlement: (id, payload) => api.post(`/settlements/${id}/retry`, payload),
-  releaseSettlementHold: (id) => api.post(`/settlements/${id}/release-hold`, {}),
   holdSellerPayouts: (sellerId, payload) => api.post(`/sellers/${sellerId}/payout-hold`, payload),
-
-  // Bulk settlement: pay many of one seller's ready items under one reference.
-  bulkSellers: () => api.get('/settlements/bulk/sellers'),
-  bulkSellerLines: (sellerId) => api.get(`/settlements/bulk/sellers/${sellerId}/lines`),
-  bulkPreview: (payload) => api.post('/settlements/bulk/preview', payload),
-  bulkPay: (payload) => api.post('/settlements/bulk/pay', payload),
-  bulkList: (params) => api.get('/settlements/bulk', params),
-  bulk: (refNo) => api.get(`/settlements/bulk/${refNo}`),
+  markCodRemitted: (lineIds) => api.post('/settlements/cod-remitted', { lineIds }),
+  adjustWallet: (sellerId, payload) => api.post(`/seller-wallets/${sellerId}/adjustments`, payload),
+  withdrawals: (params) => api.get('/withdrawals', params),
+  approveWithdrawal: (id) => api.post(`/withdrawals/${id}/approve`, {}),
+  rejectWithdrawal: (id, payload) => api.post(`/withdrawals/${id}/reject`, payload),
+  payWithdrawal: (id, payload) => api.post(`/withdrawals/${id}/pay`, payload),
 
   commissionRules: (params) => api.get('/commission-rules', params),
   updateCommissionRule: (id, payload) => api.patch(`/commission-rules/${id}`, payload),
@@ -45,6 +37,8 @@ export const financeApi = {
   disputeRemittance: (id, payload) => api.post(`/cod-remittances/${id}/dispute`, payload),
 
   invoices: (params) => api.get('/invoices', params),
+  downloadInvoice: (id) => http.get(`/invoices/${id}/pdf`, { responseType: 'blob' }).then((response) => response.data),
+  resendInvoice: (id) => api.post(`/invoices/${id}/resend`, {}),
   invoice: (id) => api.get(`/invoices/${id}`),
   regenerateInvoice: (id, payload) => api.post(`/invoices/${id}/regenerate`, payload),
 
@@ -59,7 +53,7 @@ export const financeKeys = {
   settlements: (p) => ['finance', 'settlements', p],
   settlementSummary: ['finance', 'settlements', 'summary'],
   settlement: (id) => ['finance', 'settlements', 'detail', id],
-  bulkSellers: ['finance', 'settlements', 'bulk', 'sellers'],
+  withdrawals: (p) => ['finance', 'withdrawals', p],
   bulkSellerLines: (sellerId) => ['finance', 'settlements', 'bulk', 'sellers', sellerId],
   bulkList: (p) => ['finance', 'settlements', 'bulk', 'list', p],
   commission: (p) => ['finance', 'commission', p],

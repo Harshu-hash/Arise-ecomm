@@ -1,6 +1,6 @@
 import { baseApi } from '@core/api/baseApi';
 import { RETURN_ENDPOINTS } from './returns.endpoints';
-import { mapReturnEligibility, mapReturnRequest } from './returns.mapper';
+import { mapReturnEligibility, mapReturnList, mapReturnRequest } from './returns.mapper';
 
 export const returnsApi = baseApi.injectEndpoints({
   endpoints: builder => ({
@@ -9,11 +9,17 @@ export const returnsApi = baseApi.injectEndpoints({
       transformResponse: mapReturnEligibility,
       providesTags: (_, __, orderId) => [{ type: 'Return', id: `ELIGIBILITY-${orderId}` }],
     }),
+    getReturns: builder.query({
+      query: () => ({ url: RETURN_ENDPOINTS.list }),
+      transformResponse: mapReturnList,
+      providesTags: [{ type: 'Return', id: 'LIST' }],
+    }),
     createReturn: builder.mutation({
       query: data => ({ url: RETURN_ENDPOINTS.create, method: 'POST', data }),
       transformResponse: mapReturnRequest,
       invalidatesTags: (_, __, { orderId }) => [
         { type: 'Return', id: `ELIGIBILITY-${orderId}` },
+        { type: 'Return', id: 'LIST' },
         { type: 'Order', id: orderId },
         { type: 'Order', id: 'LIST' },
       ],
@@ -26,7 +32,12 @@ export const returnsApi = baseApi.injectEndpoints({
     cancelReturn: builder.mutation({
       query: returnId => ({ url: RETURN_ENDPOINTS.cancel(returnId), method: 'POST' }),
       transformResponse: mapReturnRequest,
-      invalidatesTags: (_, __, returnId) => [{ type: 'Return', id: returnId }],
+      invalidatesTags: (result, __, returnId) => [
+        { type: 'Return', id: returnId },
+        { type: 'Return', id: 'LIST' },
+        { type: 'Order', id: 'LIST' },
+        ...(result ? [{ type: 'Order', id: result.orderId }, { type: 'Return', id: `ELIGIBILITY-${result.orderId}` }] : []),
+      ],
     }),
   }),
 });
@@ -35,4 +46,5 @@ export const {
   useCreateReturnMutation,
   useGetReturnEligibilityQuery,
   useGetReturnQuery,
+  useGetReturnsQuery,
 } = returnsApi;

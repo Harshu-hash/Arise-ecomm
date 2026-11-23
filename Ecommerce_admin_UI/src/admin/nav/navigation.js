@@ -96,7 +96,9 @@ export const NAV_GROUPS = [
     items: [
       { label: 'Payments', path: '/finance/payments' },
       { label: 'Refunds', path: '/finance/refunds' },
+      { label: 'Invoices', path: '/finance/invoices' },
       { label: 'Seller Settlements', path: '/finance/payouts' },
+      { label: 'Withdrawals', path: '/finance/withdrawals' },
     ],
   },
   {

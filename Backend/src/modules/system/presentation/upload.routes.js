@@ -1,10 +1,11 @@
 import { rm } from 'node:fs/promises';
 import { Router } from 'express';
 import { z } from 'zod';
-import { PRIVATE_FOLDERS, UPLOAD_PURPOSES } from '../../../shared/constants/uploadPurposes.js';
+import { PRIVATE_FOLDERS, UPLOAD_PURPOSES, VISIBILITY } from '../../../shared/constants/uploadPurposes.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { saveUpload, publicUrl, resolveKey } from '../../../infrastructure/storage/local.storage.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { urlForKey } from '../../media/public/index.js';
 import { sendCommand } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate } from '../../../shared/middleware/authenticate.js';
@@ -82,7 +83,8 @@ export function createUploadRouter() {
 }
 
 // Purposes the customer app's media uploads may use today; anything else gets a clear 400.
-const CUSTOMER_MEDIA_PURPOSES = ['PROFILE_IMAGE'];
+const CUSTOMER_MEDIA_PURPOSES = ['PROFILE_IMAGE', 'RETURN_EVIDENCE'];
+const PURPOSE_OF = { RETURN_EVIDENCE: 'RETURN_PROOF' }; // the app's name for the private return-proof folder
 const customerMediaBody = z.object({ purpose: z.enum(CUSTOMER_MEDIA_PURPOSES) });
 
 // Mounted at /api/customer/v1/media: the customer app's upload contract ({ id, url, thumbnailUrl, mimeType, ... }).
@@ -97,11 +99,11 @@ export function createCustomerMediaRouter() {
     validate({ body: customerMediaBody }),
     async (req, res, next) => {
       try {
-        const purpose = UPLOAD_PURPOSES[req.body.purpose];
+        const purpose = UPLOAD_PURPOSES[PURPOSE_OF[req.body.purpose] ?? req.body.purpose];
         if (!req.file) throw new ValidationError('A file is required.', { file: ['Missing'] });
         if (!purpose.roles.includes(req.auth.role)) throw new ForbiddenError();
         const saved = await saveUpload({ file: req.file, allowedKinds: purpose.kinds, visibility: purpose.visibility, scope: `${purpose.folder}/${req.auth.userId}` });
-        const url = deviceUrl(publicUrl(saved.key));
+        const url = deviceUrl(purpose.visibility === VISIBILITY.PRIVATE ? urlForKey(saved.key, null) : publicUrl(saved.key)); // private files are shown through a signed link
         return sendCommand(res, { id: saved.key, url, thumbnailUrl: url, mimeType: saved.mime, sizeBytes: saved.sizeBytes, status: 'READY' }, { status: 201 });
       } catch (error) {
         if (req.file) await rm(req.file.path, { force: true });

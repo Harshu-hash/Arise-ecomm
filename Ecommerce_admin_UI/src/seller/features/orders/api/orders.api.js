@@ -15,6 +15,7 @@ export const ordersApi = {
         selection: Array.isArray(selection) ? { mode: 'SELECTED', ids: selection } : selection,
       })
       .then((r) => r.data),
+  printInvoices: (ids) => http.post('/orders/invoices/print', { ids }, { responseType: 'blob' }).then((response) => response.data),
   createPackages: (id, packages) =>
     api.post(`/orders/${id}/packages`, { packages }).then((r) => r.data),
   split: (id, itemIds) => api.post(`/orders/${id}/split`, { itemIds }).then((r) => r.data),
@@ -38,4 +39,6 @@ export const ACTION_LABELS = {
   pack: 'Pack & invoice',
   manifest: 'Label & manifest',
   dispatch: 'Mark dispatched',
+  'mock-ready-to-ship': 'Mock ready to ship', // dev builds only: no courier account needed
+  'ready-to-ship': 'Ready to ship', // creates the courier shipment, label and pickup in one go
 };

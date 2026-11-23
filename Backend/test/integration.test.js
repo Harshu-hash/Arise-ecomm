@@ -1570,7 +1570,7 @@ test('seller stock: lists only own offers, edits self-ship stock once per versio
   assert.deepEqual((await call('', { sellerId: sellerB })).body.data.map((row) => row.productTitle), ['Vase']);
 });
 
-test('category commission: children inherit it, and changing it needs the finance permission', opts, async (t) => {
+test('category commission: the bottom-most set rate wins, and changing it needs the finance permission', opts, async (t) => {
   const { createApp } = await import('../src/app/app.js');
   const { signAccessToken } = await import('../src/shared/utils/jwt.js');
   const { User } = await import('../src/modules/identity/infrastructure/persistence/user.model.js');
@@ -1592,23 +1592,404 @@ test('category commission: children inherit it, and changing it needs the financ
     return { status: response.status, body: await response.json() };
   };
 
-  const root = (await call('/', { method: 'POST', body: { name: 'Commission Root', commissionPct: 12.5 } })).body.data;
-  assert.equal(root.commissionPct, 12.5);
-  const child = (await call('/', { method: 'POST', body: { name: 'Commission Child', parentId: root.id }, as: editor })).body.data;
-  assert.equal(child.commissionPct, 12.5); // inherited, no finance permission needed
-  assert.equal((await call('/', { method: 'POST', body: { name: 'Commission Set', parentId: root.id, commissionPct: 5 }, as: editor })).status, 403);
+  const { getCategoryForListing } = await import('../src/modules/category/application/category.service.js');
+  const make = async (name, parentId, extra = {}, as = finance) => (await call('/', { method: 'POST', body: { name, ...(parentId ? { parentId } : {}), ...extra }, as })).body.data;
+  const inherited = async (categoryId) => (await call(`/${categoryId}`)).body.meta.inheritedCommission;
+  const applied = async (categoryId) => (await getCategoryForListing(categoryId)).commissionPct;
 
-  // the editor can still save the form (which sends the unchanged rate) but not change the rate
-  const saved = await call(`/${child.id}`, { method: 'PATCH', body: { name: 'Commission Kid', commissionPct: 12.5, version: child.version }, as: editor });
-  assert.deepEqual([saved.status, saved.body.data.name], [200, 'Commission Kid']);
-  const denied = await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct: 8, version: saved.body.data.version }, as: editor });
+  const root = await make('Commission Root', null, { commissionPct: 12.5 });
+  const mid = await make('Commission Mid', root.id, {}, editor);
+  const leaf = await make('Commission Leaf', mid.id, {}, editor);
+  assert.deepEqual([root.commissionPct, mid.commissionPct, leaf.commissionPct], [12.5, null, null]); // a child is not given a copy
+
+  // only the top has a rate: everything below follows it, and says where it comes from
+  assert.deepEqual(await inherited(leaf.id), { pct: 12.5, source: { id: root.id, name: 'Commission Root' } });
+  assert.equal(await applied(leaf.id), 12.5);
+
+  // a rate in the middle beats the top, and the bottom one beats both
+  const midSet = await call(`/${mid.id}`, { method: 'PATCH', body: { commissionPct: 8, version: mid.version } });
+  assert.equal(midSet.status, 200);
+  assert.deepEqual(await inherited(leaf.id), { pct: 8, source: { id: mid.id, name: 'Commission Mid' } });
+  assert.equal(await applied(leaf.id), 8);
+  const leafSet = await call(`/${leaf.id}`, { method: 'PATCH', body: { commissionPct: 5.25, version: leaf.version } });
+  assert.deepEqual([leafSet.status, leafSet.body.data.commissionPct], [200, 5.25]);
+  assert.equal(await applied(leaf.id), 5.25);
+  assert.equal((await inherited(leaf.id)).pct, 8); // the hint ignores its own rate
+
+  // clearing it hands the category back to what is above
+  const cleared = await call(`/${leaf.id}`, { method: 'PATCH', body: { commissionPct: null, version: leafSet.body.data.version } });
+  assert.deepEqual([cleared.status, cleared.body.data.commissionPct], [200, null]);
+  assert.equal(await applied(leaf.id), 8);
+
+  // no rate anywhere up the tree counts as 0, from no category
+  const lone = await make('Commission Lone', null, {}, editor);
+  assert.deepEqual(await inherited(lone.id), { pct: 0, source: null });
+
+  // the permission: inheriting is free, setting or changing a rate needs the finance permission
+  assert.equal((await call('/', { method: 'POST', body: { name: 'Commission Set', parentId: root.id, commissionPct: 5 }, as: editor })).status, 403);
+  const saved = await call(`/${cleared.body.data.id}`, { method: 'PATCH', body: { name: 'Commission Kid', commissionPct: null, version: cleared.body.data.version }, as: editor });
+  assert.deepEqual([saved.status, saved.body.data.name], [200, 'Commission Kid']); // the form re-sends the unchanged (empty) rate
+  const denied = await call(`/${leaf.id}`, { method: 'PATCH', body: { commissionPct: 9, version: saved.body.data.version }, as: editor });
   assert.deepEqual([denied.status, denied.body.error.code], [403, 'FORBIDDEN']);
-  const changed = await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct: 8.25, version: saved.body.data.version } });
-  assert.deepEqual([changed.status, changed.body.data.commissionPct], [200, 8.25]);
+  const deniedClear = await call(`/${mid.id}`, { method: 'PATCH', body: { commissionPct: null, version: midSet.body.data.version }, as: editor });
+  assert.equal(deniedClear.status, 403);
 
   for (const commissionPct of [-1, 41, 2.555]) {
-    assert.equal((await call(`/${child.id}`, { method: 'PATCH', body: { commissionPct, version: changed.body.data.version } })).status, 422);
+    assert.equal((await call(`/${leaf.id}`, { method: 'PATCH', body: { commissionPct, version: saved.body.data.version } })).status, 422);
   }
-  assert.ok((await call(`/${child.id}`)).body.meta.allowedActions.includes('EDIT_COMMISSION'));
-  assert.ok(!(await call(`/${child.id}`, { as: editor })).body.meta.allowedActions.includes('EDIT_COMMISSION'));
+  assert.ok((await call(`/${leaf.id}`)).body.meta.allowedActions.includes('EDIT_COMMISSION'));
+  assert.ok(!(await call(`/${leaf.id}`, { as: editor })).body.meta.allowedActions.includes('EDIT_COMMISSION'));
+});
+
+// Shared by the order-readiness tests below: a category, products and offers owned by given sellers.
+async function stockFixture(prefix) {
+  const { Category } = await import('../src/modules/category/infrastructure/persistence/category.model.js');
+  const { Product } = await import('../src/modules/product/infrastructure/persistence/product.model.js');
+  const { Offer } = await import('../src/modules/product/infrastructure/persistence/offer.model.js');
+  const { Variant } = await import('../src/modules/product/infrastructure/persistence/variant.model.js');
+  const { Seller } = await import('../src/modules/identity/infrastructure/persistence/seller.model.js');
+  const { catalogChanged } = await import('../src/infrastructure/realtime/catalogEvents.js');
+  await Promise.all([Category.init(), Product.init(), Offer.init(), Variant.init(), Seller.init()]);
+  const _id = new mongoose.Types.ObjectId();
+  await Category.create({ _id, name: `${prefix} Root`, nameKey: `${prefix.toLowerCase()} root`, slug: `${prefix.toLowerCase()}-root`, parentId: null, rootId: _id, level: 1, sortOrder: 1 });
+  const seller = async (storeName, over = {}) => String((await Seller.create({ storeName, status: 'APPROVED', ...over }))._id);
+  const listed = async (title, sellerId, stock, over = {}) => {
+    const product = await Product.create({
+      title, status: 'LIVE', categoryId: _id, rootCategoryId: _id, categoryPath: `${prefix} Root`, brandName: 'Acme',
+      images: ['public/products/s1/o.png'], createdBySellerId: sellerId,
+    });
+    const variant = await Variant.create({ productId: product._id, sku: `${prefix}-${title}`.toUpperCase().replaceAll(' ', '-'), label: 'One', weightG: 100, dimsCm: { l: 1, w: 1, h: 1 } });
+    const offer = await Offer.create({ productId: product._id, variantId: variant._id, sellerId, sellingPricePaise: 900, mrpPaise: 1200, stock, status: 'LIVE', ...over });
+    catalogChanged();
+    return { product, offer, productId: String(product._id), offerId: String(offer._id) };
+  };
+  return { seller, listed, Seller, Offer };
+}
+
+test('seller eligibility: suspended, unapproved and on-holiday sellers drop out of the shop, and return with the seller', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { setVacationMode } = await import('../src/modules/identity/application/sellerSettings.service.js');
+  const { seller, listed, Seller } = await stockFixture('Elig');
+  const [ok, holiday, suspended, pending] = await Promise.all([seller('Elig Ok'), seller('Elig Holiday'), seller('Elig Suspended'), seller('Elig Pending')]);
+  const items = { ok: await listed('Elig Mug', ok, 5), holiday: await listed('Elig Lamp', holiday, 5), suspended: await listed('Elig Vase', suspended, 5), pending: await listed('Elig Pot', pending, 5) };
+  await Seller.updateOne({ _id: suspended }, { $set: { status: 'SUSPENDED' } });
+  await Seller.updateOne({ _id: pending }, { $set: { status: 'UNDER_REVIEW' } });
+  await setVacationMode(holiday, true, { userId: 'seller-user' });
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const get = async (path) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/customer/v1${path}`);
+    return { status: response.status, body: await response.json() };
+  };
+  const shown = async () => (await get('/search?q=Elig')).body.data.items.map((item) => item.name).sort();
+
+  assert.deepEqual(await shown(), ['Elig Mug']);
+  assert.equal((await get(`/products/${items.ok.productId}`)).status, 200);
+  for (const key of ['holiday', 'suspended', 'pending']) assert.equal((await get(`/products/${items[key].productId}`)).status, 404, key);
+
+  await setVacationMode(holiday, false, { userId: 'seller-user' }); // coming back from holiday restores the listing
+  assert.deepEqual(await shown(), ['Elig Lamp', 'Elig Mug']);
+  await Seller.updateOne({ _id: suspended }, { $set: { status: 'ACTIVE' } }); // an active seller sells too
+  assert.deepEqual(await shown(), ['Elig Lamp', 'Elig Mug', 'Elig Vase']);
+});
+
+test('stock reservations: all-or-nothing holds, no oversell under contention, commit, release and expiry', opts, async () => {
+  const stock = await import('../src/modules/product/application/stockReservation.service.js');
+  const inventory = await import('../src/modules/product/application/inventory.service.js');
+  const { StockReservation } = await import('../src/modules/product/infrastructure/persistence/stockReservation.model.js');
+  const { StockMovement } = await import('../src/modules/product/infrastructure/persistence/stockMovement.model.js');
+  const { getPurchasableOffers } = await import('../src/modules/product/public/index.js');
+  await Promise.all([StockReservation.init(), StockMovement.init()]);
+  const { seller, listed, Offer } = await stockFixture('Resv');
+  const sellerId = await seller('Resv Seller');
+  const a = await listed('Resv A', sellerId, 5);
+  const b = await listed('Resv B', sellerId, 2);
+  const inOneHour = new Date(Date.now() + 3_600_000);
+  const state = async (item) => { const o = await Offer.findById(item.offerId).lean(); return [o.stock, o.reserved ?? 0]; };
+  const fail = async (work) => work.then(() => assert.fail('expected a conflict'), (error) => error);
+
+  // a checkout with one short line holds nothing at all, and says exactly what was short
+  const short = await fail(stock.holdStock({ reference: 'chk-1', lines: [{ offerId: a.offerId, qty: 3 }, { offerId: b.offerId, qty: 3 }], expiresAt: inOneHour }));
+  assert.equal(short.code, 'INSUFFICIENT_STOCK');
+  assert.deepEqual(short.details.lines, [{ offerId: b.offerId, requested: 3, available: 2, reason: 'INSUFFICIENT_STOCK' }]);
+  assert.deepEqual([await state(a), await state(b)], [[5, 0], [2, 0]]);
+
+  const held = await stock.holdStock({ reference: 'chk-1', customerId: 'cust-1', lines: [{ offerId: a.offerId, qty: 3 }, { offerId: b.offerId, qty: 2 }], expiresAt: inOneHour });
+  assert.equal(held.length, 2);
+  assert.deepEqual([await state(a), await state(b)], [[5, 3], [2, 2]]);
+  await stock.holdStock({ reference: 'chk-1', lines: [{ offerId: a.offerId, qty: 3 }, { offerId: b.offerId, qty: 2 }], expiresAt: inOneHour }); // a retry takes nothing twice
+  assert.deepEqual(await state(a), [5, 3]);
+  assert.equal((await fail(stock.holdStock({ reference: 'chk-1', lines: [{ offerId: a.offerId, qty: 1 }], expiresAt: inOneHour }))).code, 'RESERVATION_EXISTS');
+
+  // others cannot take what is held, and shoppers see only what is left
+  const other = await fail(stock.holdStock({ reference: 'chk-2', lines: [{ offerId: a.offerId, qty: 3 }], expiresAt: inOneHour }));
+  assert.equal(other.details.lines[0].available, 2);
+  assert.equal((await getPurchasableOffers([a.offerId])).get(a.offerId).availableUnits, 2);
+
+  // the seller sees the hold and cannot count stock below it
+  const row = (await inventory.listSellerInventory(sellerId, { page: 1, pageSize: 10, sort: '-sellable' })).data.find((r) => r.id === a.offerId);
+  assert.deepEqual([row.sellable, row.reserved, row.available], [5, 3, 2]);
+  const refused = await fail(inventory.setSellerStock(sellerId, a.offerId, { sellable: 2, version: row.version, note: 'recount' }, { userId: 's' }));
+  assert.equal(refused.code, 'RESERVED_STOCK');
+
+  // paying sells the units: stock drops, the hold goes, the ledger records it; repeating changes nothing
+  const sold = await stock.commitStock({ reference: 'chk-1' });
+  assert.deepEqual([sold.committed.length, sold.missing.length], [2, 0]);
+  assert.deepEqual([await state(a), await state(b)], [[2, 0], [0, 0]]);
+  assert.deepEqual((await stock.commitStock({ reference: 'chk-1' })).committed.length, 2);
+  assert.deepEqual(await state(a), [2, 0]);
+  const ledger = await StockMovement.find({ offerId: a.offerId, type: 'SALE' }).lean();
+  assert.deepEqual(ledger.map((m) => [m.qty, m.balanceAfter, m.reference]), [[-3, 2, 'chk-1']]);
+  assert.equal((await Offer.findById(a.offerId).lean()).version, 2); // a stale stock-page edit now gets VERSION_CONFLICT
+
+  // an abandoned checkout gives its units back, once
+  await stock.holdStock({ reference: 'chk-3', lines: [{ offerId: a.offerId, qty: 1 }], expiresAt: inOneHour });
+  assert.equal((await stock.releaseStock({ reference: 'chk-3' })).length, 1);
+  assert.equal((await stock.releaseStock({ reference: 'chk-3' })).length, 0);
+  assert.deepEqual(await state(a), [2, 0]);
+
+  // a hold nobody paid for expires; paying late finds it gone and says so
+  await stock.holdStock({ reference: 'chk-4', lines: [{ offerId: a.offerId, qty: 2 }], expiresAt: new Date(Date.now() - 1000) });
+  assert.deepEqual(await state(a), [2, 2]);
+  assert.equal(await stock.expireStaleReservations(), 1);
+  assert.equal(await stock.expireStaleReservations(), 0);
+  assert.deepEqual(await state(a), [2, 0]);
+  const late = await stock.commitStock({ reference: 'chk-4' });
+  assert.deepEqual([late.committed.length, late.missing[0].status], [0, 'EXPIRED']);
+
+  // twelve shoppers race for five units: exactly five win
+  const c = await listed('Resv C', sellerId, 5);
+  const results = await Promise.allSettled(Array.from({ length: 12 }, (_, i) => stock.holdStock({ reference: `race-${i}`, lines: [{ offerId: c.offerId, qty: 1 }], expiresAt: inOneHour })));
+  assert.equal(results.filter((r) => r.status === 'fulfilled').length, 5);
+  assert.ok(results.filter((r) => r.status === 'rejected').every((r) => r.reason.code === 'INSUFFICIENT_STOCK'));
+  assert.deepEqual(await state(c), [5, 5]);
+});
+
+test('line resolution: one price and one verdict for cart, checkout and order', opts, async () => {
+  const { resolveLines } = await import('../src/modules/cart/public/index.js');
+  const { holdStock } = await import('../src/modules/product/public/index.js');
+  const { Campaign } = await import('../src/modules/coupon/infrastructure/persistence/campaign.model.js');
+  const { CampaignSubmission } = await import('../src/modules/coupon/infrastructure/persistence/campaignSubmission.model.js');
+  await Promise.all([Campaign.init(), CampaignSubmission.init()]);
+  const { seller, listed, Seller } = await stockFixture('Line');
+  const [ok, holiday] = await Promise.all([seller('Line Ok'), seller('Line Holiday', { vacationMode: true })]);
+  const mug = await listed('Line Mug', ok, 4);
+  const away = await listed('Line Away', holiday, 4);
+  const gone = await listed('Line Gone', ok, 0);
+  const hour = 3_600_000;
+  const campaign = await Campaign.create({ name: 'Line Flash', type: 'FLASH_DEAL', status: 'ACTIVE', customerSection: 'FLASH_DEALS_RAIL', minDiscountPct: 10, startsAt: new Date(Date.now() - hour), endsAt: new Date(Date.now() + hour), createdBy: 'admin' });
+  await CampaignSubmission.create({ campaignId: campaign._id, sellerId: ok, sellerName: 'Line Ok', productId: mug.productId, productTitle: 'Line Mug', mrpPaise: 1200, dealPricePaise: 700, discountPct: 42, stockCommitted: 3, status: 'APPROVED' });
+  const one = async (offerId, quantity) => (await resolveLines([{ offerId, quantity }]))[0];
+
+  // price: a running campaign beats the shelf while enough deal units remain for the whole quantity
+  const deal = await one(mug.offerId, 2);
+  assert.deepEqual([deal.unitPricePaise, deal.priceSource, deal.campaign.name, deal.sellable, deal.issueCode], [700, 'CAMPAIGN', 'Line Flash', true, null]);
+  assert.deepEqual([deal.mrpPaise, deal.sellerName, deal.variantLabel, deal.maximumQuantity], [1200, 'Line Ok', 'One', 4]);
+  const past = await one(mug.offerId, 4); // only 3 deal units left: the whole line is at the shelf price
+  assert.deepEqual([past.unitPricePaise, past.priceSource, past.campaign, past.sellable], [900, 'SHELF', null, true]);
+  await Campaign.updateOne({ _id: campaign._id }, { $set: { status: 'PAUSED' } });
+  const paused = await one(mug.offerId, 2);
+  assert.deepEqual([paused.unitPricePaise, paused.priceSource], [900, 'SHELF']);
+
+  // verdicts
+  const tooMany = await one(mug.offerId, 5);
+  assert.deepEqual([tooMany.issueCode, tooMany.sellable], ['QUANTITY_LIMIT', false]);
+  assert.equal((await one(away.offerId, 1)).issueCode, 'SELLER_UNAVAILABLE');
+  assert.equal((await one(gone.offerId, 1)).issueCode, 'OUT_OF_STOCK');
+  const missing = await one(String(new mongoose.Types.ObjectId()), 1);
+  assert.deepEqual([missing.sellable, missing.issueCode], [false, 'OFFER_UNAVAILABLE']);
+
+  // units held by another checkout are not available to this one
+  await holdStock({ reference: 'line-hold', lines: [{ offerId: mug.offerId, qty: 3 }], expiresAt: new Date(Date.now() + hour) });
+  const left = await one(mug.offerId, 2);
+  assert.deepEqual([left.availableUnits, left.maximumQuantity, left.issueCode], [1, 1, 'QUANTITY_LIMIT']);
+
+  // answers come back in the order asked, and the seller returning from holiday sells again
+  await Seller.updateOne({ _id: holiday }, { $set: { vacationMode: false } });
+  const both = await resolveLines([{ offerId: away.offerId, quantity: 1 }, { offerId: mug.offerId, quantity: 1 }]);
+  assert.deepEqual(both.map((l) => [l.name, l.sellable]), [['Line Away', true], ['Line Mug', true]]);
+});
+
+test('cart: priced by the server on every read, checked on every change, coupon-aware, one per customer', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const { Coupon } = await import('../src/modules/coupon/infrastructure/persistence/coupon.model.js');
+  const { Cart } = await import('../src/modules/cart/infrastructure/persistence/cart.model.js');
+  await Promise.all([Coupon.init(), Cart.init()]);
+  const { seller, listed, Seller, Offer } = await stockFixture('Cart');
+  const home = await seller('Cart Seller');
+  const away = await seller('Cart Away');
+  const mug = await listed('Cart Mug', home, 6, { sellingPricePaise: 30_000, mrpPaise: 40_000 });
+  const lamp = await listed('Cart Lamp', home, 50, { sellingPricePaise: 2_000, mrpPaise: 2_500 });
+  const scarf = await listed('Cart Scarf', away, 5, { sellingPricePaise: 1_000, mrpPaise: 1_200 });
+  const variantOf = (item) => String(item.offer.variantId);
+  const day = 86_400_000;
+  const coupon = (code, over) => Coupon.create({ code, name: code, type: 'FLAT', valuePaise: 5_000, minCartPaise: 19_900, totalLimit: 100, perUserLimit: 1, budgetPaise: 1_000_000, startsAt: new Date(Date.now() - day), endsAt: new Date(Date.now() + day), createdBy: 'admin', ...over });
+  await coupon('CART50', {});
+  await coupon('CARTBIG', { minCartPaise: 1_000_000 });
+  await coupon('CARTHIDE', { valuePaise: 1_000, minCartPaise: 0, visibility: 'HIDDEN' });
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const alice = String(new mongoose.Types.ObjectId());
+  const bob = String(new mongoose.Types.ObjectId());
+  const call = async (method, path, { body, as = alice, anonymous = false } = {}) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/customer/v1${path}`, {
+      method,
+      headers: { 'content-type': 'application/json', ...(anonymous ? {} : { authorization: `Bearer ${signAccessToken({ sub: as, role: 'CUSTOMER' })}` }) },
+      ...(body ? { body: JSON.stringify(body) } : {}),
+    });
+    return { status: response.status, body: await response.json() };
+  };
+  const cart = async (as = alice) => (await call('GET', '/cart', { as })).body.data;
+  const error = (response) => [response.status, response.body.error.code];
+
+  // nothing yet: an empty cart owes nothing, and it needs a signed-in customer
+  assert.equal((await call('GET', '/cart', { anonymous: true })).status, 401);
+  const empty = await cart();
+  assert.deepEqual([empty.id, empty.version, empty.items, empty.savedItems, empty.checkoutAllowed, empty.totals.payablePaise], [alice, 0, [], [], false, 0]);
+
+  // adding by product and variant picks the seller; the line is priced by the server
+  const added = await call('POST', '/cart/items', { body: { productId: mug.productId, variantId: variantOf(mug), quantity: 1 } });
+  assert.equal(added.status, 201);
+  const [line] = added.body.data.items;
+  assert.deepEqual([line.pricePaise, line.mrpPaise, line.quantity, line.sellerName, line.variantLabel, line.maximumQuantity, line.available, line.issueCode], [30_000, 40_000, 1, 'Cart Seller', 'One', 6, true, null]);
+  assert.deepEqual(added.body.data.totals, { mrpPaise: 40_000, subtotalPaise: 30_000, productDiscountPaise: 10_000, couponDiscountPaise: 0, deliveryFeePaise: 4_000, platformFeePaise: 500, payablePaise: 34_500 });
+  assert.deepEqual([added.body.data.version, added.body.data.checkoutAllowed], [1, true]);
+
+  // the same offer again joins the line; going over what can be bought is refused and changes nothing
+  assert.equal((await call('POST', '/cart/items', { body: { offerId: mug.offerId, quantity: 2 } })).body.data.items[0].quantity, 3);
+  const tooMany = await call('POST', '/cart/items', { body: { offerId: mug.offerId, quantity: 4 } });
+  assert.deepEqual(error(tooMany), [409, 'QUANTITY_UNAVAILABLE']);
+  assert.equal(tooMany.body.error.details.maximumQuantity, 6);
+  const same = await cart();
+  assert.deepEqual([same.version, same.items[0].quantity], [2, 3]);
+
+  // bad requests
+  assert.deepEqual(error(await call('POST', '/cart/items', { body: { productId: String(new mongoose.Types.ObjectId()), quantity: 1 } })), [404, 'PRODUCT_NOT_FOUND']);
+  for (const body of [{}, { productId: mug.productId, quantity: 0 }, { variantId: variantOf(mug), quantity: 1 }, { productId: mug.productId, quantity: 1, price: 1 }, { productId: mug.productId, quantity: 1.5 }]) {
+    assert.equal((await call('POST', '/cart/items', { body })).status, 422, JSON.stringify(body));
+  }
+
+  // quantity changes: re-priced, delivery turns free from the threshold, limits enforced
+  const mugLine = line.cartItemId;
+  const two = await call('PATCH', `/cart/items/${mugLine}`, { body: { quantity: 2 } });
+  assert.deepEqual([two.body.data.totals.subtotalPaise, two.body.data.totals.deliveryFeePaise, two.body.data.totals.payablePaise], [60_000, 0, 60_500]);
+  assert.deepEqual(error(await call('PATCH', `/cart/items/${mugLine}`, { body: { quantity: 7 } })), [409, 'QUANTITY_UNAVAILABLE']);
+  assert.deepEqual(error(await call('PATCH', `/cart/items/${new mongoose.Types.ObjectId()}`, { body: { quantity: 1 } })), [404, 'CART_ITEM_NOT_FOUND']);
+
+  // coupons: only ones that would save something are offered; an unlisted code still works by code
+  const lampAdded = await call('POST', '/cart/items', { body: { offerId: lamp.offerId, quantity: 1 } });
+  const lampLine = lampAdded.body.data.items[1].cartItemId;
+  assert.equal(lampAdded.body.data.totals.subtotalPaise, 62_000);
+  assert.deepEqual((await call('GET', '/coupons/eligible')).body.data.items.filter((c) => c.code.startsWith('CART')), [{ code: 'CART50', description: 'Flat ₹50 off on orders above ₹199', discountPaise: 5_000, minimumSubtotalPaise: 19_900 }]);
+  assert.deepEqual(error(await call('POST', '/cart/coupon', { body: { code: 'NOPE' } })), [422, 'COUPON_INVALID']);
+  assert.deepEqual(error(await call('POST', '/cart/coupon', { body: { code: 'cartbig' } })), [409, 'COUPON_MINIMUM_NOT_MET']);
+  assert.equal((await cart()).appliedCoupon, null); // a refused coupon is not kept
+  const hidden = await call('POST', '/cart/coupon', { body: { code: 'CARTHIDE' } });
+  assert.deepEqual([hidden.body.data.appliedCoupon.code, hidden.body.data.totals.couponDiscountPaise], ['CARTHIDE', 1_000]);
+  const applied = await call('PUT', '/cart/coupon', { body: { code: ' cart50 ' } }); // PUT is the contract's verb, POST the app's
+  assert.deepEqual([applied.body.data.appliedCoupon.code, applied.body.data.appliedCoupon.discountPaise, applied.body.data.totals.payablePaise], ['CART50', 5_000, 57_500]);
+
+  // a change that breaks the coupon drops it and says so
+  const smaller = await call('DELETE', `/cart/items/${mugLine}`);
+  assert.equal(smaller.body.data.appliedCoupon, null);
+  assert.deepEqual(smaller.body.data.issues.map((i) => [i.code, i.blocking]), [['COUPON_REMOVED', false]]);
+  assert.deepEqual((await cart()).issues, []);
+  assert.deepEqual(error(await call('POST', '/cart/coupon', { body: { code: 'CART50' } })), [409, 'COUPON_MINIMUM_NOT_MET']);
+  assert.equal((await call('DELETE', '/cart/coupon')).status, 200);
+
+  // save for later and back; saved items are not charged for
+  const mugAgain = await call('POST', '/cart/items', { body: { offerId: mug.offerId, quantity: 1 } });
+  const mugId = mugAgain.body.data.items[1].cartItemId;
+  const saved = await call('POST', `/cart/items/${mugId}/save-for-later`);
+  assert.deepEqual([saved.body.data.items.length, saved.body.data.savedItems.map((i) => i.productId), saved.body.data.totals.payablePaise], [1, [mug.productId], 6_500]);
+  assert.deepEqual(error(await call('POST', `/cart/items/${mugId}/save-for-later`)), [404, 'CART_ITEM_NOT_FOUND']);
+  assert.deepEqual(error(await call('POST', `/cart/saved/${new mongoose.Types.ObjectId()}/move-to-cart`)), [404, 'SAVED_ITEM_NOT_FOUND']);
+  const back = await call('POST', `/cart/saved/${mugId}/move-to-cart`);
+  assert.deepEqual([back.body.data.items.length, back.body.data.savedItems.length], [2, 0]);
+
+  // an item that can no longer be bought blocks checkout and is not charged; fixing the cart clears it
+  const scarfId = (await call('POST', '/cart/items', { body: { offerId: scarf.offerId, quantity: 1 } })).body.data.items[2].cartItemId;
+  await Seller.updateOne({ _id: away }, { $set: { vacationMode: true } });
+  const blocked = await cart();
+  const scarfLine = blocked.items.find((i) => i.cartItemId === scarfId);
+  assert.deepEqual([scarfLine.available, scarfLine.issueCode, blocked.checkoutAllowed, blocked.totals.subtotalPaise], [false, 'SELLER_UNAVAILABLE', false, 32_000]);
+  assert.deepEqual(blocked.issues.map((i) => [i.code, i.cartItemId, i.blocking]), [['SELLER_UNAVAILABLE', scarfId, true]]);
+  assert.deepEqual(error(await call('PATCH', `/cart/items/${scarfId}`, { body: { quantity: 2 } })), [409, 'PRODUCT_UNAVAILABLE']);
+  assert.equal((await call('DELETE', `/cart/items/${scarfId}`)).body.data.checkoutAllowed, true);
+  await Offer.updateOne({ _id: lamp.offerId }, { $set: { stock: 0 } });
+  assert.deepEqual((await cart()).issues.map((i) => i.code), ['OUT_OF_STOCK']);
+  await Offer.updateOne({ _id: lamp.offerId }, { $set: { stock: 50 } });
+
+  // a price change is shown once, on the next look after the next action
+  await Offer.updateOne({ _id: lamp.offerId }, { $set: { sellingPricePaise: 2_500, mrpPaise: 3_000 } });
+  const changed = await cart();
+  assert.deepEqual(changed.issues.map((i) => [i.code, i.cartItemId, i.blocking]), [['PRICE_CHANGED', lampLine, false]]);
+  assert.equal(changed.items[0].pricePaise, 2_500);
+  assert.equal(changed.checkoutAllowed, true);
+  assert.equal((await call('PATCH', `/cart/items/${lampLine}`, { body: { quantity: 1 } })).body.data.issues.length, 1); // judged against what they last saw
+  assert.deepEqual((await cart()).issues, []); // ...and now they have seen it
+
+  // every customer has their own cart
+  assert.deepEqual((await cart(bob)).items, []);
+  assert.deepEqual(error(await call('PATCH', `/cart/items/${lampLine}`, { body: { quantity: 2 }, as: bob })), [404, 'CART_ITEM_NOT_FOUND']);
+
+  // changes made at the same moment from two devices are never lost
+  const before = (await cart()).items.find((i) => i.cartItemId === lampLine).quantity;
+  const burst = await Promise.all(Array.from({ length: 3 }, () => call('POST', '/cart/items', { body: { offerId: lamp.offerId, quantity: 1 } })));
+  const won = burst.filter((r) => r.status === 201).length;
+  assert.ok(burst.every((r) => [201, 409].includes(r.status)) && won >= 1);
+  assert.equal((await cart()).items.find((i) => i.cartItemId === lampLine).quantity, before + won);
+  assert.equal(await Cart.countDocuments({ customerId: alice }), 1);
+});
+
+test('wishlist to cart: the cheapest seller\'s offer moves over; what cannot be bought stays saved', opts, async (t) => {
+  const { createApp } = await import('../src/app/app.js');
+  const { signAccessToken } = await import('../src/shared/utils/jwt.js');
+  const wishlist = await import('../src/modules/wishlist/application/wishlist.service.js');
+  const { deleteCustomerCart } = await import('../src/modules/cart/public/index.js');
+  const { Cart } = await import('../src/modules/cart/infrastructure/persistence/cart.model.js');
+  const { seller, listed } = await stockFixture('Move');
+  const cheap = await seller('Move Cheap');
+  const dear = await seller('Move Dear');
+  const kettle = await listed('Move Kettle', dear, 5, { sellingPricePaise: 5_000 });
+  // a second seller offers the same variant for less: that is the one the cart should take
+  const { Offer } = await import('../src/modules/product/infrastructure/persistence/offer.model.js');
+  const cheaper = await Offer.create({ productId: kettle.product._id, variantId: kettle.offer.variantId, sellerId: cheap, sellingPricePaise: 4_000, mrpPaise: 6_000, stock: 5, status: 'LIVE' });
+  const empty = await listed('Move Empty', dear, 0);
+
+  const server = createServer(createApp());
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => new Promise((resolve) => server.close(resolve)));
+  const customer = String(new mongoose.Types.ObjectId());
+  const call = async (method, path) => {
+    const response = await fetch(`http://127.0.0.1:${server.address().port}/api/customer/v1${path}`, {
+      method, headers: { authorization: `Bearer ${signAccessToken({ sub: customer, role: 'CUSTOMER' })}` },
+    });
+    return { status: response.status, body: await response.json() };
+  };
+
+  await wishlist.addToWishlist(customer, kettle.productId);
+  const moved = await call('POST', `/wishlist/${kettle.productId}/move-to-cart`);
+  assert.equal(moved.status, 200);
+  assert.deepEqual([moved.body.data.productId, moved.body.data.wishlisted], [kettle.productId, false]);
+  const cart = (await call('GET', '/cart')).body.data;
+  assert.deepEqual(cart.items.map((i) => [i.cartItemId, i.offerId, i.sellerName, i.pricePaise]), [[moved.body.data.cartItemId, String(cheaper._id), 'Move Cheap', 4_000]]);
+  assert.equal((await wishlist.listWishlist(customer)).total, 0);
+  assert.deepEqual([(await call('POST', `/wishlist/${kettle.productId}/move-to-cart`)).status, (await call('POST', `/wishlist/${kettle.productId}/move-to-cart`)).body.error.code], [404, 'WISHLIST_ITEM_NOT_FOUND']);
+
+  // out of stock: the cart says why and the item stays on the wishlist
+  await wishlist.addToWishlist(customer, empty.productId);
+  const refused = await call('POST', `/wishlist/${empty.productId}/move-to-cart`);
+  assert.deepEqual([refused.status, refused.body.error.code], [409, 'PRODUCT_OUT_OF_STOCK']);
+  assert.equal((await wishlist.listWishlist(customer)).total, 1);
+  assert.equal((await call('GET', '/cart')).body.data.items.length, 1);
+
+  // deleting the account deletes the cart
+  await deleteCustomerCart(customer);
+  assert.equal(await Cart.countDocuments({ customerId: customer }), 0);
 });

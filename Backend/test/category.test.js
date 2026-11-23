@@ -24,7 +24,9 @@ test('new children inherit every policy and zero return windows clear return typ
     hsnCode: '6205',
     attributeSetId: 'abc',
   };
-  assert.deepEqual(inheritedCategoryValues(parent, {}), parent);
+  // commission is the exception: it is not copied, so a child with no rate of its own keeps following its ancestors
+  assert.deepEqual(inheritedCategoryValues(parent, {}), { ...parent, commissionPct: null });
+  assert.equal(inheritedCategoryValues(parent, { commissionPct: 5 }).commissionPct, 5);
   assert.deepEqual(inheritedCategoryValues(parent, { returnWindowDays: 0 }).returnTypes, []);
 });
 

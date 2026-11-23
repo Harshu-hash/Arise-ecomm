@@ -19,7 +19,7 @@ import {
   validateVariantCombinations,
   variantDefiningCodes,
 } from '../domain/services/productRules.js';
-import { bestOffer } from './customerCatalog.service.js';
+import { bestOffer, campaignByOffer } from './customerCatalog.service.js';
 import { Offer } from '../infrastructure/persistence/offer.model.js';
 import { Product } from '../infrastructure/persistence/product.model.js';
 import { Variant } from '../infrastructure/persistence/variant.model.js';
@@ -292,8 +292,10 @@ export async function getListingForSeller(offerId, sellerId) {
     Variant.find({ productId: product._id }).sort({ createdAt: 1, _id: 1 }).lean(),
   ]);
   const variantById = new Map(variants.map((v) => [String(v._id), v]));
+  const campaigns = await campaignByOffer(offers);
   return {
     ...serializeListing(offer, product, variant),
+    campaign: campaigns.get(String(offer._id)) ?? null,
     product: { ...product, imageUrls: (product.images ?? []).map((k) => urlForKey(k, 'PRODUCT_IMAGE')) },
     variant,
     variants: offers
@@ -309,6 +311,7 @@ export async function getListingForSeller(offerId, sellerId) {
           attributes: v.attributes ?? {},
           sellingPricePaise: o.sellingPricePaise,
           mrpPaise: o.mrpPaise,
+          campaign: campaigns.get(String(o._id)) ?? null,
           stock: o.stock,
           status: o.status,
           weightG: v.weightG,
@@ -376,6 +379,9 @@ export async function updateListing(offerId, body, { sellerId, actor }) {
     const price = item.sellingPricePaise ?? o.sellingPricePaise;
     const mrp = item.mrpPaise ?? o.mrpPaise;
     if (price > mrp) throw new ValidationError('Invalid pricing.', { sellingPricePaise: ['Selling price cannot exceed MRP.'] });
+    if (item.stock !== undefined && item.stock < (o.reserved ?? 0)) {
+      throw new ConflictError('RESERVED_STOCK', `${o.reserved} units are held for checkouts in progress; stock cannot go below that.`);
+    }
     if (item.stock !== undefined && item.stock !== o.stock) {
       stockEdits.push({ offer: o, before: o.stock });
       o.version += 1; // an open stock-management edit of this row now gets VERSION_CONFLICT instead of overwriting it
@@ -484,6 +490,7 @@ export async function listMyListings(sellerId, query) {
     Offer.find({ sellerId, productId: { $in: groups.map((g) => g._id) } }).sort({ createdAt: 1, _id: 1 }).lean(),
     Product.find({ _id: { $in: groups.map((g) => g._id) } }).select('title images brandName').lean(),
   ]);
+  const campaigns = await campaignByOffer(offers);
   const offerById = new Map(offers.map((o) => [String(o._id), o]));
   const productById = new Map(products.map((p) => [String(p._id), p]));
   const rows = groups.map((g) => {
@@ -497,6 +504,7 @@ export async function listMyListings(sellerId, query) {
         sellerSku: o.sellerSku,
         sellingPricePaise: o.sellingPricePaise,
         mrpPaise: o.mrpPaise,
+        campaign: campaigns.get(String(o._id)) ?? null,
         stock: o.stock,
         status: o.status,
       }));
@@ -509,6 +517,7 @@ export async function listMyListings(sellerId, query) {
       variantLabel: g.variantCount > 1 ? `${g.variantCount} variants` : offer.variantLabel,
       variantCount: g.variantCount,
       variants,
+      campaign: variants.find((v) => v.campaign)?.campaign ?? null,
       sellingPricePaise: g.sellingPricePaise,
       maxPricePaise: g.maxPricePaise,
       mrpPaise: g.mrpPaise,

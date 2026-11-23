@@ -3,18 +3,19 @@ import { Offer } from '../infrastructure/persistence/offer.model.js';
 import { StockMovement } from '../infrastructure/persistence/stockMovement.model.js';
 
 // Seller stock management. One row per offer (a seller's variant), read straight from the Offer collection.
-// Honest gaps until their modules exist: nothing reserves stock yet (no orders), so reserved is 0 and available equals
-// sellable; there is no sales velocity, so days of cover and restock suggestions are empty; nothing records when units
+// `reserved` is the units held for checkouts in progress (stockReservation.service). Honest gaps until their modules
+// exist: there is no sales velocity, so days of cover and restock suggestions are empty; nothing records when units
 // arrived, so no stock is aged; and there are no warehouses or pickup addresses, so the location is the fulfilment kind.
 export const LOW_STOCK_UNITS = 10;
 const LEDGER_LIMIT = 200;
-const ROW_FIELDS = 'productId variantId sellerId sku sellerSku productTitle variantLabel stock fulfillmentType status productStatus version updatedAt';
+const ROW_FIELDS = 'productId variantId sellerId sku sellerSku productTitle variantLabel stock reserved fulfillmentType status productStatus version updatedAt';
+const AVAILABLE = { $subtract: ['$stock', { $ifNull: ['$reserved', 0] }] };
 const SORT_FIELDS = { sellable: 'stock', available: 'stock', productTitle: 'productTitle', updatedAt: 'updatedAt' };
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 export function inventoryRow(offer) {
-  const reserved = 0;
+  const reserved = offer.reserved ?? 0;
   const available = offer.stock - reserved;
   return {
     id: String(offer._id),
@@ -46,7 +47,7 @@ export function inventoryRow(offer) {
 export async function listSellerInventory(sellerId, { page, pageSize, q, sort, fulfillmentType, lowStock, aged }) {
   const filter = { sellerId };
   if (fulfillmentType) filter.fulfillmentType = fulfillmentType;
-  if (lowStock) filter.stock = { $lt: LOW_STOCK_UNITS };
+  if (lowStock) filter.$expr = { $lt: [AVAILABLE, LOW_STOCK_UNITS] };
   if (q) {
     const pattern = new RegExp(escapeRegex(q), 'i');
     filter.$or = [{ productTitle: pattern }, { sku: pattern }, { sellerSku: pattern }];
@@ -60,7 +61,7 @@ export async function listSellerInventory(sellerId, { page, pageSize, q, sort, f
     aged ? 0 : Offer.countDocuments(filter),
     Offer.aggregate([
       { $match: { sellerId } },
-      { $group: { _id: null, skus: { $sum: 1 }, unitsSellable: { $sum: '$stock' }, lowStock: { $sum: { $cond: [{ $lt: ['$stock', LOW_STOCK_UNITS] }, 1, 0] } } } },
+      { $group: { _id: null, skus: { $sum: 1 }, unitsSellable: { $sum: '$stock' }, lowStock: { $sum: { $cond: [{ $lt: [AVAILABLE, LOW_STOCK_UNITS] }, 1, 0] } } } },
     ]),
   ]);
   return {
@@ -101,16 +102,19 @@ export async function setSellerStock(sellerId, offerId, { sellable, version, not
   if (offer.fulfillmentType === 'ARISE') {
     throw new ConflictError('FBA_STOCK_IMMUTABLE', 'Stock fulfilled by Arise changes only through receiving, adjustment, return or removal movements.');
   }
-  const stale = () => new ConflictError('VERSION_CONFLICT', 'This stock row changed. Refresh and retry.', { current: inventoryRow(offer) });
-  if (offer.version !== version) throw stale();
+  const conflict = (row) => (sellable < (row.reserved ?? 0)
+    ? new ConflictError('RESERVED_STOCK', `${row.reserved} units are held for checkouts in progress; stock cannot go below that.`, { current: inventoryRow(row) })
+    : new ConflictError('VERSION_CONFLICT', 'This stock row changed. Refresh and retry.', { current: inventoryRow(row) }));
+  if (offer.version !== version || sellable < (offer.reserved ?? 0)) throw conflict(offer);
   if (offer.stock === sellable) return inventoryRow(offer);
 
+  // The reserved guard sits in the write itself: a checkout may hold units between the read above and this update.
   const updated = await Offer.findOneAndUpdate(
-    { _id: offerId, sellerId, version },
+    { _id: offerId, sellerId, version, $expr: { $lte: [{ $ifNull: ['$reserved', 0] }, sellable] } }, // offers saved before reservations have no field
     { $set: { stock: sellable }, $inc: { version: 1 } },
     { new: true, projection: ROW_FIELDS },
   ).lean();
-  if (!updated) throw new ConflictError('VERSION_CONFLICT', 'This stock row changed. Refresh and retry.', { current: inventoryRow(await ownOffer(sellerId, offerId)) });
+  if (!updated) throw conflict(await ownOffer(sellerId, offerId));
 
   // shortcut: the ledger row is written after the stock, not in one transaction; move both into withTransaction once
   // every deployment runs MongoDB as a replica set.

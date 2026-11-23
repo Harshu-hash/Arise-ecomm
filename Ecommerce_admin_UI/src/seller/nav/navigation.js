@@ -66,8 +66,9 @@ export const NAV_GROUPS = [
     label: 'Payments',
     icon: 'bank',
     items: [
-      { label: 'Overview', path: '/payments' },
-      { label: 'Settlements', path: '/payments/settlements' },
+      { label: 'Wallet', path: '/payments' },
+      { label: 'Earnings', path: '/payments/settlements' },
+      { label: 'Invoices', path: '/payments/invoices' },
     ],
   },
   {
@@ -88,6 +89,7 @@ export const NAV_GROUPS = [
     items: [
       { label: 'Business Profile', path: '/settings/profile' },
       { label: 'Bank Account', path: '/settings/bank' },
+      { label: 'Pickup Address', path: '/settings/address' },
     ],
   },
 ];

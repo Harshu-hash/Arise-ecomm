@@ -31,27 +31,30 @@ import FullPageSpinner from '@ui/components/FullPageSpinner';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
+import useRealtime from '@ui/hooks/useRealtime';
 import { ACTION_LABELS, orderKeys, ordersApi } from '../api/orders.api';
 
 const FLOW_STEPS = [
-  { key: 'confirm', title: 'Confirm', status: 'PLACED' },
-  { key: 'pack', title: 'Invoice & pack', status: 'ACCEPTED' },
-  { key: 'manifest', title: 'Label & manifest', status: 'PACKED' },
-  { key: 'dispatch', title: 'Dispatch', status: 'MANIFESTED' },
+  { key: 'confirm', title: 'Accept', status: 'CONFIRMED' },
+  { key: 'ready-to-ship', title: 'Ready to ship', status: 'ACCEPTED' },
   { key: 'shipped', title: 'Shipped', status: 'SHIPPED' },
+  { key: 'delivered', title: 'Delivered', status: 'DELIVERED' },
 ];
 
 function stepIndex(status) {
   const map = {
     PLACED: 0,
+    CONFIRMED: 0,
     ACCEPTED: 1,
-    PACKED: 2,
-    MANIFESTED: 3,
-    SHIPPED: 4,
-    IN_TRANSIT: 4,
-    OUT_FOR_DELIVERY: 4,
-    UNDELIVERED: 4,
-    DELIVERED: 5,
+    PACKED: 1,
+    MANIFESTED: 2,
+    READY_TO_SHIP: 2,
+    SHIPPED: 2,
+    IN_TRANSIT: 2,
+    OUT_FOR_DELIVERY: 2,
+    UNDELIVERED: 2,
+    DELIVERY_FAILED: 2,
+    DELIVERED: 4,
   };
   return map[status] ?? 0;
 }
@@ -61,6 +64,8 @@ export default function OrderDetailPage() {
   const navigate = useNavigate();
   const { message } = App.useApp();
   const queryClient = useQueryClient();
+  const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['seller', 'orders'] });
+  useRealtime('seller', { 'order:changed': refreshOrders, 'session:ready': refreshOrders });
   const [cancelOpen, setCancelOpen] = useState(false);
   const [cancelReason, setCancelReason] = useState('');
   const [packageOpen, setPackageOpen] = useState(false);
@@ -192,6 +197,14 @@ export default function OrderDetailPage() {
                   >
                     {ACTION_LABELS[data.nextAction]}
                   </Button>
+                  {import.meta.env.DEV && data.nextAction === 'ready-to-ship' && (
+                    <Button
+                      loading={actionMut.isPending}
+                      onClick={() => actionMut.mutate('mock-ready-to-ship')}
+                    >
+                      {ACTION_LABELS['mock-ready-to-ship']}
+                    </Button>
+                  )}
                 </>
               )}
             </Space>

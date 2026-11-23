@@ -1,4 +1,5 @@
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
+import { catalogChanged } from '../../../infrastructure/realtime/catalogEvents.js';
 import { publicUrl } from '../../../infrastructure/storage/local.storage.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { decryptField, encryptField, verifyPassword } from '../../../shared/utils/crypto.js';
@@ -47,9 +48,37 @@ export async function updateProfile(sellerId, { storeName, logoKey }, actor) {
   return { id: String(seller._id), storeName: seller.storeName, vacationMode: seller.vacationMode, logoUrl: logoUrlOf(seller.logoKey) };
 }
 
+/** Sets (or clears) the seller's GSTIN. Without one the seller's documents are bills of supply with no GST; an admin still verifies it (gstinOk resets). */
+export async function setGstin(sellerId, gstin, actor) {
+  await updateSeller(sellerId, { gstin: gstin ? encryptField(gstin) : null, gstinOk: false }, 'gstin');
+  await recordAudit({ action: 'seller.gstin.set', subjectType: 'seller', subjectId: sellerId, after: { gstin: gstin ? `${gstin.slice(0, 2)}••••••••${gstin.slice(-3)}` : null }, actor });
+  return { gstin };
+}
+
+/** The store's one pickup address (where couriers collect parcels), plus the contact the courier is given and whether it is registered. */
+export async function getPickupAddress(sellerId) {
+  const [seller, owner] = await Promise.all([
+    Seller.findById(sellerId, 'location pickupLocationName').lean(),
+    User.findOne({ sellerId, role: 'SELLER' }, 'name email phone').lean(),
+  ]);
+  if (!seller) throw new NotFoundError('Seller account not found.');
+  const { address = null, locality = null, city = null, state = null, pincode = null } = seller.location ?? {};
+  return { address, locality, city, state, pincode, contact: { name: owner?.name ?? null, phone: owner?.phone ?? null, email: owner?.email ?? null }, registeredWithCourier: Boolean(seller.pickupLocationName) };
+}
+
+/** Saves the pickup address. A changed address is registered with the courier afresh the next time a parcel is made ready to ship. */
+export async function setPickupAddress(sellerId, { address, locality, city, state, pincode }, actor) {
+  const before = await getPickupAddress(sellerId);
+  const location = { address, locality: locality || null, city, state, pincode };
+  await updateSeller(sellerId, { location }, 'location');
+  await recordAudit({ action: 'seller.address.update', subjectType: 'seller', subjectId: sellerId, before: { address: before.address, city: before.city, pincode: before.pincode }, after: { address, city, pincode }, actor });
+  return getPickupAddress(sellerId);
+}
+
 export async function setVacationMode(sellerId, on, actor) {
   const seller = await updateSeller(sellerId, { vacationMode: on }, 'storeName vacationMode');
   await recordAudit({ action: 'seller.vacation.set', subjectType: 'seller', subjectId: sellerId, after: { vacationMode: on }, actor });
+  catalogChanged(); // the seller's listings leave (or return to) the shop for customers
   return { id: String(seller._id), storeName: seller.storeName, vacationMode: seller.vacationMode };
 }
 

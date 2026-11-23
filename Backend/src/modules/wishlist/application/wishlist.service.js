@@ -1,4 +1,5 @@
 import { AppError } from '../../../shared/errors/AppError.js';
+import { addProductToCart } from '../../cart/public/index.js';
 import { getLiveProductCards } from '../../product/public/index.js';
 import { WishlistItem } from '../infrastructure/persistence/wishlistItem.model.js';
 
@@ -42,6 +43,19 @@ export async function addToWishlist(customerId, productId) {
 export async function removeFromWishlist(customerId, productId) {
   await WishlistItem.deleteOne({ customerId, productId });
   return { productId, wishlisted: false };
+}
+
+/**
+ * Saved item to the cart: the cheapest seller's offer, one unit. If it cannot be bought (out of stock, seller away) the
+ * cart's reason is returned and the item stays saved; once it is in the cart it leaves the wishlist.
+ */
+export async function moveWishlistItemToCart(customerId, productId) {
+  if (!(await WishlistItem.exists({ customerId, productId }))) {
+    throw new AppError({ code: 'WISHLIST_ITEM_NOT_FOUND', message: 'This item is no longer saved.', status: 404 });
+  }
+  const { cartItemId } = await addProductToCart(customerId, productId);
+  await WishlistItem.deleteOne({ customerId, productId });
+  return { productId, wishlisted: false, cartItemId };
 }
 
 export const deleteCustomerWishlist = (customerId) => WishlistItem.deleteMany({ customerId: String(customerId) });

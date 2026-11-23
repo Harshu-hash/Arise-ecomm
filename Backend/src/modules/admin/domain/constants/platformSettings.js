@@ -41,7 +41,8 @@ export const SETTINGS_SECTIONS = [
   {
     id: 'fees',
     label: 'Fees',
-    values: { platformFeePaise: 500, deliveryFeeFreeThresholdPaise: 49_900, codConvenienceFeePaise: 1500 },
+    // deliveryFeePaise is the flat delivery charge the cart shows until checkout has a real shipping quote.
+    values: { platformFeePaise: 500, deliveryFeePaise: 4000, deliveryFeeFreeThresholdPaise: 49_900, codConvenienceFeePaise: 1500 },
   },
   {
     id: 'payments',
@@ -51,7 +52,7 @@ export const SETTINGS_SECTIONS = [
   {
     id: 'tax',
     label: 'Tax',
-    values: { invoiceSeriesPrefix: 'ARS/INV', hsnDefaultRatePct: 18 },
+    values: { invoiceSeriesPrefix: 'ARS', hsnDefaultRatePct: 18 },
   },
   {
     id: 'sellerPolicies',
@@ -60,6 +61,17 @@ export const SETTINGS_SECTIONS = [
       tierGmvThresholdsPaise: { bronze: 0, silver: 50_000_000, gold: 250_000_000, platinum: 1_000_000_000 },
       payoutCycleDay: 'MONDAY',
       reserveHoldPctNewSellers: 10,
+    },
+  },
+  {
+    id: 'settlement',
+    label: 'Seller settlement',
+    // shortcut: tcsPct/tdsPct are the current statutory rates (GST s.52 on taxable value, income tax s.194-O); confirm with a tax advisor before launch
+    values: {
+      holdBufferDays: 2, closingFeePaise: 0, collectionFeePct: 0, gstOnFeesPct: 18, tcsPct: 0.5, tdsPct: 0.1,
+      // withdrawals: set by admin, applied to every seller
+      minWithdrawalPaise: 50_000, maxWithdrawalPaise: 5_000_000, dailyWithdrawalLimitPaise: 10_000_000, maxOpenWithdrawals: 1,
+      newSellerDays: 90, // sellers approved less than this long ago keep sellerPolicies.reserveHoldPctNewSellers of their balance unwithdrawable
     },
   },
   {
@@ -98,4 +110,4 @@ export const SETTINGS_SECTIONS = [
 export const SETTINGS_SECTION_IDS = SETTINGS_SECTIONS.map((section) => section.id);
 
 // Changing these affects money or access platform-wide, so a reason is mandatory and audited.
-export const SENSITIVE_SETTINGS_SECTIONS = new Set(['fees', 'approvalThresholds', 'security']);
+export const SENSITIVE_SETTINGS_SECTIONS = new Set(['fees', 'settlement', 'approvalThresholds', 'security']);

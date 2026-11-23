@@ -31,6 +31,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 import ErrorState from '@ui/components/ErrorState';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
+import CampaignTag from '@ui/components/CampaignTag';
 import MoneyText from '@ui/components/MoneyText';
 import PageHeader from '@ui/components/PageHeader';
 import StatusTag from '@ui/components/StatusTag';
@@ -306,6 +307,7 @@ export default function ListingDetailPage() {
                     render: (_, v) => (
                       <>
                         <MoneyText paise={v.sellingPricePaise} strong />
+                        <div><CampaignTag campaign={v.campaign} /></div>
                         {v.mrpPaise > v.sellingPricePaise && (
                           <div>
                             <Typography.Text delete type="secondary" style={{ fontSize: 11 }}>

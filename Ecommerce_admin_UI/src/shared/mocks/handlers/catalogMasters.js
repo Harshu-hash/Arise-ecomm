@@ -95,8 +95,11 @@ export const catalogMasterHandlers = [
       node = node.parentId ? findById('categories', node.parentId) : null;
     }
 
-    return ok({ ...category, commissionPct: category.commissionPct ?? 0 }, {
+    // Bottom-most rate above this category (ancestors run root first, so walk them backwards).
+    const rateAbove = [...ancestors].reverse().map((a) => findById('categories', a.id)).find((row) => row?.commissionPct != null);
+    return ok({ ...category, commissionPct: category.commissionPct ?? null }, {
       ancestors,
+      inheritedCommission: rateAbove ? { pct: rateAbove.commissionPct, source: { id: rateAbove.id, name: rateAbove.name } } : { pct: 0, source: null },
       childCount: db.categories.filter((c) => c.parentId === category.id).length,
       attributeSet: set,
       attributes: (set?.attributeIds ?? []).map((aid) => findById('attributes', aid)).filter(Boolean),
@@ -146,7 +149,7 @@ export const catalogMasterHandlers = [
       codAllowed: body.codAllowed !== false,
       assuredEligible: level === 3,
       gstRate: body.gstRate ?? parent?.gstRate ?? 18,
-      commissionPct: body.commissionPct ?? parent?.commissionPct ?? 0,
+      commissionPct: body.commissionPct ?? null,
       hsnCode: body.hsnCode ?? parent?.hsnCode ?? null,
       attributeSetId: body.attributeSetId ?? parent?.attributeSetId ?? null,
       liveListings: 0,

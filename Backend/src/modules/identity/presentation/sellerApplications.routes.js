@@ -142,7 +142,7 @@ function buildSellersMatch(query) {
     ];
   }
   if (query.state) match['location.state'] = { $regex: `^${escapeRegex(query.state)}$`, $options: 'i' };
-  if (query.payoutOnHold === 'true') match._id = null; // no payout-hold feature yet: always empty, never fabricated
+  if (query.payoutOnHold === 'true') match['payoutHold.on'] = true;
   const gte = query['joinedAt[gte]'];
   const lte = query['joinedAt[lte]'];
   if (gte || lte) {
@@ -277,7 +277,7 @@ export function createSellerApplicationsRouter() {
                   cancellationPct: { $literal: 0 },
                   lateDispatchPct: { $literal: 0 },
                   returnPct: { $literal: 0 },
-                  payoutOnHold: { $literal: false },
+                  payoutOnHold: { $ifNull: ['$payoutHold.on', false] },
                   joinedAt: '$approvedAt',
                 },
               },
@@ -368,7 +368,7 @@ export function createSellerApplicationsRouter() {
           cancellationPct: 0,
           lateDispatchPct: 0,
           returnPct: 0,
-          payoutOnHold: false,
+          payoutOnHold: Boolean(seller.payoutHold?.on),
           suspensionReason: null,
           joinedAt: seller.approvedAt ?? null,
           accountManagerName: null,

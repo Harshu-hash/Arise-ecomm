@@ -1,6 +1,7 @@
 export {
   findCategoryForCatalog,
   findRootCategoryByName,
+  getCategoryTerms,
   getCategoryForListing,
   incrementCategoryProductCount,
   listHomeCategoryTabs,

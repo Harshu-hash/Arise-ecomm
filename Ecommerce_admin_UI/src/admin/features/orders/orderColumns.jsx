@@ -163,11 +163,11 @@ export const orderFilterSchema = [
 
 export const ORDER_TABS = [
   { key: 'all', label: 'All' },
-  { key: 'PLACED', label: 'To accept', codes: ['PLACED', 'ON_HOLD'] },
-  { key: 'PACKED', label: 'To ship', codes: ['ACCEPTED', 'PACKED', 'MANIFESTED'] },
+  { key: 'PLACED', label: 'To accept', codes: ['PLACED', 'ON_HOLD', 'CONFIRMED'] },
+  { key: 'PACKED', label: 'To ship', codes: ['ACCEPTED', 'PACKED', 'MANIFESTED', 'PROCESSING', 'READY_TO_SHIP'] },
   { key: 'IN_TRANSIT', label: 'In transit', codes: ['SHIPPED', 'IN_TRANSIT', 'OUT_FOR_DELIVERY'] },
   { key: 'DELIVERED', label: 'Delivered' },
-  { key: 'UNDELIVERED', label: 'NDR' },
+  { key: 'UNDELIVERED', label: 'NDR', codes: ['UNDELIVERED', 'DELIVERY_FAILED'] },
   { key: 'CANCELLED', label: 'Cancelled' },
   { key: 'RTO_IN_TRANSIT', label: 'RTO', codes: ['RTO_INITIATED', 'RTO_IN_TRANSIT', 'RTO_DELIVERED'] },
 ];

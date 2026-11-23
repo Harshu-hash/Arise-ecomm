@@ -6,7 +6,10 @@ export const settingsApi = {
   uploadLogo: (file) => { const body = new FormData(); body.append('purpose', 'STORE_LOGO'); body.append('file', file); return api.post('/uploads', body).then((r) => r.data); },
   requestVerifiedChange: (payload) => api.post('/settings/profile/change-requests', payload).then((r) => r.data),
   renewDocument: (documentId, payload) => api.post(`/settings/profile/documents/${documentId}/renew`, payload).then((r) => r.data),
+  setGstin: (gstin) => api.put('/settings/gstin', { gstin }).then((r) => r.data),
   setVacation: (on) => api.post('/settings/vacation', { on }).then((r) => r.data),
+  address: () => api.get('/settings/address').then((r) => r.data),
+  setAddress: (payload) => api.put('/settings/address', payload).then((r) => r.data),
   bank: () => api.get('/settings/bank').then((r) => r.data),
   setBankAccount: (payload, stepUpToken) => api.put('/settings/bank/account', payload, stepUpToken ? { headers: { 'X-Step-Up-Token': stepUpToken } } : undefined).then((r) => r.data),
   addPickupAddress: (payload) => api.post('/settings/bank/pickup-addresses', payload).then((r) => r.data),
@@ -23,6 +26,7 @@ export const settingsApi = {
 export const settingsKeys = {
   profile: ['seller', 'settings', 'profile'],
   bank: ['seller', 'settings', 'bank'],
+  address: ['seller', 'settings', 'address'],
   warehouses: ['seller', 'settings', 'warehouses'],
   team: ['seller', 'settings', 'team'],
 };

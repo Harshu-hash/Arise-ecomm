@@ -26,7 +26,8 @@ const editableFields = {
   codAllowed: z.boolean(),
   gstRate: z.union([z.literal(0), z.literal(5), z.literal(12), z.literal(18), z.literal(28)]),
   commissionPct: z.number().min(0, 'Commission cannot be negative.').max(40, 'Commission cannot exceed 40%.')
-    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9, 'Use at most two decimal places.'),
+    .refine((value) => Math.abs(value * 100 - Math.round(value * 100)) < 1e-9, 'Use at most two decimal places.')
+    .nullable(), // null clears this category's own rate so it inherits again
   hsnCode: z.string().trim().min(1).max(20).nullable(),
   attributeSetId: nullableObjectId,
   imageUrl: z.url().max(2048).nullable(),

@@ -13,46 +13,18 @@ import {
 } from '../api/cart.query';
 
 /**
- * The "Apply Coupon" row + picker sheet, shared by Cart and Checkout so a
- * coupon applied in either screen is visible in both through the cart API cache.
+ * The "Apply Coupon" row. It only opens the picker: the picker (CouponSheet) must be rendered by the screen itself, at its
+ * top level, because the bottom sheet is an overlay that fills whatever container renders it. Inside this small card it was
+ * clipped to a thin sliver.
  */
-export default function CouponSection({ cartId }) {
+export default function CouponSection({ onOpen }) {
   const { data: cart } = useGetCartQuery();
-  const { data: eligibleCoupons = [], isFetching } = useGetEligibleCouponsQuery(cartId, {
-    skip: !cartId,
-  });
-  const [applyCartCoupon, { isLoading: isApplying }] = useApplyCartCouponMutation();
   const [removeCartCoupon, { isLoading: isRemoving }] = useRemoveCartCouponMutation();
   const appliedCoupon = cart?.appliedCoupon;
-  const [visible, setVisible] = useState(false);
-  const [input, setInput] = useState('');
-  const [error, setError] = useState('');
-
-  const tryApply = async coupon => {
-    try {
-      await applyCartCoupon(coupon.code).unwrap();
-      haptics.success();
-      setError('');
-      setVisible(false);
-    } catch (mutationError) {
-      haptics.warning();
-      setError(mutationError.message || 'This coupon could not be applied.');
-    }
-  };
-
-  const applyTyped = () => {
-    const code = input.trim().toUpperCase();
-    const match = eligibleCoupons.find(coupon => coupon.code === code);
-    tryApply(match || { code });
-  };
 
   return (
     <View style={styles.sectionCard}>
-      <TouchableOpacity
-        activeOpacity={0.8}
-        style={styles.couponRow}
-        onPress={() => setVisible(true)}
-      >
+      <TouchableOpacity activeOpacity={0.8} style={styles.couponRow} onPress={onOpen}>
         <View style={[styles.couponIconCircle, appliedCoupon && styles.couponIconCircleActive]}>
           <Icon name="tag" size={15} color={appliedCoupon ? COLORS.white : COLORS.ratingGreen} />
         </View>
@@ -72,14 +44,7 @@ export default function CouponSection({ cartId }) {
         {appliedCoupon ? (
           <TouchableOpacity
             disabled={isRemoving}
-            onPress={async () => {
-              try {
-                await removeCartCoupon().unwrap();
-                setError('');
-              } catch (mutationError) {
-                setError(mutationError.message || 'Could not remove this coupon.');
-              }
-            }}
+            onPress={() => removeCartCoupon().unwrap().catch(() => haptics.warning())}
           >
             <Text style={styles.couponRemove}>Remove</Text>
           </TouchableOpacity>
@@ -87,8 +52,39 @@ export default function CouponSection({ cartId }) {
           <Icon name="chevron-right" size={18} color={COLORS.textTertiary} />
         )}
       </TouchableOpacity>
+    </View>
+  );
+}
 
-      <BottomSheetModal visible={visible} onClose={() => setVisible(false)}>
+/** The coupon picker sheet. Render it once, at the top level of the screen, next to the screen's other content. */
+export function CouponSheet({ cartId, visible, onClose }) {
+  const { data: eligibleCoupons = [], isFetching } = useGetEligibleCouponsQuery(cartId, {
+    skip: !cartId,
+  });
+  const [applyCartCoupon, { isLoading: isApplying }] = useApplyCartCouponMutation();
+  const [input, setInput] = useState('');
+  const [error, setError] = useState('');
+
+  const tryApply = async coupon => {
+    try {
+      await applyCartCoupon(coupon.code).unwrap();
+      haptics.success();
+      setError('');
+      onClose();
+    } catch (mutationError) {
+      haptics.warning();
+      setError(mutationError.message || 'This coupon could not be applied.');
+    }
+  };
+
+  const applyTyped = () => {
+    const code = input.trim().toUpperCase();
+    const match = eligibleCoupons.find(coupon => coupon.code === code);
+    tryApply(match || { code });
+  };
+
+  return (
+    <BottomSheetModal visible={visible} onClose={onClose}>
         <View style={styles.sheetContent}>
           <View style={styles.sheetHandle} />
           <Text style={styles.sheetTitle}>Apply Coupon</Text>
@@ -140,8 +136,7 @@ export default function CouponSection({ cartId }) {
             </TouchableOpacity>
           ))}
         </View>
-      </BottomSheetModal>
-    </View>
+    </BottomSheetModal>
   );
 }
 

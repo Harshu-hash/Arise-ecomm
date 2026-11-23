@@ -177,7 +177,8 @@ const ReturnReplaceScreen = ({ navigation, route }) => {
       />
     );
   }
-  if (!returnItem) {
+  // once the request is placed the item is no longer returnable, so the success view must win over this one
+  if (!returnItem && !submitted) {
     return (
       <ErrorState
         title="No returnable items"
@@ -201,7 +202,7 @@ const ReturnReplaceScreen = ({ navigation, route }) => {
             {mode === 'refund' ? 'Return Request Placed' : 'Replacement Requested'}
           </Text>
           <Text style={styles.successSubtitle}>
-            Request {submitted.id} is scheduled: {submitted.pickupWindowLabel}.{' '}
+            Request {submitted.id} was placed. {submitted.pickupWindowLabel}.{' '}
             {mode === 'refund'
               ? 'Your refund will be initiated once the item passes quality check.'
               : 'A replacement will be shipped once the returned item is picked up.'}
@@ -209,7 +210,7 @@ const ReturnReplaceScreen = ({ navigation, route }) => {
           <TouchableOpacity
             activeOpacity={0.85}
             style={styles.primaryBtn}
-            onPress={() => navigation && navigation.navigate('OrderDetail', { orderId })}
+            onPress={() => navigation && navigation.navigate('ReturnDetail', { returnId: submitted.id })}
           >
             <Text style={styles.primaryBtnText}>Track this Request</Text>
           </TouchableOpacity>

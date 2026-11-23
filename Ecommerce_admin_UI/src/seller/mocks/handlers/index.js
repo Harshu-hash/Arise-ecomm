@@ -7,6 +7,7 @@ import { sellerOrderHandlers } from './orders';
 import { sellerLogisticsHandlers } from './logistics';
 import { sellerFulfilmentHandlers } from './fulfilment';
 import { sellerFinanceHandlers } from './finance';
+import { sellerWalletHandlers } from './wallet';
 import { sellerGrowthHandlers } from './growth';
 import { sellerPerformanceHandlers } from './performance';
 import { sellerSupportHandlers } from './support';
@@ -34,6 +35,7 @@ export const sellerHandlers = [
   ...sellerLogisticsHandlers,
   ...sellerOrderHandlers,
   ...sellerFulfilmentHandlers,
+  ...sellerWalletHandlers,
   ...sellerFinanceHandlers,
   ...sellerGrowthHandlers,
   ...sellerBannerAdHandlers,

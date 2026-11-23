@@ -1509,6 +1509,33 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
+  /finance/wallet:
+    get:
+      operationId: getSellerWallet
+      x-permission: finance.payout.view
+      responses: { '200': { description: 'Pending, available and locked balances, withdrawable amount, the admin limits and why withdrawing may be blocked' } }
+  /finance/wallet/transactions:
+    get:
+      operationId: listSellerWalletTransactions
+      x-permission: finance.payout.view
+      responses: { '200': { description: Append-only wallet ledger, newest first } }
+  /finance/withdrawals:
+    get:
+      operationId: listSellerWithdrawals
+      x-permission: finance.payout.view
+      responses: { '200': { description: The seller's withdrawal requests } }
+    post:
+      operationId: requestSellerWithdrawal
+      x-permission: finance.payout.view
+      x-idempotent: true
+      responses: { '201': { description: Withdrawal requested and its amount locked }, '409': { $ref: '#/components/responses/Error' } }
+  /finance/withdrawals/{id}/cancel:
+    parameters: [{ name: id, in: path, required: true, schema: { type: string } }]
+    post:
+      operationId: cancelSellerWithdrawal
+      x-permission: finance.payout.view
+      x-idempotent: true
+      responses: { '200': { description: Withdrawal cancelled and its amount returned to available }, '409': { $ref: '#/components/responses/Error' } }
   /settlements/mine:
     get:
       operationId: getSettlementsMine

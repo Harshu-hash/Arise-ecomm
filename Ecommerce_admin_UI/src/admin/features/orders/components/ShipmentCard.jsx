@@ -13,7 +13,7 @@ const BLANK = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg'/%3E"
  * multi-seller order legible: each parcel has its own courier, tracking and
  * promised date.
  */
-export default function ShipmentCard({ shipment, selectable, selectedIds, onToggleItem, onReturn }) {
+export default function ShipmentCard({ shipment, selectable, selectedIds, onToggleItem, onReturn, onChangeStatus }) {
   return (
     <Card
       size="small"
@@ -31,6 +31,9 @@ export default function ShipmentCard({ shipment, selectable, selectedIds, onTogg
       }
       extra={
         <Space size={10} wrap>
+          {onChangeStatus && shipment.status !== 'CANCELLED' && (
+            <Button size="small" onClick={() => onChangeStatus(shipment)}>Change status</Button>
+          )}
           {shipment.awb && (
             <Tooltip title={`${shipment.courierName} · last scan ${shipment.lastScanLocation ?? '—'}`}>
               <Typography.Text className="mono" style={{ fontSize: 11 }}>{shipment.awb}</Typography.Text>

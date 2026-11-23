@@ -7,6 +7,9 @@ export const MAINTENANCE_JOBS = Object.freeze({
   OUTBOX_CLEANUP: 'outbox.cleanup',
   UPLOAD_TMP_CLEANUP: 'uploads.tmp-cleanup',
   ACCOUNT_DELETION: 'customers.account-deletion',
+  STOCK_RESERVATION_EXPIRY: 'stock.reservations-expire',
+  RETURN_DECISION_DEADLINE: 'returns.decision-deadline',
+  WALLET_RELEASE: 'settlements.release',
 });
 
 export function createMaintenanceQueue() {
@@ -24,4 +27,7 @@ export async function registerMaintenanceSchedules(queue) {
   await queue.upsertJobScheduler('outbox-cleanup', { pattern: '0 3 * * *' }, { name: MAINTENANCE_JOBS.OUTBOX_CLEANUP });
   await queue.upsertJobScheduler('uploads-tmp-cleanup', { every: 60 * 60_000 }, { name: MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP });
   await queue.upsertJobScheduler('customer-account-deletion', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.ACCOUNT_DELETION });
+  await queue.upsertJobScheduler('stock-reservation-expiry', { every: 60_000 }, { name: MAINTENANCE_JOBS.STOCK_RESERVATION_EXPIRY });
+  await queue.upsertJobScheduler('return-decision-deadline', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.RETURN_DECISION_DEADLINE });
+  await queue.upsertJobScheduler('wallet-release', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.WALLET_RELEASE });
 }

@@ -1,5 +1,6 @@
 export {
   useCancelOrderMutation,
+  useGetOrderInvoicesQuery,
   useGetOrderQuery,
   useGetOrdersQuery,
   useGetOrderTimelineQuery,
