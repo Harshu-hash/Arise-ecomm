@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,8 +19,12 @@ import EmptyState from '../../../shared/EmptyState/EmptyState';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import { useGetBrandsQuery } from '../api/brands.query';
 
+const COLUMNS = 3;
+
 const BrandsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const cardWidth = (width - SPACING.l * 2 - SPACING.m * (COLUMNS - 1)) / COLUMNS; // a lone brand keeps this size
   const [activeFilter, setActiveFilter] = useState('All');
   const { data, error, isLoading, isFetching, refetch } = useGetBrandsQuery({
     filter: activeFilter,
@@ -90,7 +95,7 @@ const BrandsScreen = ({ navigation }) => {
         <FlatList
           data={brands}
           keyExtractor={item => item.id}
-          numColumns={2}
+          numColumns={COLUMNS}
           columnWrapperStyle={styles.row}
           contentContainerStyle={styles.gridContent}
           showsVerticalScrollIndicator={false}
@@ -105,12 +110,12 @@ const BrandsScreen = ({ navigation }) => {
           renderItem={({ item }) => (
             <TouchableOpacity
               activeOpacity={0.85}
-              style={styles.card}
+              style={[styles.card, { width: cardWidth }]}
               onPress={() =>
                 navigation?.navigate('SearchResults', { brandId: item.id, query: item.name })
               }
             >
-              <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
+              <Image source={{ uri: item.image }} style={styles.image} resizeMode="contain" />
               <Text style={styles.brandName} numberOfLines={1}>
                 {item.name}
               </Text>
@@ -159,20 +164,23 @@ const styles = StyleSheet.create({
   filterChipTextActive: { color: COLORS.white },
   gridContent: { paddingHorizontal: SPACING.l, paddingBottom: SPACING.xxl },
   row: { gap: SPACING.m },
-  card: { flex: 1, marginBottom: SPACING.m },
+  card: { marginBottom: SPACING.m },
   image: {
     width: '100%',
-    aspectRatio: 1.4,
+    aspectRatio: 1,
     borderRadius: RADIUS.m,
-    backgroundColor: COLORS.mutedBg,
+    backgroundColor: COLORS.surface,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   brandName: {
-    fontSize: 13.5,
+    fontSize: 12.5,
     fontWeight: '700',
     color: COLORS.textPrimary,
     marginTop: SPACING.s,
+    textAlign: 'center',
   },
-  discount: { fontSize: 12, color: COLORS.ratingGreen, marginTop: 2 },
+  discount: { fontSize: 11, color: COLORS.ratingGreen, marginTop: 2, textAlign: 'center' },
 });
 
 export default BrandsScreen;

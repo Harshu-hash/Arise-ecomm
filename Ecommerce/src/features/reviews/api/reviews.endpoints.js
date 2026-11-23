@@ -4,6 +4,8 @@ export const REVIEW_ENDPOINTS = {
   eligibility: orderItemId => `/order-items/${encodeURIComponent(orderItemId)}/review-eligibility`,
   create: '/reviews',
   detail: reviewId => `/reviews/${encodeURIComponent(reviewId)}`,
+  helpful: reviewId => `/reviews/${encodeURIComponent(reviewId)}/helpful`,
+  report: reviewId => `/reviews/${encodeURIComponent(reviewId)}/report`,
 };
 export const QUESTION_ENDPOINTS = {
   mine: '/questions/mine',

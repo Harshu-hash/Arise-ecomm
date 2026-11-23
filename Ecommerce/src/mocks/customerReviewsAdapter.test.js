@@ -17,6 +17,22 @@ describe('customerReviewsFixtureAdapter', () => {
     expect(eligible.data.data.eligible).toBe(true);
     expect(duplicate.data.data).toMatchObject({ eligible: false, existingReviewId: 'review-1' });
   });
+  it('lets a customer mark someone else\'s review helpful once and report it, but not their own', async () => {
+    const vote = method =>
+      customerReviewsFixtureAdapter({ url: '/reviews/review-2/helpful', method });
+    expect((await vote('put')).data.data).toMatchObject({ helpfulCount: 25, viewerFoundHelpful: true });
+    expect((await vote('put')).data.data.helpfulCount).toBe(25);
+    expect((await vote('delete')).data.data).toMatchObject({ helpfulCount: 24, viewerFoundHelpful: false });
+    const report = await customerReviewsFixtureAdapter({
+      url: '/reviews/review-2/report',
+      method: 'post',
+      data: { reason: 'Fake or spam' },
+    });
+    expect(report.status).toBe(201);
+    await expect(
+      customerReviewsFixtureAdapter({ url: '/reviews/review-1/helpful', method: 'put' }),
+    ).rejects.toMatchObject({ code: 'CANNOT_VOTE_OWN' });
+  });
   it('creates one verified review per delivered order item', async () => {
     const created = await customerReviewsFixtureAdapter({
       url: '/reviews',

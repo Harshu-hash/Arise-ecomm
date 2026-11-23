@@ -16,6 +16,7 @@ export const reviewDtoSchema = z.object({
   authorDisplayName: z.string().min(1),
   verifiedPurchase: z.boolean(),
   helpfulCount: z.number().int().nonnegative(),
+  viewerFoundHelpful: z.boolean().optional(),
   moderationStatus: z.enum(['PENDING', 'PUBLISHED', 'REJECTED']),
   rejectionReason: z.string().nullable(),
   allowedActions: z.array(z.enum(['EDIT', 'DELETE'])),
@@ -28,7 +29,11 @@ export const reviewsResponseSchema = apiEnvelope(
     total: z.number().int().nonnegative(),
     nextCursor: z.string().nullable(),
     summary: z
-      .object({ average: z.number().min(0).max(5), count: z.number().int().nonnegative() })
+      .object({
+        average: z.number().min(0).max(5),
+        count: z.number().int().nonnegative(),
+        distribution: z.record(z.string(), z.number().int().nonnegative()).optional(),
+      })
       .nullable(),
   }),
 );

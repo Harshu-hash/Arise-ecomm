@@ -157,7 +157,7 @@ const WriteReviewScreen = ({ navigation, route }) => {
               <Icon
                 name="star"
                 size={32}
-                color={value <= rating ? COLORS.ratingGreen : COLORS.border}
+                color={value <= rating ? COLORS.starGold : COLORS.border}
               />
             </TouchableOpacity>
           ))}

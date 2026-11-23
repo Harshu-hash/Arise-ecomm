@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, Image, StyleSheet, FlatList, TouchableOpacity, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
@@ -15,6 +15,8 @@ import {
 
 const RecentlyViewedScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { width } = useWindowDimensions();
+  const cardWidth = (width - SPACING.l * 2 - SPACING.m) / 2; // two columns; a lone item keeps this size
   const { data, isLoading, error, refetch } = useGetRecentlyViewedQuery();
   const [clearRecentlyViewed, { isLoading: isClearing }] = useClearRecentlyViewedMutation();
   const items = data?.items || [];
@@ -71,7 +73,7 @@ const RecentlyViewedScreen = ({ navigation }) => {
           contentContainerStyle={styles.gridContent}
           showsVerticalScrollIndicator={false}
           renderItem={({ item }) => (
-            <TouchableOpacity activeOpacity={0.85} onPress={() => handlePressItem(item)} style={styles.card}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => handlePressItem(item)} style={[styles.card, { width: cardWidth }]}>
               <Image source={{ uri: item.image }} style={styles.image} resizeMode="cover" />
               <Text style={styles.itemTitle} numberOfLines={1}>{item.title}</Text>
               <Text style={styles.itemSubtitle} numberOfLines={1}>{item.subtitle}</Text>
@@ -119,7 +121,6 @@ const styles = StyleSheet.create({
     gap: SPACING.m,
   },
   card: {
-    flex: 1,
     marginBottom: SPACING.m,
   },
   image: {

@@ -71,5 +71,6 @@ const orderSchema = new mongoose.Schema(
 );
 
 orderSchema.index({ customerId: 1, _id: -1 });
+orderSchema.index({ 'subOrders.deliveredAt': 1 }); // the rate-your-purchase reminder scan
 
 export const Order = mongoose.models.Order ?? mongoose.model('Order', orderSchema);

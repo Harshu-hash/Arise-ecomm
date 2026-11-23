@@ -40,8 +40,11 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 | `POST` | `/api/customer/v1/auth/logout-all` | Bearer JWT | Revokes every session belonging to the customer. |
 | `GET` | `/api/customer/v1/app-config` | none | Supplies the minimum app version, maintenance state, store links, and bootstrap feature flags required before customer navigation starts. |
 | `GET` | `/api/customer/v1/home` | optional customer Bearer | Home feed. `header.categoryTabs` are the ACTIVE top-level categories. `?categoryId=` serves that tab's page (hero banners, paid carousel `PROMO_CAROUSEL`, products). The main For You page also returns `RECENTLY_VIEWED` ("Still looking for these?", only when a signed-in customer has opened products), `SUGGESTED_PRODUCTS` (their viewed categories first, best discounts next) and `BRAND_SPOTLIGHT` (top 3 brands by live products, with their best discount). Pages are cached for 15s per category; the recently-viewed list is per customer and not cached. |
-| `GET` | `/api/customer/v1/search` | none | Approved products (admin-LIVE, with a LIVE offer, an image and a visible category). Query: `q`, `categoryId` (whole subtree), `brandId`, `categories`, `brands` (comma lists), `priceRangeId`, `minRating`, `sort`, `cursor` (offset), `limit` (≤24). Returns cards, `total`, `nextCursor`, facets and sort options. Price is the cheapest in-stock live offer. |
-| `GET` | `/api/customer/v1/products/:id` | none | Approved product detail: images, sizes/colour from variant attributes, specs, size chart, availability. 404 for anything not LIVE or in a hidden category. Ratings/reviews are empty until a reviews module exists. |
+| `GET` | `/api/customer/v1/search` | none | Approved products (admin-LIVE, with a LIVE offer, an image and a visible category). Query: `q` (every word must match, any order), `categoryId` (whole subtree), `brandId`, `categories`, `brands` (comma lists), `priceRangeId`, `minRating`, `sort`, `cursor` (offset), `limit` (≤24). Returns cards, `total`, `nextCursor`, facets and sort options. Price is the cheapest in-stock live offer. |
+| `GET` | `/api/customer/v1/products/:id` | none | Approved product detail: images, sizes/colour from variant attributes, specs, size chart, availability. 404 for anything not LIVE or in a hidden category. `rating`, `ratingCount` and `reviewCount` come from published reviews (null/0 until the first one). |
+| `GET` | `/api/customer/v1/brands` | none | The Brands page: brands with at least one product on the shelf, A-Z. Query: `filter` (`All`, `Popular` = the 10 brands with most products, or a department name), `cursor` (offset), `limit` (≤ 50). Returns `{ filters, items: [{ id, name, imageUrl, offerText ('Up to N% Off' or null), category, popular }], nextCursor }`. Cached with the catalog snapshot (about 15s). |
+| `GET` | `/api/customer/v1/me/recently-viewed` | Bearer JWT (customer) | The products this customer opened lately, newest first (up to 20; ones no longer on the shelf are left out): `{ items: [{ id, productId, imageUrl, title, subtitle, viewedAt }] }`. History is forgotten after 60 days. |
+| `DELETE` | `/api/customer/v1/me/recently-viewed` | Bearer JWT (customer) | Clears this customer's history. |
 | `GET` | `/api/customer/v1/categories/tree` | none | ACTIVE top-level categories (`id`, `name`, `imageUrl`, `icon`) for the "All Categories" sidebar. |
 | `GET` | `/api/customer/v1/categories/:id` | none | Category pane: hero banner (its image) and sections — level-2 groups with their level-3 tiles. 404 when missing or hidden (a hidden parent hides its subtree). |
 | `GET` | `/api/admin/v1/roles` | Bearer JWT + `admin.role.view` | Paginated role list (`q`, `system`, `hasUsers`, `sort`, `page`, `pageSize`) with admin and permission counts. |
@@ -158,6 +161,38 @@ Status is never stored: coupons derive it from state, schedule and usage; deals 
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/customer/v1/products/:productId/reviews` | none | Published reviews, newest first (`cursor`, `limit` ≤ 20) with `summary { average, count, distribution }`. |
+| `GET` | `/api/customer/v1/order-items/:orderItemId/review-eligibility` | Bearer JWT (customer) | `{ eligible, reason, existingReviewId }`. Eligible once that parcel is `DELIVERED`, not already reviewed, and not refunded. `404 ORDER_ITEM_NOT_FOUND` for someone else's item. |
+| `POST` | `/api/customer/v1/reviews` | Bearer JWT (customer) | `{ orderItemId, rating 1-5, title?, body 10-2000, mediaIds? (≤5, own REVIEW_MEDIA uploads) }`. Clean text with no photos is `PUBLISHED` at once; anything else is `PENDING` for an admin. `409 REVIEW_NOT_ELIGIBLE` / `REVIEW_ALREADY_EXISTS`, `422 MEDIA_INVALID`. No Idempotency-Key: the unique order item makes a repeat a 409. |
+| `GET` | `/api/customer/v1/reviews/mine` | Bearer JWT (customer) | The customer's reviews in every state, with `rejectionReason` and `allowedActions`. |
+| `PATCH` / `DELETE` | `/api/customer/v1/reviews/:reviewId` | Bearer JWT (owner) | Edit (re-moderated like a new review; a published one that now needs a look leaves the rating until approved) or delete (frees the item to be reviewed again). |
+| `GET` | `/api/admin/v1/reviews` | Bearer JWT + `reviews.review.view` | Moderation queue: `status`, `autoModeration`, `hasMedia`, `q`, `sort=submittedAt\|rating\|helpfulVotes`; meta has status/autoModeration facets. |
+| `GET` | `/api/admin/v1/reviews/:id` | Bearer JWT + `reviews.review.view` | One review plus `otherReviewsByAuthor`. |
+| `POST` | `/api/admin/v1/reviews/:id/publish`, `/reject` `{ reason }`, `/hide-media`, `/flag-incentivised` | Bearer JWT + `reviews.review.moderate` | Moderation actions. Rejecting needs a reason and tells the customer. `409 NO_CHANGE` when already in that state. Audited. |
+| `POST` | `/api/admin/v1/reviews/bulk` | Bearer JWT + `reviews.review.moderate` | `{ action: PUBLISH_CLEAN\|REJECT, reviewIds, reason? }` → `{ affected }`. |
+| `POST` | `/api/admin/v1/reviews/:id/reply/moderate` | Bearer JWT + `reviews.review.moderate` | `{ status: PUBLISHED\|REJECTED, reason }` on a seller's pending reply (reason required to reject; the seller is notified). `409 NO_PENDING_REPLY`. Audited. |
+| `GET` | `/api/admin/v1/abuse-reports` | Bearer JWT + `reviews.abuse.view` | Seller reports on reviews: `status`, `q`, `sort=reportedAt\|reporterCount`, status facets. |
+| `POST` | `/api/admin/v1/abuse-reports/:id/decide` | Bearer JWT + `reviews.abuse.decide` | `{ decision: DISMISSED\|REMOVED, reason? }`. REMOVED rejects the review (out of the rating, author told). `409 ALREADY_DECIDED`. Audited. |
+| `GET` | `/api/seller/v1/customer-experience/reviews` | Bearer JWT (seller) | This seller's published reviews (`rating`, `q`, `sort`), buyer masked, with their reply and latest report. Other sellers' reviews never appear. |
+| `POST` | `/api/seller/v1/customer-experience/reviews/:id/reply` | Bearer JWT (seller) | `{ text ≤ 1000 }`. Public only once an admin publishes it; no phone numbers, emails or links (`400 PROHIBITED_CONTENT`). `409 REPLY_EXISTS` unless the last one was rejected. Another seller's review is `404`. |
+| `POST` | `/api/seller/v1/customer-experience/reviews/:id/report` | Bearer JWT (seller) | `{ reason }` → an abuse report. `409 REPORT_EXISTS` while one is open. |
+| `PUT` / `DELETE` | `/api/customer/v1/reviews/:reviewId/helpful` | Bearer JWT (customer) | Mark a published review helpful / take it back. One vote per person (a repeat changes nothing); `409 CANNOT_VOTE_OWN`. The product's review list also returns `viewerFoundHelpful` for a signed-in customer. |
+| `POST` | `/api/customer/v1/reviews/:reviewId/report` | Bearer JWT (customer) | `{ reason }` flags a published review for the abuse queue (`reporterType: CUSTOMER`). `409 REPORT_EXISTS` / `CANNOT_REPORT_OWN`. |
+| `GET` | `/api/customer/v1/products/:productId/questions` | optional customer Bearer | Public questions with `answersCount` and the most helpful answer as `answerPreview` (`cursor`, `limit` ≤ 20). |
+| `GET` | `/api/customer/v1/questions/mine` | Bearer JWT (customer) | The customer's questions in every state, with `rejectionReason`. |
+| `POST` | `/api/customer/v1/questions` | Bearer JWT (customer) | `{ productId, body 5-500 }` about a LIVE product. Clean text is public at once, the rest waits for an admin; sellers with an offer on it are notified. |
+| `GET` | `/api/customer/v1/questions/:questionId` | optional customer Bearer | The question with its published answers (plus the viewer's own), most helpful first. A question that is not public is `404` unless it is the viewer's own. |
+| `POST` | `/api/customer/v1/questions/:questionId/answers` | Bearer JWT (customer) | `{ body 2-2000 }`; clean text is public at once. The asker is notified when an answer goes public. |
+| `PUT` / `DELETE` | `/api/customer/v1/answers/:answerId/helpful` | Bearer JWT (customer) | Helpful vote on a public answer; returns the answer with `helpfulCount` and `viewerFoundHelpful`. |
+| `GET` | `/api/admin/v1/questions` | Bearer JWT + `reviews.qa.view` | Q&A queue: `status`, `unanswered`, `q`, `sort=askedAt\|answerCount`; each row has `answerCount`, `pendingSellerAnswer`, `unansweredDays`. |
+| `GET` | `/api/admin/v1/questions/:id` | Bearer JWT + `reviews.qa.view` | One question with every answer. |
+| `POST` | `/api/admin/v1/questions/:id/moderate` | Bearer JWT + `reviews.qa.moderate` | `{ status: PUBLISHED\|REJECTED, reason }` (reason required to reject; the asker is told). Audited. |
+| `POST` | `/api/admin/v1/questions/:id/answers` | Bearer JWT + `reviews.qa.answer` | `{ text }` answers as Arise Support, public at once. |
+| `POST` | `/api/admin/v1/answers/:id/moderate` | Bearer JWT + `reviews.qa.moderate` | `{ status, reason }` publishes or rejects an answer (a seller's waits here). `409 NO_CHANGE`. |
+| `GET` | `/api/seller/v1/customer-experience/questions` | Bearer JWT (seller) | Public questions on this seller's products (buyer masked) with answers, `responseDueAt` (2 days) and `slaBreached` (filterable). |
+| `POST` | `/api/seller/v1/customer-experience/questions/:id/answers` | Bearer JWT (seller) | `{ text }`; waits for an admin; no phone numbers, emails or links (`400 PROHIBITED_CONTENT`); `409 ANSWER_PENDING`. |
+
+A product's rating is kept in `review_summaries` (running totals of published reviews, changed only by atomic `$inc`). A "rate your purchase" push goes once to each parcel delivered 3-14 days ago that still has an unreviewed, unrefunded item (hourly job). Deleting an account removes the customer's reviews, questions, answers, open reports and votes.
 
 ## notification
 
@@ -386,6 +421,12 @@ The maintenance worker completes due requests every 15 minutes. It revokes sessi
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/customer/v1/search/suggestions` | none | `?q=` → `{ suggestions, trending, prompts }`. `suggestions`: up to 5 matching product names (`type: arrow`, tap to search), then up to 2 brands and 2 categories that match a typed word (`type: chevron`), each with an image. `trending`: the most searched queries of the last 7 days (searched at least twice, results found), topped up with the shelf's biggest brands and departments. `prompts`: related searches built from the matches' brands and categories ("Puma shoe"); every one finds products. Empty `q` gives no suggestions, only `trending`. |
+| `GET` | `/api/customer/v1/search/recent` | Bearer JWT (customer) | `{ items: [text] }`: this customer's last 8 searches, newest first. |
+| `POST` | `/api/customer/v1/search/recent` | Bearer JWT (customer) | `{ query }` remembers a search (a repeat moves to the top; the newest 20 are kept for 90 days). Contact details, very short or very long text are ignored. Returns the list. |
+| `DELETE` | `/api/customer/v1/search/recent` | Bearer JWT (customer) | Clears the history (also cleared when the account is deleted). |
+
+Product search (`GET /search`, listed under catalog) matches **every word** of `q` in any order against the name, brand and category (`nike shoes` = `shoes nike`). `sort=relevance` puts the best name/brand match first and sold-out items last; `sort=popularity` ranks by units sold in the last 90 days (refreshed every 10 minutes); `sort=rating` ranks by average rating. A typed search that finds something counts toward trending (first page only, no customer is recorded). Not built: spell correction, synonyms, and searching descriptions.
 
 ## analytics
 

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import StarIcon from 'react-native-vector-icons/FontAwesome';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -39,6 +40,7 @@ import {
   useRemoveWishlistItemMutation,
 } from '@features/wishlist';
 import { useAddCartItemMutation } from '@features/cart';
+import { useGetProductReviewsQuery } from '@features/reviews';
 
 // Aliases onto the app theme.
 const PINK = COLORS.primary;
@@ -90,25 +92,6 @@ const SIMILAR_PRODUCTS = [
     price: 915,
     mrp: 2499,
     discountPct: 63,
-  },
-];
-
-const REVIEWS = [
-  {
-    id: 'r1',
-    stars: 4,
-    date: 'May 29, 2026',
-    size: '42',
-    text: 'What I liked the most is the perfect balance between softness and durability. The fabric feels premium and the fit is true to size.',
-    author: 'Kuldeep Chakraverti',
-  },
-  {
-    id: 'r2',
-    stars: 5,
-    date: 'May 28, 2026',
-    size: '40',
-    text: 'Very comfortable. The fit is perfect and the quality is good for the price.',
-    author: 'Verified Customer',
   },
 ];
 
@@ -287,6 +270,15 @@ const SpecTable = ({ title, rows }) =>
 const ProductDetailContent = ({ product, navigation }) => {
   const insets = useSafeAreaInsets();
   const { width, height: windowHeight } = useWindowDimensions();
+
+  // The newest few published reviews, only once the product has any.
+  const { data: reviewData } = useGetProductReviewsQuery(
+    { productId: product.id, limit: 5 },
+    { skip: !(product.reviewCount > 0) },
+  );
+  const reviews = reviewData?.items ?? [];
+  const distribution = reviewData?.summary?.distribution;
+  const reviewPhotos = reviews.flatMap(review => review.media.map(photo => photo.thumbnailUrl));
 
   const [activeImage, setActiveImage] = useState(0);
   const [selectedColor, setSelectedColor] = useState(product.color);
@@ -591,7 +583,7 @@ const ProductDetailContent = ({ product, navigation }) => {
             {product.ratingCount > 0 ? (
               <View style={styles.ratingPill}>
                 <Text style={styles.ratingPillText}>{product.rating}</Text>
-                <Icon name="star" size={11} color={GREEN} />
+                <StarIcon name="star" size={11} color={COLORS.starGold} />
                 <View style={styles.ratingDivider} />
                 <Text style={styles.ratingPillCount}>{product.ratingCount}</Text>
               </View>
@@ -907,7 +899,7 @@ const ProductDetailContent = ({ product, navigation }) => {
             />
           </Section>
 
-          {/* Review sections render sample data below; show them only once real reviews exist. */}
+          {/* Ratings and reviews: shown only once the product has published reviews. */}
           {product.reviewCount > 0 && (
           <>
           {/* Ratings & Reviews */}
@@ -923,14 +915,40 @@ const ProductDetailContent = ({ product, navigation }) => {
                 <Text style={styles.ratingCountText}>{product.reviewCount} reviews ›</Text>
               </TouchableOpacity>
             </View>
-            <FlatList
-              data={gallery}
-              horizontal
-              keyExtractor={(u, i) => `rv-${i}`}
-              showsHorizontalScrollIndicator={false}
-              style={{ marginTop: SPACING.l }}
-              renderItem={({ item }) => <Image source={{ uri: item }} style={styles.reviewPhoto} />}
-            />
+            {distribution ? (
+              <View style={styles.distribution}>
+                {[5, 4, 3, 2, 1].map(star => {
+                  const count = distribution[star] ?? 0;
+                  return (
+                    <View key={star} style={styles.distRow}>
+                      <Text style={styles.distLabel}>{star}</Text>
+                      <Text style={styles.distStar}>★</Text>
+                      <View style={styles.distTrack}>
+                        <View
+                          style={[
+                            styles.distFill,
+                            { width: `${Math.round((count / product.ratingCount) * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.distCount}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+            {reviewPhotos.length > 0 ? (
+              <FlatList
+                data={reviewPhotos}
+                horizontal
+                keyExtractor={(u, i) => `rv-${i}`}
+                showsHorizontalScrollIndicator={false}
+                style={{ marginTop: SPACING.l }}
+                renderItem={({ item }) => (
+                  <Image source={{ uri: item }} style={styles.reviewPhoto} />
+                )}
+              />
+            ) : null}
           </Section>
 
           <Section
@@ -943,7 +961,7 @@ const ProductDetailContent = ({ product, navigation }) => {
             }
           >
             <FlatList
-              data={REVIEWS}
+              data={reviews}
               horizontal
               keyExtractor={r => r.id}
               showsHorizontalScrollIndicator={false}
@@ -951,15 +969,13 @@ const ProductDetailContent = ({ product, navigation }) => {
                 <View style={[styles.reviewCard, { width: width * 0.72 }]}>
                   <View style={styles.reviewTop}>
                     <View style={styles.reviewStars}>
-                      <Text style={styles.reviewStarsText}>{item.stars}</Text>
+                      <Text style={styles.reviewStarsText}>{item.rating}</Text>
                       <Icon name="star" size={12} color={COLORS.white} />
                     </View>
                     <Text style={styles.reviewDate}>{item.date}</Text>
-                    <View style={styles.reviewSize}>
-                      <Text style={styles.reviewSizeText}>Size: {item.size}</Text>
-                    </View>
                   </View>
                   <Text style={styles.reviewBody} numberOfLines={3}>
+                    {item.title ? <Text style={styles.reviewTitle}>{item.title}{'\n'}</Text> : null}
                     {item.text}
                     <Text style={styles.readMore} onPress={handleViewReviews}>
                       {' '}
@@ -968,7 +984,7 @@ const ProductDetailContent = ({ product, navigation }) => {
                   </Text>
                   <View style={styles.reviewAuthorRow}>
                     <Icon name="check-circle" size={16} color={GREEN} />
-                    <Text style={styles.reviewAuthor}>{item.author}</Text>
+                    <Text style={styles.reviewAuthor}>{item.authorDisplayName}</Text>
                   </View>
                 </View>
               )}
@@ -1720,6 +1736,21 @@ const styles = StyleSheet.create({
     marginRight: SPACING.m,
     backgroundColor: COLORS.mutedBg,
   },
+
+  distribution: { marginTop: SPACING.l, gap: 6 },
+  distRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  distLabel: { width: 10, fontSize: 12, color: COLORS.textPrimary, textAlign: 'right' },
+  distStar: { fontSize: 12, color: COLORS.starGold },
+  distTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: COLORS.mutedBg,
+    overflow: 'hidden',
+  },
+  distFill: { height: 6, borderRadius: 3, backgroundColor: COLORS.starGold },
+  distCount: { width: 28, fontSize: 12, color: COLORS.textSecondary, textAlign: 'right' },
+  reviewTitle: { fontWeight: '700', color: COLORS.textPrimary },
 
   viewAll: {
     fontSize: 13,

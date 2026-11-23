@@ -83,7 +83,7 @@ export function createUploadRouter() {
 }
 
 // Purposes the customer app's media uploads may use today; anything else gets a clear 400.
-const CUSTOMER_MEDIA_PURPOSES = ['PROFILE_IMAGE', 'RETURN_EVIDENCE'];
+const CUSTOMER_MEDIA_PURPOSES = ['PROFILE_IMAGE', 'RETURN_EVIDENCE', 'REVIEW_MEDIA'];
 const PURPOSE_OF = { RETURN_EVIDENCE: 'RETURN_PROOF' }; // the app's name for the private return-proof folder
 const customerMediaBody = z.object({ purpose: z.enum(CUSTOMER_MEDIA_PURPOSES) });
 

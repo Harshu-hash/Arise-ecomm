@@ -219,8 +219,28 @@ const searchEnvelope = params => {
   };
 };
 
+let recentSearches = [];
+const recentEnvelope = () => ({ data: { items: recentSearches.slice(0, 8) } });
+
+export const resetRecentSearchesFixture = () => {
+  recentSearches = [];
+};
+
 export const customerSearchProductFixtureAdapter = async config => {
   await wait();
+  if (config.url === '/search/recent') {
+    if (config.method === 'get') return response(config, recentEnvelope());
+    if (config.method === 'post') {
+      const text = String(config.data?.query || '').trim();
+      if (!text) return reject(config, 422, 'VALIDATION_ERROR', 'Enter something to search for.');
+      recentSearches = [text, ...recentSearches.filter(item => item.toLowerCase() !== text.toLowerCase())];
+      return response(config, recentEnvelope(), 201);
+    }
+    if (config.method === 'delete') {
+      recentSearches = [];
+      return response(config, { data: { cleared: true } });
+    }
+  }
   if (config.url === '/search/suggestions' && config.method === 'get') {
     return response(config, suggestionsEnvelope(config.params?.q));
   }

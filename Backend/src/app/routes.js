@@ -37,6 +37,12 @@ import { createSellerSettlementRouter, createSellerWalletRouter } from '../modul
 import { createSellerReturnRouter } from '../modules/order/presentation/sellerReturn.routes.js';
 import { createCustomerNotificationRouter, createSellerAlertRouter } from '../modules/notification/presentation/notification.routes.js';
 import { createCustomerOrderRouter } from '../modules/order/presentation/order.routes.js';
+import { createCustomerReviewRouter } from '../modules/review/presentation/review.routes.js';
+import { createAdminReviewRouter } from '../modules/review/presentation/adminReview.routes.js';
+import { createCustomerQuestionRouter } from '../modules/review/presentation/question.routes.js';
+import { createAdminAnswerRouter, createAdminQuestionRouter } from '../modules/review/presentation/adminQuestion.routes.js';
+import { createAdminAbuseRouter } from '../modules/review/presentation/adminAbuse.routes.js';
+import { createSellerReviewRouter } from '../modules/review/presentation/sellerReview.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
 import { createMeRouter } from '../modules/identity/presentation/me.routes.js';
 import { createPasswordRouter } from '../modules/identity/presentation/password.routes.js';
@@ -50,7 +56,8 @@ import { createCategoryRouter } from '../modules/category/presentation/category.
 import { createCustomerCategoryRouter } from '../modules/category/presentation/customerCategory.routes.js';
 import { listHomeCategoryTabs } from '../modules/category/public/index.js';
 import { createSellerCatalogRouter } from '../modules/category/presentation/sellerCatalog.routes.js';
-import { createCustomerProductRouter, createCustomerSearchRouter } from '../modules/product/presentation/customerCatalog.routes.js';
+import { createCustomerSearchExtrasRouter } from '../modules/search/presentation/search.routes.js';
+import { createCustomerBrandRouter, createCustomerProductRouter, createCustomerRecentlyViewedRouter, createCustomerSearchRouter } from '../modules/product/presentation/customerCatalog.routes.js';
 import { listHomeProductFeed, listHomeSections } from '../modules/product/public/index.js';
 import { createListingRouter } from '../modules/product/presentation/listing.routes.js';
 import { createInventoryRouter } from '../modules/product/presentation/inventory.routes.js';
@@ -194,6 +201,9 @@ export function createRoutes() {
   root.use('/api/customer/v1/categories', createCustomerCategoryRouter());
   root.use('/api/customer/v1/products', createCustomerProductRouter());
   root.use('/api/customer/v1/search', createCustomerSearchRouter());
+  root.use('/api/customer/v1/search', createCustomerSearchExtrasRouter());
+  root.use('/api/customer/v1/brands', createCustomerBrandRouter());
+  root.use('/api/customer/v1/me/recently-viewed', createCustomerRecentlyViewedRouter());
   root.use('/api/customer/v1/media', createCustomerMediaRouter());
   root.use('/api/customer/v1/flash-sales', createCustomerFlashSaleRouter());
   root.use('/api/customer/v1/coupons', createCustomerCouponRouter());
@@ -204,6 +214,8 @@ export function createRoutes() {
   root.use('/api/customer/v1', createCustomerCartRouter());
   root.use('/api/customer/v1', createCustomerOrderRouter());
   root.use('/api/customer/v1', createCustomerNotificationRouter());
+  root.use('/api/customer/v1', createCustomerReviewRouter());
+  root.use('/api/customer/v1', createCustomerQuestionRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();
@@ -242,6 +254,10 @@ export function createRoutes() {
   root.use('/api/admin/v1/campaigns/reach', createAudienceReachRouter()); // before the campaign router: "reach" is not an id
   root.use('/api/admin/v1/campaigns', createCampaignRouter());
   root.use('/api/admin/v1/coupons', createCouponRouter());
+  root.use('/api/admin/v1/reviews', createAdminReviewRouter());
+  root.use('/api/admin/v1/abuse-reports', createAdminAbuseRouter());
+  root.use('/api/admin/v1/questions', createAdminQuestionRouter());
+  root.use('/api/admin/v1/answers', createAdminAnswerRouter());
   root.use('/api/admin/v1/orders', createAdminOrderRouter());
   root.use('/api/admin/v1/returns', createAdminReturnRouter());
   root.use('/api/admin/v1/invoices', createAdminInvoiceRouter());
@@ -263,6 +279,7 @@ export function createRoutes() {
   root.use('/api/admin/v1/offers', createOfferAdminRouter());
   root.use('/api/admin/v1/pii', createPiiRouter());
   root.use('/api/admin/v1/audit-events', createAuditRouter());
+  root.use('/api/seller/v1/customer-experience', createSellerReviewRouter());
   root.use('/api/seller/v1/settings', createSellerSettingsRouter());
   root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
   root.use('/api/seller/v1/listings', createListingRouter());

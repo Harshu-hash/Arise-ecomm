@@ -5,6 +5,7 @@ import { getCategoryForListing, visibleCategoryIds } from '../../category/public
 import { dealPriceForVariant, getCampaignDealPrices } from '../../coupon/public/index.js';
 import { getUnsellableSellerIds } from '../../identity/public/index.js';
 import { urlForKey } from '../../media/public/index.js';
+import { getRatingSummaries } from '../../review/public/index.js';
 import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { onCatalogChange } from '../../../infrastructure/realtime/catalogEvents.js';
 import { ttlMemo } from '../../../shared/utils/ttlMemo.js';
@@ -13,6 +14,7 @@ import { Product } from '../infrastructure/persistence/product.model.js';
 import { RecentView } from '../infrastructure/persistence/recentView.model.js';
 import { Variant } from '../infrastructure/persistence/variant.model.js';
 import { availableUnits } from '../domain/services/stockRules.js';
+import { cardMatches, rankByPopularity, rankByRelevance, tokenize } from '../domain/services/searchRules.js';
 
 // Customer read model. A product is shown only once an admin approved it (Product LIVE),
 // it has at least one LIVE offer, an image, and its category is visible to customers.
@@ -72,7 +74,7 @@ export async function campaignByOffer(offers) {
   return new Map(priced.filter((offer) => offer.campaign).map((offer) => [String(offer._id), offer.campaign]));
 }
 
-function toCard(product, offers) {
+function toCard(product, offers, summary = null) {
   const best = bestOffer(offers);
   return {
     campaign: best.campaign ?? null,
@@ -81,12 +83,13 @@ function toCard(product, offers) {
     brand: product.brandName ?? '',
     brandId: product.brandId ? String(product.brandId) : null,
     category: leafName(product.categoryPath),
+    rootCategory: (product.categoryPath ?? '').split(' › ')[0],
     imageUrl: urlForKey(product.images[0], 'PRODUCT_IMAGE'),
     pricePaise: best.sellingPricePaise,
     mrpPaise: Math.max(best.mrpPaise, best.sellingPricePaise, 1),
-    // No reviews module yet: honest "unrated" instead of an invented score.
-    rating: null,
-    ratingCount: 0,
+    // Unrated products stay null/0 rather than showing an invented score.
+    rating: summary?.rating ?? null,
+    ratingCount: summary?.ratingCount ?? 0,
     assured: offers.some((offer) => offer.ariseAssured),
     inStock: offers.some((offer) => availableUnits(offer) > 0),
   };
@@ -104,9 +107,10 @@ async function liveCards(filter) {
     const key = String(offer.productId);
     byProduct.set(key, [...(byProduct.get(key) ?? []), offer]);
   }
+  const ratings = await getRatingSummaries([...byProduct.keys()]);
   return products.flatMap((product) => {
     const own = byProduct.get(String(product._id));
-    return own ? [toCard(product, own)] : [];
+    return own ? [toCard(product, own, ratings.get(String(product._id)))] : [];
   });
 }
 
@@ -115,6 +119,7 @@ const SORTERS = {
   price_low: (a, b) => a.pricePaise - b.pricePaise,
   price_high: (a, b) => b.pricePaise - a.pricePaise,
   discount: (a, b) => discount(b) - discount(a),
+  rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || b.ratingCount - a.ratingCount,
 };
 
 export async function searchCustomerProducts({ q, categoryId, brandId, categories, brands, priceRangeId, minRating, sort, cursor, limit }) {
@@ -123,9 +128,13 @@ export async function searchCustomerProducts({ q, categoryId, brandId, categorie
   if (!visible) return { items: [], total: 0, nextCursor: null, facets, sortOptions: SORT_OPTIONS };
 
   const filter = { categoryId: { $in: visible }, ...(brandId ? { brandId } : {}) };
-  if (q) {
-    const pattern = new RegExp(escapeRegex(q), 'i');
-    filter.$or = [{ title: pattern }, { brandName: pattern }, { categoryPath: pattern }];
+  const tokens = tokenize(q);
+  // Every word must appear in the title, brand or category, in any order ("nike shoes" finds "Nike Revolution Running Shoes").
+  if (tokens.length) {
+    filter.$and = tokens.map((token) => {
+      const pattern = new RegExp(escapeRegex(token), 'i');
+      return { $or: [{ title: pattern }, { brandName: pattern }, { categoryPath: pattern }] };
+    });
   }
   const matched = await liveCards(filter);
 
@@ -137,6 +146,8 @@ export async function searchCustomerProducts({ q, categoryId, brandId, categorie
     && (card.rating ?? 0) >= minRating
   ));
   if (SORTERS[sort]) items = [...items].sort(SORTERS[sort]);
+  else if (sort === 'popularity') items = rankByPopularity(items, tokens, await salesByProduct());
+  else items = rankByRelevance(items, tokens); // "relevance": best name/brand match first, then in-stock, newest
 
   const distinct = (key) => [...new Set(matched.map((card) => card[key]).filter(Boolean))].sort();
   return {
@@ -160,8 +171,8 @@ export async function listHomeProductFeed({ categoryId = null, limit = 20 } = {}
     imageUrl: card.imageUrl,
     pricePaise: card.pricePaise,
     mrpPaise: card.mrpPaise,
-    rating: null,
-    ratingCount: null,
+    rating: card.rating,
+    ratingCount: card.ratingCount,
   }));
 }
 
@@ -186,6 +197,7 @@ export async function getCustomerProduct(productId) {
   ]);
   if (!offers.length) throw notFound();
   const { attributes: definitions } = await attributeSetDetails(category?.attributeSetId ?? null);
+  const summary = (await getRatingSummaries([product._id])).get(String(product._id));
   const nameByCode = new Map(definitions.map((definition) => [definition.code, definition.name]));
 
   const keys = product.images.length ? product.images : variants.flatMap((variant) => variant.images);
@@ -226,9 +238,9 @@ export async function getCustomerProduct(productId) {
   });
 
   return {
-    ...toCard({ ...product, images: keys }, offers),
+    ...toCard({ ...product, images: keys }, offers, summary),
     images: keys.map((key) => urlForKey(key, 'PRODUCT_IMAGE')),
-    reviewCount: 0,
+    reviewCount: summary?.ratingCount ?? 0, // every rating comes with a written review for now
     color: sellable.find((variant) => variant.color)?.color ?? '',
     sizes: [...new Set(sellable.map((v) => v.size).filter(Boolean))],
     variants: sellable,
@@ -256,7 +268,7 @@ onCatalogChange(catalogSnapshot.clear);
 
 const feedCard = (card) => ({
   id: card.id, brand: card.brand, name: card.name, imageUrl: card.imageUrl,
-  pricePaise: card.pricePaise, mrpPaise: card.mrpPaise, rating: null, ratingCount: null,
+  pricePaise: card.pricePaise, mrpPaise: card.mrpPaise, rating: card.rating, ratingCount: card.ratingCount,
 });
 const discountPct = (card) => Math.round(discount(card) * 100);
 
@@ -316,6 +328,146 @@ export async function listHomeSections({ userId = null, suggestedLimit = 10, bra
   }));
 
   return { recentlyViewed, suggested, brands };
+}
+
+/* ---------------------------------------------------------------- search suggestions and popularity */
+
+const POPULARITY_DAYS = 90;
+
+/** Units sold per product over the last 90 days (Map productId -> units); what the "Popularity" sort ranks by. Refreshed every 10 minutes. */
+const salesByProduct = ttlMemo(async () => {
+  try {
+    // Loaded on demand: order already depends on this module.
+    const { Order } = await import('../../order/public/index.js');
+    const since = new Date(Date.now() - POPULARITY_DAYS * 86_400_000);
+    const rows = await Order.aggregate([
+      { $match: { placedAt: { $gte: since } } },
+      { $unwind: '$subOrders' },
+      { $match: { 'subOrders.status': { $nin: ['CANCELLED', 'RTO_DELIVERED'] } } },
+      { $unwind: '$subOrders.items' },
+      { $group: { _id: '$subOrders.items.productId', units: { $sum: '$subOrders.items.quantity' } } },
+    ]);
+    return new Map(rows.map((row) => [String(row._id), row.units]));
+  } catch {
+    return new Map(); // a failed read only loses the sales ordering, never the search
+  }
+}, 10 * 60_000, () => 'all');
+
+const SUGGESTED_PRODUCTS = 5;
+const SUGGESTED_BRANDS = 2;
+const SUGGESTED_CATEGORIES = 2;
+const RELATED_SEARCHES = 3;
+
+const mostCommon = (counts) => [...counts].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name);
+const countBy = (cards, pick) => {
+  const counts = new Map();
+  for (const card of cards) {
+    const key = pick(card);
+    if (key) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+  return counts;
+};
+
+/**
+ * What to offer while someone types: matching product names (tap to search them), then brands and categories that match
+ * a typed word (tap to browse). `related` are searches worth trying next, built from the brands and categories of the
+ * matches ("Puma shoe" for "shoe"). Nothing is invented: every entry comes from a product that is on the shelf now.
+ */
+export async function suggestFromCatalog(q) {
+  const tokens = tokenize(q);
+  if (!tokens.length) return { suggestions: [], related: [] };
+  const matched = rankByRelevance((await catalogSnapshot()).filter((card) => cardMatches(card, tokens)), tokens);
+  if (!matched.length) return { suggestions: [], related: [] };
+
+  const products = matched.slice(0, SUGGESTED_PRODUCTS).map((card) => ({
+    id: `p:${card.id}`, text: card.name, category: card.category || null, type: 'arrow', imageUrl: card.imageUrl,
+  }));
+
+  const typedAWordOf = (name) => tokens.some((token) => name.toLowerCase().includes(token));
+  const brandIds = mostCommon(countBy(matched.filter((card) => card.brandId && typedAWordOf(card.brand)), (card) => card.brandId)).slice(0, SUGGESTED_BRANDS);
+  const logos = brandIds.length ? await getBrandImages(brandIds) : new Map();
+  const brands = brandIds.map((brandId) => {
+    const card = matched.find((entry) => entry.brandId === brandId);
+    return { id: `b:${brandId}`, text: card.brand, category: 'Brand', type: 'chevron', imageUrl: deviceUrl(logos.get(brandId)?.imageUrl) ?? card.imageUrl };
+  });
+
+  const categories = mostCommon(countBy(matched.filter((card) => card.category && typedAWordOf(card.category)), (card) => card.category))
+    .slice(0, SUGGESTED_CATEGORIES)
+    .map((name) => {
+      const card = matched.find((entry) => entry.category === name);
+      return { id: `c:${name}`, text: name, category: card.rootCategory ? `in ${card.rootCategory}` : null, type: 'chevron', imageUrl: card.imageUrl };
+    });
+
+  const typed = tokens.join(' ');
+  const related = [
+    ...mostCommon(countBy(matched.filter((card) => card.brand && !typedAWordOf(card.brand)), (card) => card.brand)).map((brand) => `${brand} ${typed}`),
+    ...mostCommon(countBy(matched.filter((card) => card.category && !typedAWordOf(card.category)), (card) => card.category)).map((category) => `${typed} ${category}`),
+  ].slice(0, RELATED_SEARCHES);
+
+  return { suggestions: [...products, ...brands, ...categories], related };
+}
+
+/** Names worth showing before anyone has searched: the brands with most products, then the departments. */
+export async function getCatalogHighlights(limit = 8) {
+  const cards = await catalogSnapshot();
+  return [...mostCommon(countBy(cards, (card) => card.brand)), ...mostCommon(countBy(cards, (card) => card.rootCategory))].slice(0, limit);
+}
+
+/* ---------------------------------------------------------------- brands and recently viewed */
+
+const BRAND_PAGE = 24;
+const POPULAR_BRANDS = 10; // the "Popular" tab is the brands with the most products on the shelf
+
+/**
+ * The Brands page: every brand with at least one product on the shelf, filterable by the department it mostly sells in
+ * ("Popular" = most products). Brands come from the live snapshot, so a brand with nothing to buy never shows.
+ * Returns { filters, items, nextCursor }; `cursor` is an offset.
+ */
+export async function listCustomerBrands({ filter = 'All', cursor = 0, limit = BRAND_PAGE } = {}) {
+  const perBrand = new Map();
+  for (const card of await catalogSnapshot()) {
+    if (!card.brandId) continue;
+    const entry = perBrand.get(card.brandId) ?? { id: card.brandId, name: card.brand, count: 0, bestPct: 0, image: card.imageUrl, departments: new Map() };
+    entry.count += 1;
+    entry.bestPct = Math.max(entry.bestPct, discountPct(card));
+    entry.departments.set(card.rootCategory, (entry.departments.get(card.rootCategory) ?? 0) + 1);
+    perBrand.set(card.brandId, entry);
+  }
+  const brands = [...perBrand.values()];
+  const popular = new Set([...brands].sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)).slice(0, POPULAR_BRANDS).map((brand) => brand.id));
+  const department = (brand) => [...brand.departments].sort((a, b) => b[1] - a[1])[0][0] || 'Other';
+  const filters = ['All', ...(popular.size ? ['Popular'] : []), ...[...new Set(brands.map(department))].sort()];
+
+  const matching = brands
+    .filter((brand) => filter === 'All' || (filter === 'Popular' ? popular.has(brand.id) : department(brand) === filter))
+    .sort((a, b) => a.name.localeCompare(b.name));
+  const page = matching.slice(cursor, cursor + limit);
+  const logos = page.length ? await getBrandImages(page.map((brand) => brand.id)) : new Map();
+  return {
+    filters,
+    items: page.map((brand) => ({
+      id: brand.id,
+      name: brand.name,
+      imageUrl: deviceUrl(logos.get(brand.id)?.imageUrl) ?? brand.image,
+      offerText: brand.bestPct >= 1 ? `Up to ${brand.bestPct}% Off` : null,
+      category: department(brand),
+      popular: popular.has(brand.id),
+    })),
+    nextCursor: cursor + limit < matching.length ? String(cursor + limit) : null,
+  };
+}
+
+const RECENT_LIMIT = 20;
+
+/** The products this customer opened lately, newest first; anything no longer on the shelf is left out. */
+export async function listRecentlyViewed(userId) {
+  const views = await RecentView.find({ userId: String(userId) }).sort({ viewedAt: -1 }).limit(RECENT_LIMIT * 2).lean();
+  const byId = new Map((await catalogSnapshot()).map((card) => [card.id, card]));
+  const items = views.flatMap((view) => {
+    const card = byId.get(String(view.productId));
+    return card ? [{ id: card.id, productId: card.id, imageUrl: card.imageUrl, title: card.name, subtitle: card.brand || card.category || 'Product', viewedAt: view.viewedAt.toISOString() }] : [];
+  });
+  return { items: items.slice(0, RECENT_LIMIT) };
 }
 
 /** Customer-visible cards for the given product ids (current snapshot); anything not visible is simply absent. */

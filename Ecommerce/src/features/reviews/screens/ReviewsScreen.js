@@ -11,25 +11,29 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
+import StarIcon from 'react-native-vector-icons/FontAwesome';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import { useToast } from '../../../contexts/ToastContext';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import {
   useDeleteReviewMutation,
   useGetMyReviewsQuery,
   useGetProductReviewsQuery,
+  useReportReviewMutation,
+  useSetReviewHelpfulMutation,
 } from '../api/reviews.api';
 
 const Stars = ({ count }) => (
   <View style={styles.stars}>
     {[1, 2, 3, 4, 5].map(value => (
-      <Icon
+      <StarIcon
         key={value}
         name="star"
         size={14}
-        color={value <= count ? COLORS.ratingGreen : COLORS.border}
+        color={value <= count ? COLORS.starGold : COLORS.border}
       />
     ))}
   </View>
@@ -43,6 +47,23 @@ const ReviewsScreen = ({ navigation, route }) => {
   const query = productId ? product : mine;
   const reviews = query.data?.items || [];
   const [deleteReview, { isLoading: isDeleting }] = useDeleteReviewMutation();
+  const [setHelpful] = useSetReviewHelpfulMutation();
+  const [reportReview] = useReportReviewMutation();
+  const toast = useToast();
+  const sendReport = async (review, reason) => {
+    try {
+      await reportReview({ review, reason }).unwrap();
+      toast.show('Thanks, we will take a look.', { variant: 'success', icon: 'check' });
+    } catch (error) {
+      toast.show(error.message || 'Could not send your report', { variant: 'error' });
+    }
+  };
+  const confirmReport = review =>
+    Alert.alert('Report this review?', 'Tell us what is wrong with it.', [
+      { text: 'Fake or spam', onPress: () => sendReport(review, 'Fake or spam') },
+      { text: 'Offensive or unrelated', onPress: () => sendReport(review, 'Offensive or unrelated') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   const confirmDelete = review =>
     Alert.alert('Delete review?', 'This cannot be undone.', [
       { text: 'Keep', style: 'cancel' },
@@ -124,6 +145,18 @@ const ReviewsScreen = ({ navigation, route }) => {
                     ? `Rejected: ${item.rejectionReason}`
                     : 'Pending moderation'}
                 </Text>
+              </View>
+            ) : null}
+            {productId ? (
+              <View style={styles.actions}>
+                <TouchableOpacity onPress={() => setHelpful({ review: item, helpful: !item.viewerFoundHelpful })}>
+                  <Text style={styles.edit}>
+                    {item.viewerFoundHelpful ? 'Helpful ✓' : 'Helpful'} ({item.helpfulCount})
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity onPress={() => confirmReport(item)}>
+                  <Text style={styles.metaText}>Report</Text>
+                </TouchableOpacity>
               </View>
             ) : null}
             {!productId && (item.canEdit || item.canDelete) ? (

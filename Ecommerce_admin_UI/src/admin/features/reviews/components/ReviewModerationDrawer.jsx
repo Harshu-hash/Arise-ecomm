@@ -54,7 +54,7 @@ export default function ReviewModerationDrawer({ reviewId, onClose, onChanged })
           {review.media?.length > 0 && (
             <Image.PreviewGroup>
               <Flex gap={8}>
-                {review.media.map((m) => <Image key={m} src={`https://placehold.co/80x80?text=${m}`} width={80} height={80} />)}
+                {review.media.map((m) => <Image key={m} src={m} width={80} height={80} />)}
               </Flex>
             </Image.PreviewGroup>
           )}

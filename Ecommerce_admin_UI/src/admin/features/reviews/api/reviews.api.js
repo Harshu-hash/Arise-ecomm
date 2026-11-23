@@ -12,7 +12,7 @@ export const reviewsApi = {
 
   questions: (params) => api.get('/questions', params),
   question: (id) => api.get(`/questions/${id}`),
-  moderateQuestion: (id, status) => api.post(`/questions/${id}/moderate`, { status }),
+  moderateQuestion: (id, status, reason) => api.post(`/questions/${id}/moderate`, { status, reason }),
   answerQuestion: (id, text) => api.post(`/questions/${id}/answers`, { text }),
   moderateAnswer: (id, status) => api.post(`/answers/${id}/moderate`, { status }),
 

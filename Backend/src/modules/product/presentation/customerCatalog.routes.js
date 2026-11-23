@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { sendData } from '../../../shared/http/respond.js';
+import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
-import { optionalAuthenticate } from '../../../shared/middleware/authenticate.js';
+import { ROLES } from '../../../shared/constants/roles.js';
+import { authenticate, authorize, optionalAuthenticate } from '../../../shared/middleware/authenticate.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
-import { SORT_OPTIONS, getCustomerProduct, recordProductView, searchCustomerProducts } from '../application/customerCatalog.service.js';
+import { recordSearch } from '../../search/public/index.js';
+import { deleteCustomerProductHistory, SORT_OPTIONS, getCustomerProduct, listCustomerBrands, listRecentlyViewed, recordProductView, searchCustomerProducts } from '../application/customerCatalog.service.js';
 
 const csv = z.string().optional().transform((value) => (value ? value.split(',').filter(Boolean) : []));
 const searchQuery = z.object({
@@ -25,7 +27,51 @@ export function createCustomerSearchRouter() {
   const router = Router();
   router.get('/', validate({ query: searchQuery }), async (req, res, next) => {
     try {
-      return sendData(res, await searchCustomerProducts(req.query));
+      const result = await searchCustomerProducts(req.query);
+      // The first page of a typed search counts toward trending; paging and filtering do not.
+      if (req.query.q && req.query.cursor === 0) recordSearch(req.query.q, result.total);
+      return sendData(res, result);
+    } catch (error) {
+      return next(error);
+    }
+  });
+  return router;
+}
+
+const brandsQuery = z.object({
+  filter: z.string().trim().max(60).default('All'),
+  cursor: z.coerce.number().int().min(0).default(0),
+  limit: z.coerce.number().int().min(1).max(50).default(24),
+});
+
+// Mounted at /api/customer/v1/brands — public: the Brands page.
+export function createCustomerBrandRouter() {
+  const router = Router();
+  router.get('/', validate({ query: brandsQuery }), async (req, res, next) => {
+    try {
+      return sendData(res, await listCustomerBrands(req.query));
+    } catch (error) {
+      return next(error);
+    }
+  });
+  return router;
+}
+
+// Mounted at /api/customer/v1/me/recently-viewed — the signed-in customer's own history.
+export function createCustomerRecentlyViewedRouter() {
+  const router = Router();
+  router.use(authenticate, authorize(ROLES.CUSTOMER));
+  router.get('/', async (req, res, next) => {
+    try {
+      return sendData(res, await listRecentlyViewed(req.auth.userId));
+    } catch (error) {
+      return next(error);
+    }
+  });
+  router.delete('/', async (req, res, next) => {
+    try {
+      await deleteCustomerProductHistory(req.auth.userId);
+      return sendCommand(res, { cleared: true });
     } catch (error) {
       return next(error);
     }

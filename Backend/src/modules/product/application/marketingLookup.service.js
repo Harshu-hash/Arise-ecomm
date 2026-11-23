@@ -45,3 +45,14 @@ export async function getShelfPrices(productIds) {
     }),
   );
 }
+
+/** A live product's title and every seller with a LIVE offer on it (to route customer questions), or null when it is not on the shelf. */
+export async function getQuestionableProduct(productId) {
+  const product = await Product.findOne({ _id: productId, status: 'LIVE' }, 'title').lean();
+  return product ? { id: String(product._id), title: product.title, sellerIds: await Offer.distinct('sellerId', { productId: product._id, status: 'LIVE' }) } : null;
+}
+
+/** Ids (as strings) of the products this seller has a LIVE offer on. */
+export async function getSellerProductIds(sellerId) {
+  return (await Offer.distinct('productId', { sellerId: String(sellerId), status: 'LIVE' })).map(String);
+}

@@ -1,32 +1,22 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
+import Icon from 'react-native-vector-icons/FontAwesome';
 import { COLORS } from '../../constants/colors';
+import StarRating from './StarRating';
 
 /**
  * Three Flipkart rating treatments:
  *  - variant="pill": dark overlay pill on a product thumbnail, e.g. "4.2 ★"
  *  - variant="pillLight": white overlay pill on a hero/gallery image, e.g. "5 ★ | 3"
- *  - variant="stars": inline green star row, e.g. "★ 5.0 · (3)"
+ *  - variant="stars": inline gold star row filled to the average, e.g. "★★★★☆ 4.0 · (3)"
  */
 const RatingBadge = ({ variant = 'pill', rating, count, style }) => {
   if (rating == null) return null;
 
   if (variant === 'stars') {
-    const filled = Math.round(rating);
     return (
       <View style={[styles.starsRow, style]}>
-        <View style={styles.starsIconsRow}>
-          {[1, 2, 3, 4, 5].map((i) => (
-            <Icon
-              key={i}
-              name="star"
-              size={12}
-              color={i <= filled ? COLORS.ratingGreen : COLORS.border}
-              style={styles.starIcon}
-            />
-          ))}
-        </View>
+        <StarRating rating={rating} size={12} style={styles.starsIconsRow} />
         <Text style={styles.starsRating}>{rating}</Text>
         {count != null ? <Text style={styles.starsCount}>{`· (${count})`}</Text> : null}
       </View>
@@ -37,7 +27,7 @@ const RatingBadge = ({ variant = 'pill', rating, count, style }) => {
     return (
       <View style={[styles.pillLight, style]}>
         <Text style={styles.pillLightText}>{rating}</Text>
-        <Icon name="star" size={11} color={COLORS.ratingGreen} style={{ marginHorizontal: 4 }} />
+        <Icon name="star" size={11} color={COLORS.starGold} style={{ marginHorizontal: 4 }} />
         {count != null ? (
           <>
             <View style={styles.pillLightDivider} />
@@ -51,7 +41,7 @@ const RatingBadge = ({ variant = 'pill', rating, count, style }) => {
   return (
     <View style={[styles.pill, style]}>
       <Text style={styles.pillText}>{rating}</Text>
-      <Icon name="star" size={9} color={COLORS.white} style={{ marginLeft: 2 }} />
+      <Icon name="star" size={9} color={COLORS.starGold} style={{ marginLeft: 2 }} />
     </View>
   );
 };
@@ -109,13 +99,10 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     marginRight: 6,
   },
-  starIcon: {
-    marginRight: 1,
-  },
   starsRating: {
     fontSize: 13,
     fontWeight: '600',
-    color: COLORS.ratingGreen,
+    color: COLORS.textPrimary,
     marginRight: 4,
   },
   starsCount: {

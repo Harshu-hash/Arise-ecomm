@@ -84,6 +84,7 @@ const paged = (items, config, summary = null) => {
 const owned = review => review.allowedActions.length > 0;
 export const resetCustomerReviewsFixture = () => {
   counter = 3;
+  Object.assign(reviews.get('review-2'), { helpfulCount: 24, viewerFoundHelpful: false });
   for (const [id, review] of [...reviews])
     if (Number(id.replace('review-', '')) >= 3) reviews.delete(id);
 };
@@ -166,6 +167,30 @@ export const customerReviewsFixtureAdapter = async config => {
     };
     reviews.set(review.id, review);
     return response(config, { data: review }, 201);
+  }
+  const voteMatch = config.url?.match(/^\/reviews\/([^/]+)\/(helpful|report)$/);
+  if (voteMatch) {
+    const review = reviews.get(decodeURIComponent(voteMatch[1]));
+    if (!review || review.moderationStatus !== 'PUBLISHED')
+      return reject(config, 404, 'REVIEW_NOT_FOUND', 'This review was not found.');
+    if (owned(review))
+      return reject(
+        config,
+        409,
+        voteMatch[2] === 'helpful' ? 'CANNOT_VOTE_OWN' : 'CANNOT_REPORT_OWN',
+        'You cannot do that on your own review.',
+      );
+    if (voteMatch[2] === 'report' && config.method === 'post')
+      return response(config, { data: { reported: true } }, 201);
+    if (voteMatch[2] === 'helpful' && ['put', 'delete'].includes(config.method)) {
+      const helpful = config.method === 'put';
+      if (helpful !== Boolean(review.viewerFoundHelpful))
+        review.helpfulCount = Math.max(0, review.helpfulCount + (helpful ? 1 : -1));
+      review.viewerFoundHelpful = helpful;
+      return response(config, {
+        data: { id: review.id, helpfulCount: review.helpfulCount, viewerFoundHelpful: helpful },
+      });
+    }
   }
   const detailMatch = config.url?.match(/^\/reviews\/([^/]+)$/);
   if (detailMatch) {

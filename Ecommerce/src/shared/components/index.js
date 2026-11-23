@@ -2,6 +2,7 @@
 export { default as StatusBarManager } from './StatusBarManager';
 export { default as PriceBlock } from './PriceBlock';
 export { default as RatingBadge } from './RatingBadge';
+export { default as StarRating } from './StarRating';
 export { default as ExpandableCard } from './ExpandableCard';
 export { default as SectionHeaderArrow } from './SectionHeaderArrow';
 export { default as MarketProductCard } from './MarketProductCard';

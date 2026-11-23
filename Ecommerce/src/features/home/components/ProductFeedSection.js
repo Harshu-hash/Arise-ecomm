@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
-import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { DiscountBadge, PriceBlock } from '../../../shared/components';
+import { DiscountBadge, PriceBlock, StarRating } from '../../../shared/components';
 
 const BADGE_STYLES = {
   'Lowest price': { bg: '#5B3DF5', text: COLORS.white },
@@ -33,7 +32,7 @@ const ProductFeedCard = ({ product, onPress }) => {
       {rating != null ? (
         <View style={styles.ratingRow}>
           <Text style={styles.ratingValue}>{rating}</Text>
-          <Icon name="star" size={11} color={COLORS.ratingGreen} style={styles.ratingIcon} />
+          <StarRating rating={rating} size={11} style={styles.ratingIcon} />
           <Text style={styles.ratingCount}>{`(${ratingCount})`}</Text>
         </View>
       ) : null}

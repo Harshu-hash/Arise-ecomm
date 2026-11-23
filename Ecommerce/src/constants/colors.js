@@ -9,6 +9,7 @@ export const COLORS = {
 
   ratingGreen: '#26A541', // discount %, star icons, "Excellent" chip
   ratingGreenBg: '#EAF7EC',
+  starGold: '#FFB400', // customer review star ratings
 
   badgeDark: '#212121', // rating pill overlay on product-card thumbnails
   offerRed: '#CC0C39', // offer-tile bottom banner strips

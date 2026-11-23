@@ -9,6 +9,7 @@ import { RECEIPT_STATUS, WebhookReceipt } from '../infrastructure/webhooks/webho
 import { processDueAccountDeletions } from '../modules/customer/application/privacy.service.js';
 import { autoApproveOverdueReturns, autoPassOverdueQc, chasePickups } from '../modules/order/public/index.js';
 import { expireStaleReservations } from '../modules/product/public/index.js';
+import { rebuildRatingSummaries, sendReviewReminders } from '../modules/review/public/index.js';
 import { accrueMissing, releaseDue } from '../modules/settlement/public/index.js';
 
 const STALE_RECEIPT_MS = 2 * 60_000;
@@ -65,6 +66,16 @@ async function enforceReturnDeadlines() {
   if (approved || passed || pickups.booked || pickups.chased || pickups.lapsed) logger.info({ approved, passed, ...pickups }, 'Settled returns the seller did not decide or check, and chased pickups');
 }
 
+async function rebuildRatings() {
+  const fixed = await rebuildRatingSummaries();
+  if (fixed) logger.warn({ fixed }, 'Corrected product ratings that had drifted from their reviews');
+}
+
+async function remindToReview() {
+  const sent = await sendReviewReminders();
+  if (sent) logger.info({ sent }, 'Sent rate-your-purchase reminders');
+}
+
 async function releaseWalletMoney() {
   const [credited, released] = [await accrueMissing(), await releaseDue()];
   if (credited || released) logger.info({ credited, released }, 'Credited missed deliveries and released settled money to seller wallets');
@@ -78,5 +89,7 @@ export async function maintenanceJobProcessor(job) {
   if (job.name === MAINTENANCE_JOBS.OUTBOX_CLEANUP) return cleanOutbox();
   if (job.name === MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP) return cleanUploadTmp();
   if (job.name === MAINTENANCE_JOBS.ACCOUNT_DELETION) return processDueAccountDeletions();
+  if (job.name === MAINTENANCE_JOBS.REVIEW_REMINDERS) return remindToReview();
+  if (job.name === MAINTENANCE_JOBS.RATING_REBUILD) return rebuildRatings();
   throw new Error(`Unknown maintenance job ${job.name}`);
 }

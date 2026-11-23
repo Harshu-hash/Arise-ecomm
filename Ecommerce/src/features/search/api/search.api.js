@@ -9,6 +9,16 @@ export const searchApi = baseApi.injectEndpoints({
       transformResponse: mapSearchSuggestions,
       keepUnusedDataFor: 60,
     }),
+    // The signed-in customer's recent searches, kept on the server so they follow them to another phone.
+    getRecentSearches: builder.query({
+      query: () => ({ url: SEARCH_ENDPOINTS.recent }),
+      transformResponse: payload => payload?.data?.items ?? [],
+      providesTags: [{ type: 'Search', id: 'RECENT' }],
+    }),
+    addRecentSearch: builder.mutation({
+      query: text => ({ url: SEARCH_ENDPOINTS.recent, method: 'POST', data: { query: text } }),
+      invalidatesTags: [{ type: 'Search', id: 'RECENT' }],
+    }),
     searchProducts: builder.query({
       query: args => ({ url: SEARCH_ENDPOINTS.products, params: args }),
       transformResponse: mapSearchProducts,
@@ -22,6 +32,8 @@ export const searchApi = baseApi.injectEndpoints({
 });
 
 export const {
+  useAddRecentSearchMutation,
+  useGetRecentSearchesQuery,
   useGetSearchSuggestionsQuery,
   useLazyGetSearchSuggestionsQuery,
   useLazySearchProductsQuery,

@@ -145,6 +145,7 @@ const RAW = {
     FLAGGED: ['Flagged', T.review],
   },
   questionAnswer: {
+    PENDING: ['Pending', T.waiting],
     PUBLISHED: ['Published', T.good],
     FLAGGED: ['Flagged', T.review],
     REJECTED: ['Rejected', T.bad],

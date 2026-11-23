@@ -1,5 +1,6 @@
 export {
   deleteCustomerProductHistory,
+  getCatalogHighlights,
   getLiveProductCards,
   getPurchasableOffers,
   listHomeProductFeed,
@@ -7,9 +8,10 @@ export {
   findVariantIdByLabel,
   getVariantShippingSpecs,
   pickOfferId,
+  suggestFromCatalog,
 } from '../application/customerCatalog.service.js';
 export { listLiveProductOptions, listSellerCampaignProducts } from '../application/listing.service.js';
-export { findLiveProducts, getShelfPrices } from '../application/marketingLookup.service.js';
+export { findLiveProducts, getQuestionableProduct, getSellerProductIds, getShelfPrices } from '../application/marketingLookup.service.js';
 export {
   commitStock,
   expireStaleReservations,

@@ -10,6 +10,8 @@ export const MAINTENANCE_JOBS = Object.freeze({
   STOCK_RESERVATION_EXPIRY: 'stock.reservations-expire',
   RETURN_DECISION_DEADLINE: 'returns.decision-deadline',
   WALLET_RELEASE: 'settlements.release',
+  RATING_REBUILD: 'reviews.rebuild-ratings',
+  REVIEW_REMINDERS: 'reviews.reminders',
 });
 
 export function createMaintenanceQueue() {
@@ -29,5 +31,7 @@ export async function registerMaintenanceSchedules(queue) {
   await queue.upsertJobScheduler('customer-account-deletion', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.ACCOUNT_DELETION });
   await queue.upsertJobScheduler('stock-reservation-expiry', { every: 60_000 }, { name: MAINTENANCE_JOBS.STOCK_RESERVATION_EXPIRY });
   await queue.upsertJobScheduler('return-decision-deadline', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.RETURN_DECISION_DEADLINE });
+  await queue.upsertJobScheduler('rating-rebuild', { pattern: '30 3 * * *' }, { name: MAINTENANCE_JOBS.RATING_REBUILD });
+  await queue.upsertJobScheduler('review-reminders', { every: 60 * 60_000 }, { name: MAINTENANCE_JOBS.REVIEW_REMINDERS });
   await queue.upsertJobScheduler('wallet-release', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.WALLET_RELEASE });
 }

@@ -1,11 +1,17 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, Image, StyleSheet, TextInput, TouchableOpacity, FlatList } from 'react-native';
+import { useSelector } from 'react-redux';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { GradientBackground, StatusBarManager } from '../../../shared/components';
-import { useGetSearchSuggestionsQuery } from '../api/search.query';
+import { selectIsAuthenticated } from '../../auth/redux/auth.selectors';
+import {
+  useAddRecentSearchMutation,
+  useGetRecentSearchesQuery,
+  useGetSearchSuggestionsQuery,
+} from '../api/search.query';
 import { searchHistoryStorage } from '../storage/searchHistoryStorage';
 
 const HighlightedText = ({ text, query }) => {
@@ -31,11 +37,25 @@ const HighlightedText = ({ text, query }) => {
   );
 };
 
+const MAX_RECENT_SHOWN = 8;
+
+const mergeRecent = (server = [], local = []) => {
+  const seen = new Set();
+  return [...server, ...local]
+    .filter(text => !seen.has(text.toLowerCase()) && seen.add(text.toLowerCase()))
+    .slice(0, MAX_RECENT_SHOWN);
+};
+
 const SearchScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [query, setQuery] = useState(route?.params?.initialQuery || '');
   const [debouncedQuery, setDebouncedQuery] = useState(query);
-  const [recentSearches, setRecentSearches] = useState(() => searchHistoryStorage.get());
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const [localRecent, setLocalRecent] = useState(() => searchHistoryStorage.get());
+  const { data: serverRecent } = useGetRecentSearchesQuery(undefined, { skip: !isAuthenticated });
+  const [addRecentSearch] = useAddRecentSearchMutation();
+  // Signed in: the server's list leads (it follows the customer between phones); what this phone remembers fills in after it.
+  const recentSearches = mergeRecent(serverRecent, localRecent);
   const { data, error, isFetching, refetch } = useGetSearchSuggestionsQuery(debouncedQuery);
 
   useEffect(() => {
@@ -50,7 +70,8 @@ const SearchScreen = ({ navigation, route }) => {
   const runSearch = text => {
     const trimmed = text.trim();
     if (!trimmed) return;
-    setRecentSearches(searchHistoryStorage.add(trimmed));
+    setLocalRecent(searchHistoryStorage.add(trimmed));
+    if (isAuthenticated) addRecentSearch(trimmed); // best effort: a failed save only means it stays on this phone
     navigation && navigation.navigate('SearchResults', { query: trimmed });
   };
 

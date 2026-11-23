@@ -1,4 +1,6 @@
 export {
+  useAddRecentSearchMutation,
+  useGetRecentSearchesQuery,
   useGetSearchSuggestionsQuery,
   useLazyGetSearchSuggestionsQuery,
   useLazySearchProductsQuery,

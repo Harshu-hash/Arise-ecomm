@@ -65,6 +65,20 @@ export const reviewsApi = baseApi.injectEndpoints({
         { type: 'Review', id: `ELIGIBILITY-${review.orderItemId}` },
       ],
     }),
+    setReviewHelpful: builder.mutation({
+      query: ({ review, helpful }) => ({
+        url: REVIEW_ENDPOINTS.helpful(review.id),
+        method: helpful ? 'PUT' : 'DELETE',
+      }),
+      invalidatesTags: (_, __, { review }) => [{ type: 'Review', id: `PRODUCT-${review.productId}` }],
+    }),
+    reportReview: builder.mutation({
+      query: ({ review, reason }) => ({
+        url: REVIEW_ENDPOINTS.report(review.id),
+        method: 'POST',
+        data: { reason },
+      }),
+    }),
     getMyQuestions: builder.query({
       query: ({ cursor, limit = 10 } = {}) => ({
         url: QUESTION_ENDPOINTS.mine,
@@ -123,6 +137,8 @@ export const {
   useGetProductReviewsQuery,
   useGetReviewEligibilityQuery,
   useUpdateReviewMutation,
+  useSetReviewHelpfulMutation,
+  useReportReviewMutation,
   useCreateAnswerMutation,
   useCreateQuestionMutation,
   useGetMyQuestionsQuery,

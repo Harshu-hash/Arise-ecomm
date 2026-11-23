@@ -13,19 +13,25 @@ import { reviewsApi, reviewsKeys } from '../api/reviews.api';
 /** Questions & Answers (M13.2): a question older than its SLA with no answer is flagged, same way an SLA breach is flagged for tickets. */
 export default function QaPage() {
   const { message } = App.useApp();
-  const state = useUrlTableState({ defaultSort: '-askedAt' });
+  const state = useUrlTableState({ defaultSort: '-askedAt', defaultTab: 'PENDING' });
   const [answering, setAnswering] = useState(null);
+  const [rejecting, setRejecting] = useState(null);
   const [answerText, setAnswerText] = useState('');
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
-    queryKey: reviewsKeys.questions(state.queryParams),
+    queryKey: reviewsKeys.questions({ ...state.queryParams, tab: state.tab }),
     url: '/questions',
-    params: state.queryParams,
+    params: { ...state.queryParams, ...(state.tab && state.tab !== 'all' ? { status: state.tab } : {}) },
   });
 
   const answer = useMutation({
     mutationFn: ({ id, text }) => reviewsApi.answerQuestion(id, text),
     onSuccess: () => { refetch(); setAnswering(null); setAnswerText(''); message.success('Answer posted'); },
+    onError: (e) => message.error(e.message),
+  });
+  const decideQuestion = useMutation({
+    mutationFn: ({ id, status, reason }) => reviewsApi.moderateQuestion(id, status, reason),
+    onSuccess: () => { refetch(); setRejecting(null); message.success('Question updated'); },
     onError: (e) => message.error(e.message),
   });
   const moderate = useMutation({ mutationFn: ({ id, status }) => reviewsApi.moderateAnswer(id, status), onSuccess: () => { refetch(); message.success('Seller answer moderated'); }, onError: (e) => message.error(e.message) });
@@ -53,7 +59,7 @@ export default function QaPage() {
     {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
-        <Flex gap={6} justify="end"><>{row.pendingSellerAnswer && <><Button size="small" type="primary" loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'PUBLISHED' }); }}>Publish seller answer</Button><Button size="small" danger loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'REJECTED' }); }}>Reject</Button></>}</><><Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button></></Flex>
+        <Flex gap={6} justify="end"><>{row.pendingSellerAnswer && <><Button size="small" type="primary" loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'PUBLISHED' }); }}>Publish seller answer</Button><Button size="small" danger loading={moderate.isPending} onClick={(e) => { e.stopPropagation(); moderate.mutate({ id: row.pendingSellerAnswer.id, status: 'REJECTED' }); }}>Reject</Button></>}</><><Button size="small" onClick={(e) => { e.stopPropagation(); setAnswering(row); }}>Answer as Arise</Button></><>{row.status !== 'PUBLISHED' && <Button size="small" loading={decideQuestion.isPending} onClick={(e) => { e.stopPropagation(); decideQuestion.mutate({ id: row.id, status: 'PUBLISHED' }); }}>Publish question</Button>}{row.status !== 'REJECTED' && <Button size="small" danger onClick={(e) => { e.stopPropagation(); setRejecting(row); }}>Reject question</Button>}</></Flex>
       ),
     },
   ];
@@ -75,6 +81,12 @@ export default function QaPage() {
         error={error}
         onRetry={refetch}
         tableState={state}
+        tabs={[
+          { key: 'all', label: 'All' },
+          { key: 'PENDING', label: 'Pending moderation' },
+          { key: 'PUBLISHED', label: 'Published' },
+          { key: 'REJECTED', label: 'Rejected' },
+        ]}
         emptyProps={{ title: 'No questions match these filters' }}
         mobileCard={(row) => (
           <Flex vertical gap={4}>
@@ -82,6 +94,21 @@ export default function QaPage() {
             <Typography.Text type="secondary" style={{ fontSize: 12 }}>{row.productTitle}</Typography.Text>
           </Flex>
         )}
+      />
+
+      <ConfirmActionModal
+        open={Boolean(rejecting)}
+        onCancel={() => setRejecting(null)}
+        onConfirm={(v) => decideQuestion.mutate({ id: rejecting.id, status: 'REJECTED', reason: v.reason })}
+        loading={decideQuestion.isPending}
+        danger
+        title="Reject this question"
+        description={rejecting?.text}
+        impact="The customer who asked is notified with this reason."
+        reasonRequired
+        reasonLabel="Reason"
+        showNote={false}
+        confirmLabel="Reject"
       />
 
       <ConfirmActionModal

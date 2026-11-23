@@ -15,6 +15,7 @@ import { Order, ORDER_STATUS } from '../infrastructure/persistence/order.model.j
 import { allocate } from '../domain/services/orderMoney.js';
 import { isCodCollected, SUB } from '../domain/services/orderStatus.js';
 import { returnState } from '../domain/services/returnRules.js';
+import { getReviewedItems, REFUNDED_RETURN_STATUSES } from '../../review/public/index.js';
 import { itemsWithReturn } from './return.service.js';
 import { recordReturnTracking } from './returnPickup.service.js';
 import { syncReturnRefund } from './returnSettlement.service.js';
@@ -152,7 +153,7 @@ const cancellable = (order) => {
 };
 
 /** `taken`: Map(itemId -> { id, status }) of the order's items that already have a return, which cannot be returned again. */
-export const toOrderDto = (order, shipments = new Map(), taken = new Map()) => ({
+export const toOrderDto = (order, shipments = new Map(), taken = new Map(), reviewed = new Map()) => ({
   id: String(order._id),
   orderNumber: order.number,
   placedAt: order.placedAt.toISOString(),
@@ -182,6 +183,8 @@ export const toOrderDto = (order, shipments = new Map(), taken = new Map()) => (
       canReturn: returnState(sub, item, taken.has(String(item._id))).eligible,
       returnId: taken.get(String(item._id))?.id ?? null,
       returnStatus: taken.get(String(item._id))?.status ?? null,
+      reviewId: reviewed.get(String(item._id)) ?? null,
+      canReview: sub.status === SUB.DELIVERED && !reviewed.has(String(item._id)) && !REFUNDED_RETURN_STATUSES.includes(taken.get(String(item._id))?.status),
     };
   })),
   totals: order.totals,
@@ -205,13 +208,14 @@ export async function listOrders(customerId, { limit = 20, cursor } = {}) {
     Order.countDocuments(filter),
   ]);
   const page = rows.slice(0, limit);
-  const [shipments, taken] = await Promise.all([shipmentsOf(page), itemsWithReturn(page.map((order) => order._id))]);
-  return { items: page.map((order) => toOrderDto(order, shipments, taken)), total, nextCursor: rows.length > limit ? String(page.at(-1)._id) : null };
+  const orderIds = page.map((order) => order._id);
+  const [shipments, taken, reviewed] = await Promise.all([shipmentsOf(page), itemsWithReturn(orderIds), getReviewedItems(orderIds)]);
+  return { items: page.map((order) => toOrderDto(order, shipments, taken, reviewed)), total, nextCursor: rows.length > limit ? String(page.at(-1)._id) : null };
 }
 
 export async function getOrder(customerId, orderId) {
   const order = await load(customerId, orderId);
-  return toOrderDto(order, await shipmentsOf([order]), await itemsWithReturn([order._id]));
+  return toOrderDto(order, await shipmentsOf([order]), await itemsWithReturn([order._id]), await getReviewedItems([order._id]));
 }
 export const getOrderTimeline = async (customerId, orderId) => ({ items: timelineOf(await load(customerId, orderId)) });
 
@@ -250,7 +254,7 @@ export async function cancelOrder(customerId, orderId, { reason, comment } = {})
   const order = await load(customerId, orderId);
   const note = [reason, comment].filter(Boolean).join(': ') || null;
   const cancelled = await cancelParcels(order._id, { pick: allLiveParcels, actor: actorOf('CUSTOMER', customerId), note });
-  return toOrderDto(cancelled, await shipmentsOf([cancelled]), await itemsWithReturn([cancelled._id]));
+  return toOrderDto(cancelled, await shipmentsOf([cancelled]), await itemsWithReturn([cancelled._id]), await getReviewedItems([cancelled._id]));
 }
 
 /* ---------------------------------------------------------------------------------------- Razorpay events */

@@ -3,6 +3,7 @@ import { AppError } from '../../../shared/errors/AppError.js';
 import { getSettingsSection } from '../../admin/public/index.js';
 import { evaluateCouponsForCart } from '../../coupon/public/index.js';
 import { pickOfferId } from '../../product/public/index.js';
+import { getRatingSummaries } from '../../review/public/index.js';
 import { MAX_CART_LINES } from '../domain/constants/cart.js';
 import { computeTotals, couponSaving } from '../domain/services/cartRules.js';
 import { Cart } from '../infrastructure/persistence/cart.model.js';
@@ -51,7 +52,8 @@ async function assemble(customerId, items, couponCode) {
     resolveLines(items.map((item) => ({ offerId: String(item.offerId), quantity: item.quantity }))),
     getSettingsSection('fees'),
   ]);
-  const rows = items.map((item, index) => ({ item, line: resolved[index] }));
+  const ratings = await getRatingSummaries(resolved.filter(known).map((line) => line.productId));
+  const rows = items.map((item, index) => ({ item, line: resolved[index], rating: ratings.get(String(resolved[index].productId)) }));
   const active = rows.filter(({ item }) => !item.savedForLater);
   const buyable = active.filter(({ line }) => line.sellable); // lines with a problem are not charged for; they block checkout instead
   const lines = buyable.map(({ line }) => line);
@@ -66,7 +68,7 @@ async function assemble(customerId, items, couponCode) {
   return { rows, active, buyable, lines, fees, coupon, problem };
 }
 
-function toItem({ item, line }) {
+function toItem({ item, line, rating }) {
   const live = known(line);
   const saw = item.snapshot ?? {};
   const issueCode = line.issueCode;
@@ -78,8 +80,8 @@ function toItem({ item, line }) {
     imageUrl: live ? line.imageUrl : saw.imageUrl,
     pricePaise: live ? line.unitPricePaise : saw.unitPricePaise,
     mrpPaise: Math.max(live ? line.mrpPaise : saw.mrpPaise, 1),
-    rating: null, // no reviews module yet
-    ratingCount: 0,
+    rating: live ? rating?.rating ?? null : null,
+    ratingCount: live ? rating?.ratingCount ?? 0 : 0,
     assured: live ? Boolean(line.assured) : false,
     deliveryLabel: null,
     cartItemId: String(item._id),

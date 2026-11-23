@@ -83,7 +83,9 @@ const ResultCard = ({ product, wishlisted, onToggleWishlist, onPress }) => {
           {`Extra ${product.campaign.extraOffPct}% off · ${product.campaign.name}`}
         </Text>
       ) : null}
-      <Text style={styles.delivery}>{`Delivery by ${product.deliveryDate}`}</Text>
+      {product.deliveryDate ? (
+        <Text style={styles.delivery}>{`Delivery by ${product.deliveryDate}`}</Text>
+      ) : null}
     </TouchableOpacity>
   );
 };

@@ -67,6 +67,11 @@
     "/search/suggestions": {
       "get": { "operationId": "getSearchSuggestions", "tags": ["Discovery"], "security": [], "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
     },
+    "/search/recent": {
+      "get": { "operationId": "listRecentSearches", "tags": ["Discovery"], "responses": { "200": { "$ref": "#/components/responses/List" } } },
+      "post": { "operationId": "addRecentSearch", "tags": ["Discovery"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/List" } } },
+      "delete": { "operationId": "clearRecentSearches", "tags": ["Discovery"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
     "/search": {
       "get": { "operationId": "searchProducts", "tags": ["Discovery"], "security": [], "parameters": [{ "name": "q", "in": "query", "schema": { "type": "string" } }, { "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
     },
@@ -288,6 +293,10 @@
     "/devices/push-tokens/{deviceId}": {
       "parameters": [{ "$ref": "#/components/parameters/DeviceId" }],
       "delete": { "operationId": "unregisterPushToken", "tags": ["Account"], "responses": { "200": { "$ref": "#/components/responses/Command" } } }
+    },
+    "/order-items/{orderItemId}/review-eligibility": {
+      "parameters": [{ "name": "orderItemId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "operationId": "getReviewEligibility", "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
     },
     "/reviews/mine": {
       "get": { "operationId": "listMyReviews", "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
