@@ -4,64 +4,42 @@ import {
 } from './customerSupportAdapter';
 describe('customerSupportFixtureAdapter', () => {
   beforeEach(resetCustomerSupportFixture);
-  it('lists server-managed subjects and paginated tickets', async () => {
-    const subjects = await customerSupportFixtureAdapter({
-        url: '/support/subjects',
-        method: 'get',
-      }),
-      tickets = await customerSupportFixtureAdapter({
-        url: '/support/tickets',
-        method: 'get',
-        params: { limit: 1 },
-      });
-    expect(subjects.data.data.items.length).toBeGreaterThan(1);
-    expect(tickets.data.data).toMatchObject({ total: 2, nextCursor: '1' });
+  it('lists call, email and chat channels', async () => {
+    const response = await customerSupportFixtureAdapter({ url: '/support/channels', method: 'get' });
+    expect(response.data.data.channels.map(channel => channel.type)).toEqual(['CHAT', 'PHONE', 'EMAIL']);
   });
-  it('creates an order-linked ticket with SLA timestamps', async () => {
-    const response = await customerSupportFixtureAdapter({
-      url: '/support/tickets',
+  it('has no chat until the first message, which opens one linked to the order', async () => {
+    const empty = await customerSupportFixtureAdapter({ url: '/support/chat', method: 'get' });
+    expect(empty.data.data).toBeNull();
+    const sent = await customerSupportFixtureAdapter({
+      url: '/support/chat/messages',
       method: 'post',
-      data: {
-        subjectCode: 'ORDER_STATUS',
-        description: 'Please check the current delivery status.',
-        orderId: 'ORD-84920',
-        attachmentMediaIds: [],
-      },
+      data: { body: 'Where is my order?', orderId: 'ORD-84920' },
     });
-    expect(response.data.data).toMatchObject({
-      status: 'OPEN',
-      orderId: 'ORD-84920',
-      canReply: true,
-      firstResponseDueAt: expect.any(String),
+    expect(sent.data.data).toMatchObject({ status: 'OPEN', orderId: 'ORD-84920', unreadCount: 0 });
+    const again = await customerSupportFixtureAdapter({
+      url: '/support/chat/messages',
+      method: 'post',
+      data: { body: 'Hello?' },
     });
+    expect(again.data.data.messages).toHaveLength(2);
   });
-  it('requires an order for order-specific subjects', async () => {
+  it('sends a photo-only message, lists the chat in history and opens it', async () => {
+    const sent = await customerSupportFixtureAdapter({
+      url: '/support/chat/messages',
+      method: 'post',
+      data: { attachments: ['private/chat/u1/p.jpg'] },
+    });
+    expect(sent.data.data.messages[0].attachments).toHaveLength(1);
+    const history = await customerSupportFixtureAdapter({ url: '/support/chats', method: 'get' });
+    expect(history.data.data.items[0]).toMatchObject({ id: 'chat-1', lastMessagePreview: 'Photo' });
+    const opened = await customerSupportFixtureAdapter({ url: '/support/chats/chat-1', method: 'get' });
+    expect(opened.data.data.messages).toHaveLength(1);
+  });
+  it('rejects a blank chat message', async () => {
     await expect(
-      customerSupportFixtureAdapter({
-        url: '/support/tickets',
-        method: 'post',
-        data: {
-          subjectCode: 'ORDER_STATUS',
-          description: 'Please check the current delivery status.',
-          attachmentMediaIds: [],
-        },
-      }),
+      customerSupportFixtureAdapter({ url: '/support/chat/messages', method: 'post', data: { body: '  ' } }),
     ).rejects.toMatchObject({ response: { status: 422 } });
-  });
-  it('persists customer replies and blocks closed tickets', async () => {
-    const reply = await customerSupportFixtureAdapter({
-      url: '/support/tickets/HLP-101/messages',
-      method: 'post',
-      data: { body: 'Please share another update.', attachmentMediaIds: [] },
-    });
-    expect(reply.data.data.messages).toHaveLength(3);
-    await expect(
-      customerSupportFixtureAdapter({
-        url: '/support/tickets/HLP-102/messages',
-        method: 'post',
-        data: { body: 'Can I reply?', attachmentMediaIds: [] },
-      }),
-    ).rejects.toMatchObject({ response: { status: 409 } });
   });
   it('serves versioned categories, articles and search', async () => {
     const categories = await customerSupportFixtureAdapter({

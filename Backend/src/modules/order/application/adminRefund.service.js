@@ -99,13 +99,24 @@ export async function listAdminRefunds(query) {
   };
 }
 
-/** Asks the gateway again for a refund it refused. A returned item goes back through its return (which also settles the seller's side). */
-export async function retryRefund(id, actor) {
+/** Finds a refund by its list id: "<paymentId>:<key>". */
+async function locateRefund(id) {
   const split = id.indexOf(':');
   const [paymentId, key] = [id.slice(0, split), id.slice(split + 1)];
   const payment = split > 0 && mongoose.isValidObjectId(paymentId) ? await Payment.findById(paymentId).lean() : null;
   const entry = payment?.refunds.find((refund) => refund.key === key);
   if (!entry) throw new NotFoundError('That refund no longer exists.');
+  return { payment, entry, key };
+}
+
+/** What retrying this refund would send, so a route can compare it with the admin's refund limit first. */
+export async function refundAmountPaise(id) {
+  return (await locateRefund(id)).entry.amountPaise;
+}
+
+/** Asks the gateway again for a refund it refused. A returned item goes back through its return (which also settles the seller's side). */
+export async function retryRefund(id, actor) {
+  const { payment, entry, key } = await locateRefund(id);
   if (entry.status !== 'FAILED') throw new ConflictError('ILLEGAL_TRANSITION', 'Only a failed refund can be retried.');
 
   if (key.startsWith('return:')) await settleReturn(key.slice('return:'.length));

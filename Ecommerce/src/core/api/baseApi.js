@@ -22,7 +22,7 @@ export const API_TAGS = [
   'Notification',
   'Review',
   'Question',
-  'Ticket',
+  'Chat',
   'StaticContent',
   'FeatureFlag',
 ];

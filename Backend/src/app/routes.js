@@ -45,6 +45,9 @@ import { createAdminRefundRouter } from '../modules/order/presentation/adminRefu
 import { createAdminPaymentRouter } from '../modules/order/presentation/adminPayment.routes.js';
 import { createAdminAnalyticsRouter, createAdminDashboardRouter, createAdminMoneyRouter, createSellerAnalyticsRouter, createSellerDashboardRouter } from '../modules/analytics/presentation/analytics.routes.js';
 import { createAdminBroadcastRouter } from '../modules/notification/presentation/broadcast.routes.js';
+import { createAdminChatRouter, createCustomerChatRouter } from '../modules/support/presentation/chat.routes.js';
+import { createAdminApprovalRouter } from '../modules/approval/presentation/approval.routes.js';
+import { createCustomerHelpRouter, createSellerSupportRouter } from '../modules/support/presentation/help.routes.js';
 import { createAdminAbuseRouter } from '../modules/review/presentation/adminAbuse.routes.js';
 import { createSellerReviewRouter } from '../modules/review/presentation/sellerReview.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
@@ -220,6 +223,8 @@ export function createRoutes() {
   root.use('/api/customer/v1', createCustomerNotificationRouter());
   root.use('/api/customer/v1', createCustomerReviewRouter());
   root.use('/api/customer/v1', createCustomerQuestionRouter());
+  root.use('/api/customer/v1', createCustomerChatRouter());
+  root.use('/api/customer/v1/help', createCustomerHelpRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
   const authLimiter = authRateLimiter();
@@ -259,6 +264,8 @@ export function createRoutes() {
   root.use('/api/admin/v1/campaigns', createCampaignRouter());
   root.use('/api/admin/v1/coupons', createCouponRouter());
   root.use('/api/admin/v1/reviews', createAdminReviewRouter());
+  root.use('/api/admin/v1/chats', createAdminChatRouter());
+  root.use('/api/admin/v1/approvals', createAdminApprovalRouter());
   root.use('/api/admin/v1/abuse-reports', createAdminAbuseRouter());
   root.use('/api/admin/v1/push-broadcasts', createAdminBroadcastRouter());
   root.use('/api/admin/v1/dashboard', createAdminDashboardRouter());
@@ -291,6 +298,7 @@ export function createRoutes() {
   root.use('/api/admin/v1/audit-events', createAuditRouter());
   root.use('/api/seller/v1/customer-experience', createSellerReviewRouter());
   root.use('/api/seller/v1/settings', createSellerSettingsRouter());
+  root.use('/api/seller/v1/support', createSellerSupportRouter());
   root.use('/api/seller/v1/catalog', createSellerCatalogRouter());
   root.use('/api/seller/v1/listings', createListingRouter());
   root.use('/api/seller/v1/inventory', createInventoryRouter());

@@ -30,7 +30,7 @@ export const linking = {
           Tracking: 'orders/:orderId/tracking',
           Wishlist: 'wishlist',
           HelpCenter: 'help',
-          TicketDetail: 'support/tickets/:ticketId',
+          Chat: 'support/chat',
         },
       },
     },

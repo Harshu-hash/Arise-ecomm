@@ -1,6 +1,4 @@
 import { AxiosError } from 'axios';
-import { getMediaFixture } from './customerMediaAdapter';
-import { getOrderFixture } from './customerOrdersAdapter';
 const LATENCY_MS = 220;
 const publishedAt = '2026-10-01T00:00:00.000Z';
 const helpCategories = [
@@ -24,8 +22,8 @@ const helpCategories = [
         id: 'help-order-delay',
         categoryId: 'orders',
         title: 'What should I do if delivery is delayed?',
-        summary: 'Review tracking first, then raise an order-linked ticket.',
-        body: 'Check the shipment timeline for a revised estimate. If the promised date has passed, open the order and raise a support ticket so the fulfilment team can investigate.',
+        summary: 'Review tracking first, then chat with support from the order.',
+        body: 'Check the shipment timeline for a revised estimate. If the promised date has passed, open the order, choose Get Help and chat with support so the fulfilment team can investigate.',
         version: 2,
         publishedAt,
         viewerFeedback: null,
@@ -43,7 +41,7 @@ const helpCategories = [
         categoryId: 'payments',
         title: 'Payment failed but money was deducted',
         summary: 'Banks usually reverse failed debits automatically.',
-        body: 'A failed payment debit is normally reversed by the bank. Use your payment reference when raising a ticket if the bank deadline shown in your statement has passed.',
+        body: 'A failed payment debit is normally reversed by the bank. Share your payment reference when you chat with support if the bank deadline shown in your statement has passed.',
         version: 3,
         publishedAt,
         viewerFeedback: null,
@@ -107,98 +105,12 @@ const helpCategories = [
     ],
   },
 ];
-let counter = 103;
-let messageCounter = 4;
-const subjects = [
-  {
-    code: 'ORDER_STATUS',
-    label: 'Order status or delivery',
-    requiresOrder: true,
-    allowsAttachments: true,
-  },
-  {
-    code: 'PAYMENT_REFUND',
-    label: 'Payment or refund',
-    requiresOrder: true,
-    allowsAttachments: true,
-  },
-  {
-    code: 'RETURN_ISSUE',
-    label: 'Return or replacement',
-    requiresOrder: true,
-    allowsAttachments: true,
-  },
-  { code: 'ACCOUNT', label: 'Account or privacy', requiresOrder: false, allowsAttachments: true },
-  { code: 'OTHER', label: 'Something else', requiresOrder: false, allowsAttachments: true },
-];
-let tickets;
-const initial = () =>
-  new Map([
-    [
-      'HLP-101',
-      {
-        id: 'HLP-101',
-        subjectCode: 'ORDER_STATUS',
-        subjectLabel: 'Order status or delivery',
-        description: 'My order status has not changed.',
-        status: 'IN_PROGRESS',
-        orderId: 'ORD-84920',
-        createdAt: '2026-11-01T08:00:00.000Z',
-        updatedAt: '2026-11-02T09:00:00.000Z',
-        firstResponseDueAt: '2026-11-01T12:00:00.000Z',
-        resolutionDueAt: '2026-11-04T08:00:00.000Z',
-        canReply: true,
-        messages: [
-          {
-            id: 'message-1',
-            authorType: 'CUSTOMER',
-            authorDisplayName: 'You',
-            body: 'My order status has not changed.',
-            attachmentMediaIds: [],
-            createdAt: '2026-11-01T08:00:00.000Z',
-          },
-          {
-            id: 'message-2',
-            authorType: 'AGENT',
-            authorDisplayName: 'Support agent',
-            body: 'We are checking this with the fulfilment team.',
-            attachmentMediaIds: [],
-            createdAt: '2026-11-02T09:00:00.000Z',
-          },
-        ],
-      },
-    ],
-    [
-      'HLP-102',
-      {
-        id: 'HLP-102',
-        subjectCode: 'ACCOUNT',
-        subjectLabel: 'Account or privacy',
-        description: 'I need help understanding my privacy export.',
-        status: 'RESOLVED',
-        orderId: null,
-        createdAt: '2026-10-20T08:00:00.000Z',
-        updatedAt: '2026-10-21T09:00:00.000Z',
-        firstResponseDueAt: null,
-        resolutionDueAt: null,
-        canReply: false,
-        messages: [
-          {
-            id: 'message-3',
-            authorType: 'SYSTEM',
-            authorDisplayName: 'System',
-            body: 'This ticket was resolved after the export instructions were provided.',
-            attachmentMediaIds: [],
-            createdAt: '2026-10-21T09:00:00.000Z',
-          },
-        ],
-      },
-    ],
-  ]);
+let messageCounter = 1;
+let chat; // the customer's open chat, or null
+const chatSummary = ({ messages, ...summary }) => summary;
 export const resetCustomerSupportFixture = () => {
-  counter = 103;
-  messageCounter = 4;
-  tickets = initial();
+  messageCounter = 1;
+  chat = null;
 };
 resetCustomerSupportFixture();
 const wait = () => new Promise(resolve => setTimeout(resolve, LATENCY_MS));
@@ -219,15 +131,14 @@ const reject = (config, status, code, message) => {
     response(config, { error: { code, message } }, status),
   );
 };
-const sorted = () =>
-  [...tickets.values()].sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
 export const customerSupportFixtureAdapter = async config => {
   await wait();
   if (config.url === '/support/channels' && config.method === 'get') {
     return response(config, {
       data: {
-        availabilityLabel: 'Support hours and response times are shown per channel',
+        availabilityLabel: 'Our team is available 09:00 to 21:00. Leave a message any time and we will reply.',
         channels: [
+          { id: 'chat', type: 'CHAT', label: 'Live chat', description: 'Message our support team', href: 'arise://support/chat', enabled: true },
           { id: 'phone', type: 'PHONE', label: 'Call us', description: 'Customer care', href: 'tel:+911800000000', enabled: true },
           { id: 'email', type: 'EMAIL', label: 'Email us', description: 'support@arise.invalid', href: 'mailto:support@arise.invalid', enabled: true },
         ],
@@ -291,91 +202,36 @@ export const customerSupportFixtureAdapter = async config => {
         .map(({ body, viewerFeedback, ...article }) => article);
     return response(config, { data: { items, query, total: items.length } });
   }
-  if (config.url === '/support/subjects' && config.method === 'get')
-    return response(config, { data: { items: subjects } });
-  if (config.url === '/support/tickets' && config.method === 'get') {
-    const items = sorted(),
-      offset = Number(config.params?.cursor || 0),
-      limit = Math.min(Number(config.params?.limit || 20), 50);
-    return response(config, {
-      data: {
-        items: items.slice(offset, offset + limit),
-        total: items.length,
-        nextCursor: offset + limit < items.length ? String(offset + limit) : null,
-      },
-    });
+  if (config.url === '/support/chat' && config.method === 'get') return response(config, { data: chat });
+  if (config.url === '/support/chat/read' && config.method === 'post') {
+    if (chat) chat.unreadCount = 0;
+    return response(config, { data: chat });
   }
-  if (config.url === '/support/tickets' && config.method === 'post') {
-    const { subjectCode, description, orderId = null, attachmentMediaIds = [] } = config.data || {},
-      subject = subjects.find(item => item.code === subjectCode);
-    if (!subject) return reject(config, 422, 'SUBJECT_INVALID', 'Choose a valid support subject.');
-    if (description?.trim().length < 10)
-      return reject(
-        config,
-        422,
-        'DESCRIPTION_REQUIRED',
-        'Describe the issue using at least 10 characters.',
-      );
-    if (subject.requiresOrder && (!orderId || !getOrderFixture(orderId)))
-      return reject(config, 422, 'ORDER_REQUIRED', 'Choose a valid order for this issue.');
-    if (attachmentMediaIds.some(id => !getMediaFixture(id)))
-      return reject(config, 422, 'ATTACHMENT_INVALID', 'Upload the attachment again.');
-    const now = new Date(),
-      id = `HLP-${counter++}`,
-      message = {
-        id: `message-${messageCounter++}`,
-        authorType: 'CUSTOMER',
-        authorDisplayName: 'You',
-        body: description.trim(),
-        attachmentMediaIds,
-        createdAt: now.toISOString(),
-      },
-      ticket = {
-        id,
-        subjectCode,
-        subjectLabel: subject.label,
-        description: description.trim(),
-        status: 'OPEN',
-        orderId,
-        createdAt: now.toISOString(),
-        updatedAt: now.toISOString(),
-        firstResponseDueAt: new Date(now.getTime() + 4 * 3600000).toISOString(),
-        resolutionDueAt: new Date(now.getTime() + 72 * 3600000).toISOString(),
-        canReply: true,
-        messages: [message],
-      };
-    tickets.set(id, ticket);
-    return response(config, { data: ticket }, 201);
+  if (config.url === '/support/chats' && config.method === 'get')
+    return response(config, { data: { items: chat ? [chatSummary(chat)] : [], nextCursor: null } });
+  const chatMatch = config.url?.match(/^\/support\/chats\/([^/]+)$/);
+  if (chatMatch && config.method === 'get') {
+    if (!chat || chat.id !== decodeURIComponent(chatMatch[1]))
+      return reject(config, 404, 'NOT_FOUND', 'That chat was not found.');
+    return response(config, { data: chat });
   }
-  const replyMatch = config.url?.match(/^\/support\/tickets\/([^/]+)\/messages$/);
-  if (replyMatch && config.method === 'post') {
-    const ticket = tickets.get(decodeURIComponent(replyMatch[1]));
-    if (!ticket)
-      return reject(config, 404, 'TICKET_NOT_FOUND', 'This support ticket was not found.');
-    if (!ticket.canReply)
-      return reject(config, 409, 'TICKET_CLOSED', 'This ticket no longer accepts replies.');
-    const body = config.data?.body?.trim(),
-      attachmentMediaIds = config.data?.attachmentMediaIds || [];
-    if (!body) return reject(config, 422, 'MESSAGE_REQUIRED', 'Write a reply.');
-    if (attachmentMediaIds.some(id => !getMediaFixture(id)))
-      return reject(config, 422, 'ATTACHMENT_INVALID', 'Upload the attachment again.');
-    ticket.messages.push({
+  if (config.url === '/support/chat/messages' && config.method === 'post') {
+    const body = config.data?.body?.trim() || '',
+      attachments = config.data?.attachments || [];
+    if (!body && !attachments.length) return reject(config, 422, 'MESSAGE_REQUIRED', 'Write a message or add a photo.');
+    const now = new Date().toISOString();
+    chat ??= { id: 'chat-1', status: 'OPEN', orderId: config.data.orderId ?? null, createdAt: now, unreadCount: 0, messages: [] };
+    chat.messages.push({
       id: `message-${messageCounter++}`,
       authorType: 'CUSTOMER',
       authorDisplayName: 'You',
       body,
-      attachmentMediaIds,
-      createdAt: new Date().toISOString(),
+      attachments: attachments.map(id => ({ id, url: `https://example.invalid/${id}` })),
+      createdAt: now,
     });
-    ticket.updatedAt = new Date().toISOString();
-    return response(config, { data: ticket });
-  }
-  const detailMatch = config.url?.match(/^\/support\/tickets\/([^/]+)$/);
-  if (detailMatch && config.method === 'get') {
-    const ticket = tickets.get(decodeURIComponent(detailMatch[1]));
-    if (!ticket)
-      return reject(config, 404, 'TICKET_NOT_FOUND', 'This support ticket was not found.');
-    return response(config, { data: ticket });
+    chat.lastMessageAt = now;
+    chat.lastMessagePreview = body || 'Photo';
+    return response(config, { data: chat }, 201);
   }
   return reject(
     config,

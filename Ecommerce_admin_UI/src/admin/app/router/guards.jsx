@@ -1,6 +1,8 @@
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useSessionStore } from '@core/auth/sessionStore';
 import FullPageSpinner from '@ui/components/FullPageSpinner';
+import NoAccess from '@ui/components/NoAccess';
+import { canSeeNavItem, firstAllowedPath, navItemForLocation, requiredKeysFor } from '@admin/nav/access';
 
 /** Blocks the app shell until the session is known, then routes by status. */
 export function RequireAuth() {
@@ -28,5 +30,19 @@ export function RequireAnonymous() {
 
   if (status === 'loading') return <FullPageSpinner label="Loading…" />;
   if (status === 'authenticated') return <Navigate to={user?.defaultLanding ?? '/'} replace />;
+  return <Outlet />;
+}
+
+/** Shows the 403 page when the current URL belongs to a sidebar item the admin has no permission for. */
+export function RequireNavAccess() {
+  const permissions = useSessionStore((s) => s.permissions);
+  const { pathname } = useLocation();
+  const item = navItemForLocation(pathname);
+
+  if (item && !canSeeNavItem(item, permissions)) {
+    // landing on '/' without dashboard access: go to the first page that is allowed rather than a dead end
+    const home = pathname === '/' ? firstAllowedPath(permissions) : null;
+    return home ? <Navigate to={home} replace /> : <NoAccess required={requiredKeysFor(item)} />;
+  }
   return <Outlet />;
 }

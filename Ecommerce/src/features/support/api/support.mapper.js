@@ -3,36 +3,30 @@ import {
   helpCategoriesResponseSchema,
   helpCategoryResponseSchema,
   helpSearchResponseSchema,
-  subjectsResponseSchema,
-  ticketResponseSchema,
-  ticketsResponseSchema,
+  chatListResponseSchema,
+  chatResponseSchema,
   supportChannelsResponseSchema,
 } from './support.schemas';
 export const mapSupportChannels = payload => supportChannelsResponseSchema.parse(payload).data;
-const labels = {
-  OPEN: 'Open',
-  IN_PROGRESS: 'In Progress',
-  WAITING_FOR_CUSTOMER: 'Waiting for You',
-  RESOLVED: 'Resolved',
-  CLOSED: 'Closed',
+export const mapChatList = payload => {
+  const data = chatListResponseSchema.parse(payload).data;
+  return {
+    ...data,
+    items: data.items.map(chat => ({ ...chat, date: new Date(chat.lastMessageAt).toLocaleDateString('en-IN') })),
+  };
 };
-const mapTicket = ticket => ({
-  ...ticket,
-  statusLabel: labels[ticket.status],
-  createdOn: new Date(ticket.createdAt).toLocaleString('en-IN'),
-  updates: ticket.messages.map(message => ({
-    ...message,
-    author: message.authorDisplayName,
-    text: message.body,
-    date: new Date(message.createdAt).toLocaleString('en-IN'),
-  })),
-});
-export const mapSubjects = payload => subjectsResponseSchema.parse(payload).data.items;
-export const mapTickets = payload => {
-  const data = ticketsResponseSchema.parse(payload).data;
-  return { ...data, items: data.items.map(mapTicket) };
+export const mapChat = payload => {
+  const chat = chatResponseSchema.parse(payload).data;
+  return (
+    chat && {
+      ...chat,
+      messages: chat.messages.map(message => ({
+        ...message,
+        date: new Date(message.createdAt).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }),
+      })),
+    }
+  );
 };
-export const mapTicketResponse = payload => mapTicket(ticketResponseSchema.parse(payload).data);
 const mapArticleSummary = article => ({
   ...article,
   question: article.title,

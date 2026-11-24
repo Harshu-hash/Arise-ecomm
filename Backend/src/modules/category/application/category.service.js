@@ -56,6 +56,12 @@ function assertInScope(category, scope) {
   if (roots && !roots.includes(id(category.rootId))) throw new NotFoundError('Category not found.');
 }
 
+/** Every category id inside the given top-level categories (themselves included): what a role scoped to those roots may touch. */
+export async function categoryIdsUnderRoots(rootIds) {
+  const rows = await Category.find({ $or: [{ _id: { $in: rootIds } }, { rootId: { $in: rootIds } }] }, '_id').lean();
+  return rows.map((row) => String(row._id));
+}
+
 async function rootNameFor(category) {
   if (category.level === 1) return category.name;
   return (await Category.findById(category.rootId, 'name').lean())?.name ?? null;

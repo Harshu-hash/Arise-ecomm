@@ -77,8 +77,7 @@ export const NAV_GROUPS = [
     label: 'Support',
     icon: 'customerService',
     items: [
-      { label: 'My Support Tickets', path: '/support' },
-      { label: 'Customer Complaints', path: '/support/customer-complaints' },
+      { label: 'Contact Support', path: '/support' },
     ],
   },
   {

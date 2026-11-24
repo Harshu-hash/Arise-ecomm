@@ -46,10 +46,11 @@ export default function RefundsPage() {
 
   const retry = useMutation({
     mutationFn: (id) => financeApi.retryRefund(id),
-    onSuccess: () => {
+    onSuccess: (res) => {
       invalidate();
       setRetrying(null);
-      message.success('Refund re-submitted to the gateway');
+      if (res?.data?.approvalRequired) message.info('That is over your limit: sent to another admin for approval (System > Approvals).');
+      else message.success('Refund re-submitted to the gateway');
     },
     onError: (e) => message.error(e.message),
   });

@@ -1,3 +1,4 @@
+import { markPermissionGuard } from '../../../shared/middleware/permission.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getUserAuthorization } from '../../identity/public/index.js';
@@ -33,8 +34,8 @@ const updateSchema = z.object({
 }).strict();
 const idParams = z.object({ id: objectIdSchema });
 const hasPermission = (permissions, key) => permissions.includes('*') || permissions.includes(key);
-const requirePermission = (action) => (req, _res, next) =>
-  next(hasPermission(req.sizeChartAuthorization.permissions, `catalog.sizechart.${action}`) ? undefined : new ForbiddenError());
+const requirePermission = (action) => markPermissionGuard((req, _res, next) =>
+  next(hasPermission(req.sizeChartAuthorization.permissions, `catalog.sizechart.${action}`) ? undefined : new ForbiddenError()));
 
 export function createSizeChartRouter() {
   const router = Router();

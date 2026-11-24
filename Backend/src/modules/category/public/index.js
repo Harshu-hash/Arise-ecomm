@@ -1,4 +1,5 @@
 export {
+  categoryIdsUnderRoots,
   findCategoryForCatalog,
   findRootCategoryByName,
   getCategoryTerms,

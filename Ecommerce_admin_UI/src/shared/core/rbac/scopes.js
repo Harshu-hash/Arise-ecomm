@@ -17,25 +17,13 @@ export const SCOPE_DIMENSIONS = [
     help: 'Limits seller, listing, order and payout screens to these sellers.',
     entity: 'seller',
   },
-  {
-    key: 'warehouses',
-    label: 'Warehouses',
-    help: 'Limits inventory, inbound and adjustment screens to these warehouses.',
-    entity: 'warehouse',
-  },
-  {
-    key: 'queues',
-    label: 'Support queues',
-    help: 'Limits the ticket inbox and chat console to these queues.',
-    entity: 'queue',
-  },
 ];
 
 export const SCOPE_LIMITS = [
   {
     key: 'refundLimit',
-    label: 'Refund without approval',
-    help: 'Refunds above this amount create a maker-checker request instead.',
+    label: 'Refund retry without approval',
+    help: 'Retrying a failed refund above this amount waits for a second admin to approve it.',
     defaultPaise: 500000,
   },
   {
@@ -49,8 +37,6 @@ export const SCOPE_LIMITS = [
 export const UNRESTRICTED = Object.freeze({
   categories: null,
   sellers: null,
-  warehouses: null,
-  queues: null,
   refundLimit: null,
   walletAdjustLimit: null,
 });

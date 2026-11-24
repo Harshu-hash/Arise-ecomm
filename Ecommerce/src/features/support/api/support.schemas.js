@@ -15,43 +15,30 @@ export const supportChannelsResponseSchema = apiEnvelope(
     ),
   }),
 );
-export const subjectSchema = z.object({
-  code: z.string().min(1),
-  label: z.string().min(1),
-  requiresOrder: z.boolean(),
-  allowsAttachments: z.boolean(),
-});
-export const subjectsResponseSchema = apiEnvelope(z.object({ items: z.array(subjectSchema) }));
-export const ticketMessageSchema = z.object({
+export const chatMessageSchema = z.object({
   id: z.string().min(1),
-  authorType: z.enum(['CUSTOMER', 'AGENT', 'SYSTEM']),
+  authorType: z.enum(['CUSTOMER', 'AGENT']),
   authorDisplayName: z.string().min(1),
-  body: z.string().min(1).max(4000),
-  attachmentMediaIds: z.array(z.string()),
+  body: z.string().max(2000),
+  attachments: z.array(z.object({ id: z.string().min(1), url: z.string().min(1) })),
   createdAt: z.string().datetime(),
 });
-export const ticketSchema = z.object({
+const chatSummary = {
   id: z.string().min(1),
-  subjectCode: z.string().min(1),
-  subjectLabel: z.string().min(1),
-  description: z.string().min(10),
-  status: z.enum(['OPEN', 'IN_PROGRESS', 'WAITING_FOR_CUSTOMER', 'RESOLVED', 'CLOSED']),
+  status: z.enum(['OPEN', 'CLOSED']),
   orderId: z.string().nullable(),
   createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  firstResponseDueAt: z.string().datetime().nullable(),
-  resolutionDueAt: z.string().datetime().nullable(),
-  canReply: z.boolean(),
-  messages: z.array(ticketMessageSchema),
-});
-export const ticketsResponseSchema = apiEnvelope(
-  z.object({
-    items: z.array(ticketSchema),
-    total: z.number().int().nonnegative(),
-    nextCursor: z.string().nullable(),
-  }),
+  lastMessageAt: z.string().datetime(),
+  lastMessagePreview: z.string(),
+  unreadCount: z.number().int().nonnegative(),
+};
+// data is null while the customer has no open chat
+export const chatResponseSchema = apiEnvelope(
+  z.object({ ...chatSummary, messages: z.array(chatMessageSchema) }).nullable(),
 );
-export const ticketResponseSchema = apiEnvelope(ticketSchema);
+export const chatListResponseSchema = apiEnvelope(
+  z.object({ items: z.array(z.object(chatSummary)), nextCursor: z.string().nullable() }),
+);
 export const helpArticleSummarySchema = z.object({
   id: z.string().min(1),
   categoryId: z.string().min(1),

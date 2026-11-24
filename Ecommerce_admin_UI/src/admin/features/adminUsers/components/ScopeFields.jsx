@@ -21,31 +21,31 @@ export default function ScopeFields({ dimensions = [] }) {
         type="info"
         showIcon
         style={{ marginBottom: 12 }}
-        message="Data scope"
-        description="Leave a field empty for unrestricted access on that dimension."
+        message="This role is limited"
+        description="Fill in every limit below. An empty limit would mean no limit at all, so it is not allowed."
       />
 
       {entityDims.map((d) => (
-        <Form.Item key={d.key} name={['scope', d.key]} label={d.label} extra={d.help}>
-          <EntitySelect entity={d.entity} multiple placeholder={`All ${d.label.toLowerCase()}`} />
+        <Form.Item key={d.key} name={['scope', d.key]} label={d.label} extra={d.help} rules={[{ required: true, type: 'array', min: 1, message: `Choose at least one ${d.label.toLowerCase().replace(/s$/, '')}.` }]}>
+          <EntitySelect entity={d.entity} multiple placeholder={`Choose ${d.label.toLowerCase()}`} />
         </Form.Item>
       ))}
 
       {limitDims.map((l) => (
         <Form.Item key={l.key} label={l.label} extra={l.help} style={{ marginBottom: 12 }}>
-          <Form.Item name={['scope', l.key]} noStyle>
+          <Form.Item name={['scope', l.key]} noStyle rules={[{ required: true, message: `Enter ${l.label.toLowerCase()} (0 means everything needs approval).` }]}>
             <InputNumber
               style={{ width: '100%' }}
               min={0}
               step={500}
               prefix="₹"
-              placeholder="No limit"
+              placeholder="Required"
               formatter={(v) => (v ? Number(v).toLocaleString('en-IN') : '')}
               parser={(v) => (v ? v.replace(/[^\d]/g, '') : '')}
             />
           </Form.Item>
           <Typography.Text type="secondary" style={{ fontSize: 11 }}>
-            Anything above this amount creates a maker-checker request instead.
+            Anything above this amount waits for another admin to approve it.
           </Typography.Text>
         </Form.Item>
       ))}

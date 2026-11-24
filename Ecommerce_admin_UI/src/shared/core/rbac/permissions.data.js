@@ -48,6 +48,7 @@ export const PERMISSION_MODULES = [
           { action: 'release', label: 'Release hold' },
           { action: 'edit_address', label: 'Change delivery address' },
           { action: 'note', label: 'Add internal note' },
+          { action: 'override_status', label: 'Override a parcel\'s status', sensitive: true },
         ],
       },
       {

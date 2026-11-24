@@ -2,63 +2,32 @@ import {
   mapHelpArticle,
   mapHelpCategories,
   mapHelpSearch,
-  mapSubjects,
-  mapTicketResponse,
-  mapTickets,
+  mapChat,
+  mapChatList,
 } from './support.mapper';
-const ticket = {
-  id: 'HLP-1',
-  subjectCode: 'ACCOUNT',
-  subjectLabel: 'Account help',
-  description: 'I need help with my account.',
+const chat = {
+  id: 'c1',
   status: 'OPEN',
   orderId: null,
   createdAt: '2026-11-01T08:00:00.000Z',
-  updatedAt: '2026-11-01T08:00:00.000Z',
-  firstResponseDueAt: '2026-11-01T12:00:00.000Z',
-  resolutionDueAt: '2026-11-04T08:00:00.000Z',
-  canReply: true,
+  lastMessageAt: '2026-11-01T08:00:00.000Z',
+  lastMessagePreview: 'Hi',
+  unreadCount: 2,
   messages: [
-    {
-      id: 'message-1',
-      authorType: 'CUSTOMER',
-      authorDisplayName: 'You',
-      body: 'I need help with my account.',
-      attachmentMediaIds: [],
-      createdAt: '2026-11-01T08:00:00.000Z',
-    },
+    { id: 'm1', authorType: 'CUSTOMER', authorDisplayName: 'You', body: 'Hi', attachments: [{ id: 'k', url: 'https://x/k.jpg' }], createdAt: '2026-11-01T08:00:00.000Z' },
   ],
 };
 describe('support mappers', () => {
-  it('maps admin-managed subjects', () => {
-    expect(
-      mapSubjects({
-        data: {
-          items: [
-            {
-              code: 'ACCOUNT',
-              label: 'Account help',
-              requiresOrder: false,
-              allowsAttachments: true,
-            },
-          ],
-        },
-      }),
-    ).toHaveLength(1);
+  it('maps a chat, and no chat yet', () => {
+    expect(mapChat({ data: chat }).messages[0]).toMatchObject({ body: 'Hi', attachments: [{ id: 'k' }], date: expect.any(String) });
+    expect(mapChat({ data: null })).toBeNull();
   });
-  it('maps ticket status and public messages', () => {
-    expect(mapTicketResponse({ data: ticket })).toMatchObject({
-      statusLabel: 'Open',
-      updates: [{ author: 'You', text: 'I need help with my account.' }],
-    });
+  it('maps the chat history list', () => {
+    const { messages, ...summary } = chat;
+    expect(mapChatList({ data: { items: [summary], nextCursor: null } }).items[0]).toMatchObject({ id: 'c1', unreadCount: 2, date: expect.any(String) });
   });
-  it('maps paginated ticket lists', () => {
-    expect(mapTickets({ data: { items: [ticket], total: 1, nextCursor: null } }).items[0].id).toBe(
-      'HLP-1',
-    );
-  });
-  it('rejects unknown ticket states', () => {
-    expect(() => mapTicketResponse({ data: { ...ticket, status: 'UNKNOWN' } })).toThrow();
+  it('rejects unknown author types', () => {
+    expect(() => mapChat({ data: { ...chat, messages: [{ ...chat.messages[0], authorType: 'BOT' }] } })).toThrow();
   });
   it('maps versioned help content and search results', () => {
     const summary = {

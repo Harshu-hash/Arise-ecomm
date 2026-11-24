@@ -4,9 +4,8 @@ import {
   mapHelpCategories,
   mapHelpCategory,
   mapHelpSearch,
-  mapSubjects,
-  mapTicketResponse,
-  mapTickets,
+  mapChat,
+  mapChatList,
   mapSupportChannels,
 } from './support.mapper';
 export const supportApi = baseApi.injectEndpoints({
@@ -16,43 +15,30 @@ export const supportApi = baseApi.injectEndpoints({
       transformResponse: mapSupportChannels,
       providesTags: [{ type: 'StaticContent', id: 'SUPPORT-CHANNELS' }],
     }),
-    getTicketSubjects: builder.query({
-      query: () => ({ url: '/support/subjects' }),
-      transformResponse: mapSubjects,
-      providesTags: [{ type: 'Ticket', id: 'SUBJECTS' }],
+    getChat: builder.query({
+      query: () => ({ url: '/support/chat' }),
+      transformResponse: mapChat,
+      providesTags: [{ type: 'Chat', id: 'CURRENT' }],
     }),
-    getTickets: builder.query({
-      query: ({ cursor, limit = 20 } = {}) => ({
-        url: '/support/tickets',
-        params: { cursor, limit },
-      }),
-      transformResponse: mapTickets,
-      providesTags: result => [
-        { type: 'Ticket', id: 'LIST' },
-        ...(result?.items || []).map(({ id }) => ({ type: 'Ticket', id })),
-      ],
+    getChatById: builder.query({
+      query: id => ({ url: `/support/chats/${encodeURIComponent(id)}` }),
+      transformResponse: mapChat,
+      providesTags: (_, __, id) => [{ type: 'Chat', id }],
     }),
-    getTicket: builder.query({
-      query: id => ({ url: `/support/tickets/${encodeURIComponent(id)}` }),
-      transformResponse: mapTicketResponse,
-      providesTags: (_, __, id) => [{ type: 'Ticket', id }],
+    getChatHistory: builder.query({
+      query: ({ cursor, limit = 20 } = {}) => ({ url: '/support/chats', params: { cursor, limit } }),
+      transformResponse: mapChatList,
+      providesTags: [{ type: 'Chat', id: 'LIST' }],
     }),
-    createTicket: builder.mutation({
-      query: data => ({ url: '/support/tickets', method: 'POST', data }),
-      transformResponse: mapTicketResponse,
-      invalidatesTags: [{ type: 'Ticket', id: 'LIST' }],
+    markChatRead: builder.mutation({
+      query: () => ({ url: '/support/chat/read', method: 'POST' }),
+      transformResponse: mapChat,
+      invalidatesTags: [{ type: 'Chat', id: 'CURRENT' }],
     }),
-    replyToTicket: builder.mutation({
-      query: ({ ticketId, ...data }) => ({
-        url: `/support/tickets/${encodeURIComponent(ticketId)}/messages`,
-        method: 'POST',
-        data,
-      }),
-      transformResponse: mapTicketResponse,
-      invalidatesTags: (_, __, { ticketId }) => [
-        { type: 'Ticket', id: ticketId },
-        { type: 'Ticket', id: 'LIST' },
-      ],
+    sendChatMessage: builder.mutation({
+      query: data => ({ url: '/support/chat/messages', method: 'POST', data }),
+      transformResponse: mapChat,
+      invalidatesTags: [{ type: 'Chat', id: 'CURRENT' }, { type: 'Chat', id: 'LIST' }],
     }),
     getHelpCategories: builder.query({
       query: () => ({ url: '/help/categories' }),
@@ -88,11 +74,11 @@ export const supportApi = baseApi.injectEndpoints({
 });
 export const {
   useGetSupportChannelsQuery,
-  useGetTicketSubjectsQuery,
-  useGetTicketsQuery,
-  useGetTicketQuery,
-  useCreateTicketMutation,
-  useReplyToTicketMutation,
+  useGetChatQuery,
+  useGetChatByIdQuery,
+  useGetChatHistoryQuery,
+  useMarkChatReadMutation,
+  useSendChatMessageMutation,
   useGetHelpCategoriesQuery,
   useGetHelpCategoryQuery,
   useGetHelpArticleQuery,

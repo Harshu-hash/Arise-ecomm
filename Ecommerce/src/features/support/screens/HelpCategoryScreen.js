@@ -44,9 +44,9 @@ const HelpCategoryScreen = ({ navigation, route }) => {
         ListFooterComponent={
           <TouchableOpacity
             style={styles.ticket}
-            onPress={() => navigation.navigate('RaiseTicket', {})}
+            onPress={() => navigation.navigate('Chat')}
           >
-            <Text style={styles.ticketText}>Still need help? Raise a Ticket</Text>
+            <Text style={styles.ticketText}>Still need help? Chat with us</Text>
           </TouchableOpacity>
         }
         renderItem={({ item }) => (

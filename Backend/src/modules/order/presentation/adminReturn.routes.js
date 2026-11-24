@@ -5,7 +5,9 @@ import { sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
 import { requirePermission, userHasPermission } from '../../../shared/middleware/permission.js';
+import { assertInScope, scopedIds } from '../../../shared/middleware/scope.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
+import { Return } from '../infrastructure/persistence/return.model.js';
 import { QC_FAIL_CODES, REJECT_CODES } from '../domain/services/returnRules.js';
 import { actOnReturn, getAdminReturn, listAdminReturns, RETURN_PERMISSIONS } from '../application/adminReturn.service.js';
 
@@ -45,9 +47,19 @@ export const grantedReturnPermissions = async (userId) => (await Promise.all(RET
 export function createAdminReturnRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
+  // A return of a seller outside the admin's scope answers 404.
+  router.param('id', async (req, _res, next, id) => {
+    try {
+      const row = (await scopedIds(req, 'sellers')) && (await Return.findById(id, 'sellerId').lean());
+      if (row) await assertInScope(req, 'sellers', row.sellerId, 'That return no longer exists.');
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/', requirePermission('orders.return.view'), validate({ query: listQuery }), async (req, res) => {
-    const { data, meta } = await listAdminReturns(req.query);
+    const { data, meta } = await listAdminReturns({ ...req.query, ...(req.query.sellerId ? (await assertInScope(req, 'sellers', req.query.sellerId), {}) : {}) }, { sellerIds: await scopedIds(req, 'sellers') });
     return sendData(res, data, { meta });
   });
   router.get('/:id', requirePermission('orders.return.view'), validate({ params: idParams }), async (req, res) => {

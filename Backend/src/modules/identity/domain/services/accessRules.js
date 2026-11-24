@@ -13,6 +13,19 @@ export function permissionsFromRoles(roles) {
     : Array.from(new Set(roles.flatMap((role) => role.permissions)));
 }
 
+// A role marked `scopedBy` exists to be limited (a seller account manager to some sellers, a finance executive to a money limit).
+// Whoever holds it must say what the limit is: an empty one would silently mean "no limit". Returns { 'scope.<key>': [message] }, empty when fine.
+const LIMIT_LABELS = { sellers: 'at least one seller', categories: 'at least one category', walletAdjustLimit: 'a wallet adjustment limit', refundLimit: 'a refund limit' };
+export function missingScopeFields(roles, scope) {
+  const missing = {};
+  for (const key of new Set(roles.flatMap((role) => role.scopedBy ?? []))) {
+    const value = scope?.[key];
+    const filled = Array.isArray(value) ? value.length > 0 : Number.isFinite(value) && value >= 0;
+    if (!filled) missing[`scope.${key}`] = [`This role is limited: choose ${LIMIT_LABELS[key] ?? key}.`];
+  }
+  return missing;
+}
+
 // A custom role never stores the wildcard (only the seeded Super Admin does): the editor shows '*'
 // as "everything on", so it is saved as every explicit key and can later be narrowed.
 export function normalizePermissions(keys) {

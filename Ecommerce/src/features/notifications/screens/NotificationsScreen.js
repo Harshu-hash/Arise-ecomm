@@ -17,7 +17,7 @@ const destination = {
   PRODUCT: item => ['ProductDetail', { productId: item.target.entityId }],
   ORDER: item => ['OrderDetail', { orderId: item.target.entityId }],
   SHIPMENT: item => ['Tracking', { orderId: item.target.entityId }],
-  TICKET: item => ['TicketDetail', { ticketId: item.target.entityId }],
+  CHAT: () => ['Chat'],
 };
 const NotificationsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets(),

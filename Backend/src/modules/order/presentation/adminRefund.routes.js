@@ -6,7 +6,9 @@ import { sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
 import { requirePermission } from '../../../shared/middleware/permission.js';
-import { listAdminRefunds, retryRefund } from '../application/adminRefund.service.js';
+import { overLimit } from '../../../shared/middleware/scope.js';
+import { registerApprovalAction, requestApproval } from '../../approval/public/index.js';
+import { listAdminRefunds, refundAmountPaise, retryRefund } from '../application/adminRefund.service.js';
 
 // The console sends ranges as `initiatedAt[gte]=...`; anything it sends that is not listed is ignored.
 const listQuery = z.object({
@@ -35,11 +37,18 @@ const route = (handler) => async (req, res, next) => {
 export function createAdminRefundRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
+  // Retrying a refund over the admin's own refund limit waits for another admin to approve it (module approval).
+  registerApprovalAction('refund.retry', { permission: 'finance.refund.retry', run: ({ refundId }, requester) => retryRefund(refundId, requester) });
   router.get('/', requirePermission('finance.refund.view'), validate({ query: listQuery }), route(async (req, res) => {
     const { data, meta } = await listAdminRefunds(req.query);
     return sendData(res, data, { meta });
   }));
-  router.post('/:id/retry', requirePermission('finance.refund.retry'), validate({ params: idParams }), route(async (req, res) => sendData(res, await retryRefund(req.params.id, req.auth))));
+  router.post('/:id/retry', requirePermission('finance.refund.retry'), validate({ params: idParams }), route(async (req, res) => {
+    const amountPaise = await refundAmountPaise(req.params.id);
+    if (!(await overLimit(req, 'refundLimit', amountPaise))) return sendData(res, await retryRefund(req.params.id, req.auth));
+    const approval = await requestApproval({ kind: 'refund.retry', summary: `Retry refund of ₹${(amountPaise / 100).toLocaleString('en-IN')}`, amountPaise, payload: { refundId: req.params.id } }, req.auth);
+    return sendData(res, { approvalRequired: true, approval }, { status: 202 });
+  }));
   router.post('/:id/mode', requirePermission('finance.refund.switch_mode'), route(async () => {
     throw new ConflictError('REFUND_MODE_FIXED', 'Refunds go back to the original payment method; wallet and bank refunds are not available yet.');
   }));

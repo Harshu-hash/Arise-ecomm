@@ -7,10 +7,14 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import { useGetHelpCategoriesQuery, useLazySearchHelpQuery } from '../api/support.api';
+import { useGetChatQuery, useGetHelpCategoriesQuery, useLazySearchHelpQuery } from '../api/support.api';
+import { selectIsAuthenticated } from '@features/auth';
+import { useSelector } from 'react-redux';
 const HelpCenterScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets(),
     categories = useGetHelpCategoriesQuery(),
+    authenticated = useSelector(selectIsAuthenticated),
+    unread = useGetChatQuery(undefined, { skip: !authenticated }).data?.unreadCount || 0,
     [search, { data: results, isFetching }] = useLazySearchHelpQuery(),
     [query, setQuery] = useState('');
   useEffect(() => {
@@ -81,19 +85,13 @@ const HelpCenterScreen = ({ navigation }) => {
           ListHeaderComponent={
             <View>
               <View style={styles.actions}>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('MyTickets')}
-                  style={styles.action}
-                >
-                  <Icon name="clipboard" size={18} color={COLORS.primary} />
-                  <Text style={styles.actionText}>My Tickets</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('Chat')} style={styles.action}>
+                  <Icon name="message-circle" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>{unread > 0 ? `Chat with us (${unread})` : 'Chat with us'}</Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('RaiseTicket', {})}
-                  style={styles.action}
-                >
-                  <Icon name="plus-circle" size={18} color={COLORS.primary} />
-                  <Text style={styles.actionText}>Raise Ticket</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('ContactUs')} style={styles.action}>
+                  <Icon name="phone" size={18} color={COLORS.primary} />
+                  <Text style={styles.actionText}>Call or email</Text>
                 </TouchableOpacity>
               </View>
               <Text style={styles.section}>Browse Help Topics</Text>

@@ -84,6 +84,15 @@ export function createSocketServer(httpServer) {
     socket.join(roomsFor(socket.data.claims));
     // Sent on every (re)connect: clients must refetch durable resources, since missed events are not replayed.
     socket.emit('session:ready', { serverTime: new Date().toISOString() });
+    // Typing hint for live chat. The only event clients may send; it carries no data we trust: a customer's goes to the
+    // admins, an admin's goes to the named customer's own room. Dropped if sent more than once a second.
+    socket.on('chat:typing', (payload) => {
+      const claims = socket.data.claims;
+      if (!claims || Date.now() - (socket.data.lastTyping ?? 0) < 1000) return;
+      socket.data.lastTyping = Date.now();
+      if (claims.role === ROLES.CUSTOMER) emitTo(rooms.admin, 'chat:typing', { customerId: claims.sub });
+      else if (claims.role === ROLES.ADMIN && /^[\w-]{1,64}$/.test(payload?.customerId ?? '')) emitTo(rooms.user(payload.customerId), 'chat:typing', {});
+    });
     socket.on('error', (err) => logger.warn({ err }, 'Socket error'));
   });
 

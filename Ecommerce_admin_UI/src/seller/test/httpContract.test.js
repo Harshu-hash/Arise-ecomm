@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { api, http } from '@core/api/axiosInstance';
 import { financeApi } from '@seller/features/finance/api/finance.api';
-import { supportApi } from '@seller/features/support/api/support.api';
 
 describe('production HTTP contract behavior', () => {
   let originalAdapter;
@@ -27,11 +26,9 @@ describe('production HTTP contract behavior', () => {
   });
 
   it('encodes list filters exactly once', async () => {
-    await supportApi.help('settlement');
     await financeApi.documents({ entityType: 'PAYOUT', entityId: 'pay_1' });
 
-    expect(requests[0].params).toEqual({ q: 'settlement' });
-    expect(requests[1].params).toEqual({ entityType: 'PAYOUT', entityId: 'pay_1' });
+    expect(requests[0].params).toEqual({ entityType: 'PAYOUT', entityId: 'pay_1' });
   });
 
   it('adds a command idempotency key and preserves an explicit workflow key', async () => {

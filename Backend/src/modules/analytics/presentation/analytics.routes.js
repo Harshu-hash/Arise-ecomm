@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { ROLES } from '../../../shared/constants/roles.js';
-import { ForbiddenError, NotFoundError } from '../../../shared/errors/AppError.js';
+import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
-import { requirePermission, userHasPermission } from '../../../shared/middleware/permission.js';
+import { requirePermission, requirePermissionBy, userHasPermission } from '../../../shared/middleware/permission.js';
+import { assertPlatformWide } from '../../../shared/middleware/scope.js';
 import { sellerScope } from '../../../shared/policies/ownership.js';
 import { ANALYTICS_DOMAINS, getDomainAnalytics } from '../application/adminAnalytics.service.js';
 import { getActionCenter, getMoneyPosition, getSummary } from '../application/adminDashboard.service.js';
@@ -28,9 +29,12 @@ const domainParams = z.object({ domain: z.string() });
 export function createAdminDashboardRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
-  router.get('/summary', validate({ query: summaryQuery }), requirePermission('dashboard.dashboard.view'), route(async (req, res) =>
-    sendData(res, await getSummary({ days: req.query.days, showFinance: await userHasPermission(req.auth.userId, 'dashboard.finance_widgets.view') }))));
+  router.get('/summary', validate({ query: summaryQuery }), requirePermission('dashboard.dashboard.view'), route(async (req, res) => {
+    await assertPlatformWide(req);
+    return sendData(res, await getSummary({ days: req.query.days, showFinance: await userHasPermission(req.auth.userId, 'dashboard.finance_widgets.view') }));
+  }));
   router.get('/action-center', requirePermission('dashboard.action_center.view'), route(async (req, res) => {
+    await assertPlatformWide(req);
     const held = new Set((await Promise.all(['sellers.application.view', 'catalog.product.approve', 'orders.order.view', 'logistics.ndr.view', 'orders.return.view', 'finance.refund.view', 'finance.payout.view']
       .map(async (key) => ((await userHasPermission(req.auth.userId, key)) ? key : null)))).filter(Boolean));
     return sendData(res, await getActionCenter((permission) => held.has(permission)));
@@ -44,7 +48,10 @@ export function createAdminDashboardRouter() {
 export function createAdminMoneyRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
-  router.get('/overview', requirePermission('dashboard.finance_widgets.view'), route(async (_req, res) => sendData(res, await getMoneyPosition())));
+  router.get('/overview', requirePermission('dashboard.finance_widgets.view'), route(async (req, res) => {
+    await assertPlatformWide(req);
+    return sendData(res, await getMoneyPosition());
+  }));
   return router;
 }
 
@@ -54,14 +61,16 @@ const DOMAIN_PERMISSION = {
   finance: 'reports.finance.view',
 };
 
+// An unknown domain is a 404 for everyone; the permission guard only decides for real domains.
+const unknownDomainIs404 = (req, _res, next) => next(ANALYTICS_DOMAINS.includes(req.params.domain) ? undefined : new NotFoundError('Unknown analytics domain.'));
+
 // Mount path: /api/admin/v1/reports/analytics
 export function createAdminAnalyticsRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
-  router.get('/:domain', validate({ params: domainParams, query: analyticsQuery }), route(async (req, res) => {
+  router.get('/:domain', validate({ params: domainParams, query: analyticsQuery }), unknownDomainIs404, requirePermissionBy((req) => DOMAIN_PERMISSION[req.params.domain]), route(async (req, res) => {
+    await assertPlatformWide(req);
     const { domain } = req.params;
-    if (!ANALYTICS_DOMAINS.includes(domain)) throw new NotFoundError('Unknown analytics domain.');
-    if (!(await userHasPermission(req.auth.userId, DOMAIN_PERMISSION[domain]))) throw new ForbiddenError();
     return sendData(res, await getDomainAnalytics(domain, req.query.days));
   }));
   return router;

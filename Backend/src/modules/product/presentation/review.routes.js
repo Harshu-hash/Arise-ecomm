@@ -1,11 +1,14 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
-import { ForbiddenError } from '../../../shared/errors/AppError.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
-import { requirePermission, userHasPermission } from '../../../shared/middleware/permission.js';
+import { requirePermission, requirePermissionBy } from '../../../shared/middleware/permission.js';
+import { scopedIds } from '../../../shared/middleware/scope.js';
+import { categoryIdsUnderRoots } from '../../category/public/index.js';
+import { Product } from '../infrastructure/persistence/product.model.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { decideProduct, deactivateOfferForAdmin, getProductForAdmin, listProductsForAdmin } from '../application/review.service.js';
 
@@ -35,15 +38,34 @@ const DECISION_PERMISSION = {
   'request-changes': 'catalog.product.request_changes',
 };
 
+// The category ids an admin may touch: their scoped top-level categories and everything under them, or null for all.
+const allowedCategoryIds = async (req) => {
+  const roots = await scopedIds(req, 'categories');
+  return roots ? categoryIdsUnderRoots(roots) : null;
+};
+
 // Mount path: /api/admin/v1/products. "See and approve" only — activate/deactivate/block/
 // archive on an already-LIVE product are a separate, not-yet-built lifecycle feature.
 export function createProductReviewRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
+  // An admin limited to some categories sees the rest as not found, in the queue and by id.
+  router.param('id', async (req, _res, next, id) => {
+    try {
+      const allowed = await allowedCategoryIds(req);
+      if (allowed) {
+        const product = await Product.findById(id, 'categoryId').lean();
+        if (product && !allowed.includes(String(product.categoryId))) throw new NotFoundError('That product does not exist.');
+      }
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/', validate({ query: listQuery }), requirePermission('catalog.product.view'), async (req, res, next) => {
     try {
-      const { data, meta } = await listProductsForAdmin(req.query);
+      const { data, meta } = await listProductsForAdmin(req.query, { categoryIds: await allowedCategoryIds(req) });
       return sendData(res, data, { meta });
     } catch (error) {
       return next(error);
@@ -62,9 +84,9 @@ export function createProductReviewRouter() {
   router.post(
     '/:id/:action',
     validate({ params: decideParams, body: decideBody }),
+    requirePermissionBy((req) => DECISION_PERMISSION[req.params.action]),
     async (req, res, next) => {
       try {
-        if (!(await userHasPermission(req.auth.userId, DECISION_PERMISSION[req.params.action]))) throw new ForbiddenError();
         return sendCommand(res, await decideProduct(req.params.id, req.params.action, req.body, req.auth));
       } catch (error) {
         return next(error);

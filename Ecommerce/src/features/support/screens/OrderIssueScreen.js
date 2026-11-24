@@ -44,21 +44,21 @@ const OrderIssueScreen = ({ navigation, route }) => {
       icon: 'alert-circle',
       label: 'I didn’t receive my order',
       onPress: () =>
-        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'delivery' }),
+        navigation && navigation.navigate('Chat', { orderId: order.id }),
     },
     {
       id: 'damaged',
       icon: 'alert-triangle',
       label: 'Item is damaged or defective',
       onPress: () =>
-        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'product' }),
+        navigation && navigation.navigate('Chat', { orderId: order.id }),
     },
     {
       id: 'refund',
       icon: 'rotate-ccw',
       label: 'Refund related query',
       onPress: () =>
-        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'refund' }),
+        navigation && navigation.navigate('Chat', { orderId: order.id }),
     },
     // Opens the first invoice; the order screen lists them all. Before the seller ships there is none, so it goes to support.
     {
@@ -68,14 +68,14 @@ const OrderIssueScreen = ({ navigation, route }) => {
       onPress: () =>
         invoices[0]
           ? Linking.openURL(invoices[0].downloadUrl).catch(() => {})
-          : navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
+          : navigation && navigation.navigate('Chat', { orderId: order.id }),
     },
     {
       id: 'other',
       icon: 'more-horizontal',
       label: 'Something else',
       onPress: () =>
-        navigation && navigation.navigate('RaiseTicket', { order, subjectId: 'other' }),
+        navigation && navigation.navigate('Chat', { orderId: order.id }),
     },
   ].filter(Boolean);
 

@@ -330,20 +330,21 @@
     "/support/channels": {
       "get": { "operationId": "getSupportChannels", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
-    "/support/subjects": {
-      "get": { "operationId": "listSupportSubjects", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    "/support/chat": {
+      "get": { "operationId": "getSupportChat", "tags": ["Support"], "description": "The caller's open live chat with its messages, or null data when none is open.", "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
-    "/support/tickets": {
-      "get": { "operationId": "listSupportTickets", "tags": ["Support"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } },
-      "post": { "operationId": "createSupportTicket", "tags": ["Support"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    "/support/chat/messages": {
+      "post": { "operationId": "sendSupportChatMessage", "tags": ["Support"], "description": "Sends text and/or up to 3 photo keys (from /media/uploads, purpose SUPPORT_ATTACHMENT); starts a chat when none is open.", "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
     },
-    "/support/tickets/{ticketId}": {
-      "parameters": [{ "$ref": "#/components/parameters/TicketId" }],
-      "get": { "operationId": "getSupportTicket", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    "/support/chat/read": {
+      "post": { "operationId": "markSupportChatRead", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
-    "/support/tickets/{ticketId}/messages": {
-      "parameters": [{ "$ref": "#/components/parameters/TicketId" }, { "$ref": "#/components/parameters/IdempotencyKey" }],
-      "post": { "operationId": "replyToSupportTicket", "tags": ["Support"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "409": { "$ref": "#/components/responses/Error" } } }
+    "/support/chats": {
+      "get": { "operationId": "listSupportChats", "tags": ["Support"], "parameters": [{ "$ref": "#/components/parameters/Cursor" }], "responses": { "200": { "$ref": "#/components/responses/List" } } }
+    },
+    "/support/chats/{chatId}": {
+      "parameters": [{ "name": "chatId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "operationId": "getSupportChatById", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
     },
     "/help/categories": {
       "get": { "operationId": "listHelpCategories", "tags": ["Support"], "security": [], "responses": { "200": { "$ref": "#/components/responses/List" } } }
@@ -385,7 +386,6 @@
       "DeviceId": { "name": "deviceId", "in": "path", "required": true, "schema": { "type": "string" } },
       "ReviewId": { "name": "reviewId", "in": "path", "required": true, "schema": { "type": "string" } },
       "QuestionId": { "name": "questionId", "in": "path", "required": true, "schema": { "type": "string" } },
-      "TicketId": { "name": "ticketId", "in": "path", "required": true, "schema": { "type": "string" } },
       "ArticleId": { "name": "articleId", "in": "path", "required": true, "schema": { "type": "string" } }
     },
     "requestBodies": {

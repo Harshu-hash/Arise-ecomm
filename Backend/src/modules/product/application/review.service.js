@@ -61,8 +61,9 @@ function serializeProductRow(product, offerStats, campaign = null) {
   };
 }
 
-export async function listProductsForAdmin(query) {
-  const filter = {};
+/** `categoryIds`: the categories an admin is limited to (their role scope), or null for all. */
+export async function listProductsForAdmin(query, { categoryIds = null } = {}) {
+  const filter = categoryIds ? { categoryId: { $in: categoryIds } } : {};
   if (query.q) {
     const pattern = new RegExp(escapeRegex(query.q), 'i');
     filter.$or = [{ title: pattern }, { brandName: pattern }];

@@ -228,7 +228,7 @@ export const ROLE_TEMPLATES = [
     name: 'Customer Support Agent',
     description: 'Handles tickets and chats, with order actions within set limits.',
     system: true,
-    scopedBy: ['queues', 'refundLimit'],
+    scopedBy: ['refundLimit'],
     patterns: [
       'dashboard.dashboard.view',
       'support.ticket.*',
@@ -307,7 +307,7 @@ export const ROLE_TEMPLATES = [
     name: 'Warehouse Manager',
     description: 'Runs assigned fulfilment centres: inbound, inventory and dispatch.',
     system: true,
-    scopedBy: ['warehouses'],
+    scopedBy: [],
     patterns: [
       'dashboard.dashboard.view',
       'dashboard.action_center.view',

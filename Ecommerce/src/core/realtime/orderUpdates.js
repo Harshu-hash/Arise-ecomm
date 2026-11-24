@@ -2,6 +2,15 @@ import { io } from 'socket.io-client';
 import { ENV } from '../../configs/env.config';
 import { baseApi } from '../api/baseApi';
 
+// Live chat's typing hint is not a refetch signal, so screens listen to it directly through these.
+let activeSocket = null;
+const typingListeners = new Set();
+export const onSupportTyping = listener => {
+  typingListeners.add(listener);
+  return () => typingListeners.delete(listener);
+};
+export const emitCustomerTyping = () => activeSocket?.emit('chat:typing');
+
 /**
  * While a customer is signed in, listens for the backend's "your order changed" hint and refetches what is on screen, so a
  * status moves the moment the seller or courier acts, without pulling to refresh. The hint is only a nudge: the screen then
@@ -29,13 +38,21 @@ export function startOrderUpdates(dispatch, getToken) {
     dispatch(baseApi.util.invalidateTags(tags));
   };
   const refetchNotifications = () => dispatch(baseApi.util.invalidateTags([{ type: 'Notification', id: 'LIST' }]));
+  const refetchChat = () => dispatch(baseApi.util.invalidateTags([{ type: 'Chat' }]));
   socket.on('order:changed', refetchOrders);
+  socket.on('chat:changed', refetchChat);
+  socket.on('chat:typing', () => typingListeners.forEach(listener => listener()));
+  activeSocket = socket;
   socket.on('return:changed', refetchReturns);
   socket.on('notification:changed', refetchNotifications);
   socket.on('session:ready', () => {
     refetchOrders();
     refetchReturns();
     refetchNotifications();
+    refetchChat();
   });
-  return () => socket.disconnect();
+  return () => {
+    activeSocket = null;
+    socket.disconnect();
+  };
 }

@@ -21,7 +21,7 @@ export const HELP_CATEGORIES = [
         id: 'o3',
         question: 'My order is delayed, what do I do?',
         answer:
-          'Delays can happen due to weather, logistics disruptions, or regional restrictions. Check the latest status on the tracking page first. If the delivery date has passed by more than 2 days, you can raise a ticket from this order and our support team will investigate and update you within 24 hours.',
+          'Delays can happen due to weather, logistics disruptions, or regional restrictions. Check the latest status on the tracking page first. If the delivery date has passed by more than 2 days, you can chat with our support team from this order and they will investigate and update you within 24 hours.',
       },
       {
         id: 'o4',
@@ -47,7 +47,7 @@ export const HELP_CATEGORIES = [
         id: 'p1',
         question: 'Payment failed but amount was deducted',
         answer:
-          'If your payment failed but the amount was debited from your account, it is usually auto-reversed by your bank within 5-7 business days. If the amount hasn’t been credited back after 7 days, raise a ticket with your transaction ID and bank statement and our payments team will assist you.',
+          'If your payment failed but the amount was debited from your account, it is usually auto-reversed by your bank within 5-7 business days. If the amount hasn’t been credited back after 7 days, chat with us and share your transaction ID and bank statement and our payments team will assist you.',
       },
       {
         id: 'p2',
@@ -204,15 +204,6 @@ export const RETURN_REASONS = [
   'Other',
 ];
 
-export const TICKET_SUBJECTS = [
-  { id: 'delivery', icon: 'truck', label: 'Delivery Issue' },
-  { id: 'payment', icon: 'credit-card', label: 'Payment Issue' },
-  { id: 'product', icon: 'package', label: 'Product Quality' },
-  { id: 'refund', icon: 'rotate-ccw', label: 'Refund Query' },
-  { id: 'account', icon: 'user', label: 'Account Issue' },
-  { id: 'other', icon: 'more-horizontal', label: 'Other' },
-];
-
 export const MOCK_ORDERS = [
   {
     id: 'ORD-84920',
@@ -246,53 +237,5 @@ export const MOCK_ORDERS = [
     status: 'Delivered',
     canCancel: false,
     canReturn: true,
-  },
-];
-
-export const MOCK_TICKETS = [
-  {
-    id: 'HLP-30442',
-    subject: 'Delivery Issue',
-    orderId: 'ORD-84920',
-    status: 'In Progress',
-    createdOn: '19 Aug 2026',
-    description: 'My order is showing out for delivery for 2 days now with no update.',
-    updates: [
-      {
-        id: 't1',
-        author: 'You',
-        text: 'My order is showing out for delivery for 2 days now with no update.',
-        date: '19 Aug, 10:14 AM',
-      },
-      {
-        id: 't2',
-        author: 'Support Agent',
-        text: 'We’re sorry for the delay. We’ve escalated this to our logistics partner and expect delivery within 24 hours.',
-        date: '19 Aug, 11:02 AM',
-      },
-    ],
-  },
-  {
-    id: 'HLP-29187',
-    subject: 'Refund Query',
-    orderId: 'ORD-65510',
-    status: 'Resolved',
-    createdOn: '27 Jun 2026',
-    description: 'Refund for returned notebook not received after 6 days.',
-    updates: [
-      {
-        id: 't3',
-        author: 'You',
-        text: 'Refund for returned notebook not received after 6 days.',
-        date: '27 Jun, 09:20 AM',
-      },
-      {
-        id: 't4',
-        author: 'Support Agent',
-        text: 'We’ve checked with our payments team, the refund of ₹298 was processed today and should reflect within 3-5 business days.',
-        date: '27 Jun, 03:45 PM',
-      },
-      { id: 't5', author: 'You', text: 'Got it, thank you!', date: '28 Jun, 09:02 AM' },
-    ],
   },
 ];

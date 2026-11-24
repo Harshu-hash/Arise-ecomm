@@ -234,8 +234,6 @@ function describeScopeShort(scope) {
   const parts = [];
   if (scope.categories?.length) parts.push(`${scope.categories.length} categories`);
   if (scope.sellers?.length) parts.push(`${scope.sellers.length} sellers`);
-  if (scope.warehouses?.length) parts.push(`${scope.warehouses.length} warehouses`);
-  if (scope.queues?.length) parts.push(`${scope.queues.length} queues`);
   if (scope.refundLimit) parts.push('refund capped');
   return parts.length ? parts.join(' · ') : 'Unrestricted';
 }

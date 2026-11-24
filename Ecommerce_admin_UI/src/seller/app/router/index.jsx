@@ -49,9 +49,6 @@ const SettlementsPage = lazy(() => import('@seller/features/finance/pages/Settle
 
 /* Support & account */
 const SupportPage = lazy(() => import('@seller/features/support/pages/SupportPage'));
-const TicketDetailPage = lazy(() => import('@seller/features/support/pages/TicketDetailPage'));
-const CustomerComplaintsPage = lazy(() => import('@seller/features/support/pages/CustomerComplaintsPage'));
-const CustomerComplaintDetailPage = lazy(() => import('@seller/features/support/pages/CustomerComplaintDetailPage'));
 const ProfilePage = lazy(() => import('@seller/features/settings/pages/ProfilePage'));
 const BankPickupPage = lazy(() => import('@seller/features/settings/pages/BankPickupPage'));
 const PickupAddressPage = lazy(() => import('@seller/features/settings/pages/PickupAddressPage'));
@@ -92,9 +89,6 @@ const ROUTES = [
 
   // Support & account
   { path: '/support', element: <SupportPage /> },
-  { path: '/support/customer-complaints', element: <CustomerComplaintsPage /> },
-  { path: '/support/customer-complaints/:id', element: <CustomerComplaintDetailPage /> },
-  { path: '/support/:id', element: <TicketDetailPage /> },
   { path: '/settings/profile', element: <ProfilePage /> },
   { path: '/settings/bank', element: <BankPickupPage /> },
   { path: '/settings/address', element: <PickupAddressPage /> },

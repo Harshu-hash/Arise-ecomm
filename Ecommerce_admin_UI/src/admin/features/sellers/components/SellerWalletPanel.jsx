@@ -39,7 +39,12 @@ export default function SellerWalletPanel({ seller }) {
   });
   const adjust = useMutation({
     mutationFn: (values) => financeApi.adjustWallet(seller.id, { amountPaise: Math.round(values.rupees * 100) * (values.direction === 'DEBIT' ? -1 : 1), reason: values.reason }),
-    onSuccess: () => { refresh(); setAdjusting(false); message.success('Wallet adjusted.'); },
+    onSuccess: (res) => {
+      refresh();
+      setAdjusting(false);
+      if (res?.data?.approvalRequired) message.info('That is over your limit: sent to another admin for approval (System > Approvals).');
+      else message.success('Wallet adjusted.');
+    },
     onError: (e) => message.error(e.message),
   });
 

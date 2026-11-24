@@ -36,13 +36,13 @@ const seed = () => [
   },
   {
     id: 'notification-4',
-    deduplicationKey: 'support:ticket-101',
+    deduplicationKey: 'support:chat-101',
     category: 'SUPPORT',
     title: 'Support replied',
-    body: 'There is a new reply on your support request.',
+    body: 'There is a new reply in your chat.',
     createdAt: '2026-10-31T13:20:00.000Z',
     readAt: null,
-    target: { type: 'TICKET', entityId: 'ticket-101' },
+    target: { type: 'CHAT', entityId: 'chat-101' },
   },
 ];
 export const resetCustomerNotificationsFixture = () => {

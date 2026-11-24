@@ -44,7 +44,8 @@ const adminRow = (row, now = Date.now()) => ({
 });
 export { adminRow as toAdminReturnRow };
 
-export async function listAdminReturns(query) {
+/** `sellerIds`: the sellers an admin is limited to (their role scope), or null for all. */
+export async function listAdminReturns(query, { sellerIds = null } = {}) {
   const page = Math.max(1, Number(query.page ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 25)));
   const sort = query.sort || 'requestedAt';
@@ -54,7 +55,7 @@ export async function listAdminReturns(query) {
   const reason = RETURN_REASONS.find((entry) => entry.code === query.reason || entry.label === query.reason)?.code;
   const base = {
     ...(query.type === 'REPLACEMENT' ? { _id: null } : {}), // refund only: there are no replacements
-    ...(query.sellerId ? { sellerId: String(query.sellerId) } : {}),
+    ...(query.sellerId ? { sellerId: String(query.sellerId) } : sellerIds ? { sellerId: { $in: sellerIds } } : {}),
     ...(query.faultAttribution ? { faultAttribution: String(query.faultAttribution) } : {}),
     ...(query.reason ? { reasonCode: reason ?? '-' } : {}),
     ...(query.needsAttention === 'true' ? { 'reverse.cancelError': { $ne: null }, 'reverse.cancelledAt': null } : {}),

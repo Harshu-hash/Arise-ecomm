@@ -116,7 +116,7 @@ export const ROLE_TEMPLATES = [
   {
     key: 'support_agent', name: 'Customer Support Agent',
     description: 'Handles tickets and chats, with order actions within set limits.', system: true,
-    scopedBy: ['queues', 'refundLimit'],
+    scopedBy: ['refundLimit'],
     patterns: [
       'dashboard.dashboard.view', 'support.ticket.*', '-support.ticket.export', 'support.chat.handle',
       'support.macro.view', 'orders.order.view', 'orders.order.note', 'orders.order.edit_address',
@@ -147,7 +147,7 @@ export const ROLE_TEMPLATES = [
   },
   {
     key: 'warehouse_manager', name: 'Warehouse Manager',
-    description: 'Runs assigned fulfilment centres: inbound, inventory and dispatch.', system: true, scopedBy: ['warehouses'],
+    description: 'Runs assigned fulfilment centres: inbound, inventory and dispatch.', system: true,
     patterns: [
       'dashboard.dashboard.view', 'dashboard.action_center.view', 'warehouse.*', '-warehouse.warehouse.create',
       '-warehouse.warehouse.delete', 'logistics.shipment.view', 'logistics.shipment.print', 'logistics.pickup.*',

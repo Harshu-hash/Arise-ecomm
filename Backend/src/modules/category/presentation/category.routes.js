@@ -1,3 +1,4 @@
+import { markPermissionGuard } from '../../../shared/middleware/permission.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getUserAuthorization } from '../../identity/public/index.js';
@@ -60,8 +61,8 @@ const idParams = z.object({ id: objectIdSchema });
 const hasPermission = (permissions, key) => permissions.includes('*') || permissions.includes(key);
 // Commission is a finance rule: editing categories is not enough to change it.
 const canEditCommission = (req) => hasPermission(req.categoryAuthorization.permissions, 'finance.commission.edit');
-const requireCategoryPermission = (action) => (req, _res, next) =>
-  next(hasPermission(req.categoryAuthorization.permissions, `catalog.category.${action}`) ? undefined : new ForbiddenError());
+const requireCategoryPermission = (action) => markPermissionGuard((req, _res, next) =>
+  next(hasPermission(req.categoryAuthorization.permissions, `catalog.category.${action}`) ? undefined : new ForbiddenError()));
 
 export function createCategoryRouter() {
   const router = Router();

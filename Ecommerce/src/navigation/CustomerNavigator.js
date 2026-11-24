@@ -52,9 +52,8 @@ import OrderHelpScreen from '@features/support/screens/OrderHelpScreen';
 import OrderIssueScreen from '@features/support/screens/OrderIssueScreen';
 import CancelOrderScreen from '@features/support/screens/CancelOrderScreen';
 import ReturnReplaceScreen from '@features/support/screens/ReturnReplaceScreen';
-import RaiseTicketScreen from '@features/support/screens/RaiseTicketScreen';
-import MyTicketsScreen from '@features/support/screens/MyTicketsScreen';
-import TicketDetailScreen from '@features/support/screens/TicketDetailScreen';
+import ChatScreen from '@features/support/screens/ChatScreen';
+import ChatHistoryScreen from '@features/support/screens/ChatHistoryScreen';
 import ContactUsScreen from '@features/support/screens/ContactUsScreen';
 import { withAuthGuard } from './ProtectedRoute';
 
@@ -83,9 +82,8 @@ const ProtectedOrderIssue = withAuthGuard(OrderIssueScreen);
 const ProtectedCancelOrder = withAuthGuard(CancelOrderScreen);
 const ProtectedReturnReplace = withAuthGuard(ReturnReplaceScreen);
 const ProtectedReturnDetail = withAuthGuard(ReturnDetailScreen);
-const ProtectedRaiseTicket = withAuthGuard(RaiseTicketScreen);
-const ProtectedMyTickets = withAuthGuard(MyTicketsScreen);
-const ProtectedTicketDetail = withAuthGuard(TicketDetailScreen);
+const ProtectedChat = withAuthGuard(ChatScreen);
+const ProtectedChatHistory = withAuthGuard(ChatHistoryScreen);
 
 const CustomerNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -145,9 +143,8 @@ const CustomerNavigator = () => (
     <Stack.Screen name="CancelOrder" component={ProtectedCancelOrder} />
     <Stack.Screen name="ReturnReplace" component={ProtectedReturnReplace} />
     <Stack.Screen name="ReturnDetail" component={ProtectedReturnDetail} />
-    <Stack.Screen name="RaiseTicket" component={ProtectedRaiseTicket} />
-    <Stack.Screen name="MyTickets" component={ProtectedMyTickets} />
-    <Stack.Screen name="TicketDetail" component={ProtectedTicketDetail} />
+    <Stack.Screen name="Chat" component={ProtectedChat} />
+    <Stack.Screen name="ChatHistory" component={ProtectedChatHistory} />
     <Stack.Screen name="ContactUs" component={ContactUsScreen} />
   </Stack.Navigator>
 );

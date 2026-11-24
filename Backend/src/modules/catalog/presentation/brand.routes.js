@@ -1,3 +1,4 @@
+import { markPermissionGuard } from '../../../shared/middleware/permission.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { getUserAuthorization } from '../../identity/public/index.js';
@@ -44,8 +45,8 @@ const listQuery = z.object({
 }));
 
 const hasPermission = (permissions, key) => permissions.includes('*') || permissions.includes(key);
-const requirePermission = (action) => (req, _res, next) =>
-  next(hasPermission(req.brandAuthorization.permissions, `catalog.brand.${action}`) ? undefined : new ForbiddenError());
+const requirePermission = (action) => markPermissionGuard((req, _res, next) =>
+  next(hasPermission(req.brandAuthorization.permissions, `catalog.brand.${action}`) ? undefined : new ForbiddenError()));
 
 export function createBrandRouter() {
   const router = Router();

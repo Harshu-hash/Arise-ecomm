@@ -47,10 +47,10 @@ const lineDto = (line, open) => {
 };
 
 /** Settlement lines, newest delivery first. `sellerId` fixes the seller (their panel); the admin may filter by it. */
-export async function listLines({ sellerId = null, state, q, paymentMethod, page = 1, pageSize = 25, sort = '-deliveredAt' }) {
+export async function listLines({ sellerId = null, sellerIds = null, state, q, paymentMethod, page = 1, pageSize = 25, sort = '-deliveredAt' }) {
   const text = q ? new RegExp(escapeRegex(q.slice(0, 100)), 'i') : null;
   const base = {
-    ...(sellerId ? { sellerId: String(sellerId) } : {}),
+    ...(sellerId ? { sellerId: String(sellerId) } : sellerIds ? { sellerId: { $in: sellerIds } } : {}),
     ...(paymentMethod ? { paymentMethod: String(paymentMethod).toUpperCase() } : {}),
     ...(text ? { $or: [{ orderNumber: text }, { productTitle: text }, { customerName: text }, { sellerName: text }] } : {}),
   };
@@ -67,17 +67,18 @@ export async function listLines({ sellerId = null, state, q, paymentMethod, page
   return { data, meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), facets: { state: Object.fromEntries(byState.map((entry) => [entry._id.r, entry.n])) } } };
 }
 
-export async function getLine(id, { sellerId = null } = {}) {
-  const line = await SettlementLine.findOne({ _id: id, ...(sellerId ? { sellerId: String(sellerId) } : {}) }).lean();
+export async function getLine(id, { sellerId = null, sellerIds = null } = {}) {
+  const line = await SettlementLine.findOne({ _id: id, ...(sellerId ? { sellerId: String(sellerId) } : sellerIds ? { sellerId: { $in: sellerIds } } : {}) }).lean();
   if (!line) throw new NotFoundError('That settlement line does not exist.');
   return lineDto(line, await itemsWithOpenReturn([line.orderItemId]));
 }
 
 /** The admin's finance tiles: what Arise owes sellers, and the withdrawals waiting on someone. */
-export async function platformSummary() {
+export async function platformSummary({ sellerIds = null } = {}) {
+  const scoped = sellerIds ? [{ $match: { sellerId: { $in: sellerIds } } }] : [];
   const [wallets, open] = await Promise.all([
-    SellerWallet.aggregate([{ $group: { _id: null, pending: { $sum: '$pendingPaise' }, available: { $sum: '$availablePaise' }, locked: { $sum: '$lockedPaise' }, withdrawn: { $sum: '$lifetimeWithdrawnPaise' }, negative: { $sum: { $cond: [{ $lt: ['$availablePaise', 0] }, 1, 0] } } } }]),
-    Withdrawal.aggregate([{ $match: { status: { $in: ['REQUESTED', 'APPROVED'] } } }, { $group: { _id: '$status', n: { $sum: 1 }, paise: { $sum: '$amountPaise' } } }]),
+    SellerWallet.aggregate([...scoped, { $group: { _id: null, pending: { $sum: '$pendingPaise' }, available: { $sum: '$availablePaise' }, locked: { $sum: '$lockedPaise' }, withdrawn: { $sum: '$lifetimeWithdrawnPaise' }, negative: { $sum: { $cond: [{ $lt: ['$availablePaise', 0] }, 1, 0] } } } }]),
+    Withdrawal.aggregate([...scoped, { $match: { status: { $in: ['REQUESTED', 'APPROVED'] } } }, { $group: { _id: '$status', n: { $sum: 1 }, paise: { $sum: '$amountPaise' } } }]),
   ]);
   const by = (status) => open.find((row) => row._id === status) ?? { n: 0, paise: 0 };
   const w = wallets[0] ?? {};

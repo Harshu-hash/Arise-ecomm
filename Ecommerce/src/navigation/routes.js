@@ -26,5 +26,5 @@ export const CUSTOMER_ROUTES = Object.freeze({
   notifications: 'Notifications',
   wishlist: 'Wishlist',
   helpCenter: 'HelpCenter',
-  ticketDetail: 'TicketDetail',
+  chat: 'Chat',
 });

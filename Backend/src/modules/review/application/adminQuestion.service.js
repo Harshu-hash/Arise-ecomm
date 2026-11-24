@@ -35,8 +35,9 @@ export const toQuestionRow = (question) => ({
   askedAt: question.createdAt.toISOString(),
 });
 
-export async function listQuestionsForAdmin(query) {
-  const match = {};
+/** `productIds`: the products an admin is limited to (via their role's sellers), or null for all. */
+export async function listQuestionsForAdmin(query, { productIds = null } = {}) {
+  const match = productIds ? { productId: { $in: productIds } } : {};
   if (query.q) {
     const pattern = new RegExp(escapeRegex(query.q), 'i');
     match.$or = [{ productName: pattern }, { authorName: pattern }, { body: pattern }];

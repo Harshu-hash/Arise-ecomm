@@ -80,17 +80,6 @@ export function computeAlerts(sellerId) {
     }));
   }
 
-  // Tickets waiting on the seller's reply.
-  for (const t of filter('tickets', (x) => x.requesterType === 'SELLER' && x.sellerId === sellerId && ['PENDING_INTERNAL', 'PENDING_CUSTOMER', 'RESOLVED'].includes(x.status))) {
-    out.push(alert(`ticket:${t.id}`, {
-      title: 'Support replied to your ticket',
-      body: t.subject,
-      at: t.createdAt,
-      severity: 'info',
-      link: `/support/${t.id}`,
-    }));
-  }
-
   const itemIds = new Set(filter('orderItems', (item) => item.sellerId === sellerId).map((item) => item.id));
   for (const review of filter('reviews', (row) => itemIds.has(row.orderItemId) && row.sellerReply && ['PUBLISHED', 'REJECTED'].includes(row.sellerReply.status))) {
     out.push(alert(`review-reply:${review.id}:${review.sellerReply.status}`, { title: `Review reply ${review.sellerReply.status.toLowerCase()}`, body: review.productTitle, at: review.sellerReply.moderatedAt ?? review.submittedAt, severity: review.sellerReply.status === 'REJECTED' ? 'warning' : 'info', link: `/customer-experience/reviews?q=${review.id}` }));

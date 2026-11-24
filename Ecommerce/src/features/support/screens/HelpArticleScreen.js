@@ -65,10 +65,10 @@ const HelpArticleScreen = ({ navigation, route }) => {
           )}
         </View>
         <TouchableOpacity
-          onPress={() => navigation.navigate('RaiseTicket', {})}
+          onPress={() => navigation.navigate('Chat')}
           style={styles.ticket}
         >
-          <Text style={styles.ticketText}>Still need help? Raise a Ticket</Text>
+          <Text style={styles.ticketText}>Still need help? Chat with us</Text>
         </TouchableOpacity>
       </ScrollView>
     </View>

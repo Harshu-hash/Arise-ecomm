@@ -24,7 +24,7 @@ describe('customer API contract', () => {
       '/orders',
       '/returns',
       '/wallet',
-      '/support/tickets',
+      '/support/chat',
       '/support/channels',
       '/seller-leads',
     ].forEach(route => expect(contract.paths[route]).toBeDefined());
@@ -45,8 +45,6 @@ describe('customer API contract', () => {
       'createReturn',
       'cancelReturn',
       'redeemGiftCard',
-      'createSupportTicket',
-      'replyToSupportTicket',
       'submitSellerLead',
     ]);
     operations

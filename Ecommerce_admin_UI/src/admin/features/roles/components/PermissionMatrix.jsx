@@ -2,6 +2,7 @@ import { WarningFilled } from '@ant-design/icons';
 import { Checkbox, Collapse, Flex, Input, Space, Tag, Tooltip, Typography } from 'antd';
 import { useMemo, useState } from 'react';
 import { ALL_PERMISSIONS } from '@core/rbac/catalog';
+import { buildRoleSections } from '@admin/nav/access';
 import { toggleKeys } from './permissionSelection';
 
 /**
@@ -15,23 +16,8 @@ import { toggleKeys } from './permissionSelection';
  * one the server will accept unchanged.
  */
 
-// Sections mirror the admin sidebar (src/admin/nav/navigation.js); each lists the
-// `module.resource` catalog entries behind that menu's pages. Permission keys are
-// unchanged, so catalog entries not listed here stay valid, just not editable here.
-const SECTIONS = [
-  { key: 'overview', label: 'Dashboard & Analytics', res: ['dashboard.dashboard', 'dashboard.finance_widgets', 'dashboard.action_center', 'reports.sales', 'reports.operations', 'reports.finance'] },
-  { key: 'catalog', label: 'Catalog', res: ['catalog.product', 'catalog.category', 'catalog.brand', 'catalog.attribute', 'catalog.sizechart'] },
-  { key: 'marketing', label: 'Marketing', res: ['marketing.campaign', 'ads.campaign', 'notifications.broadcast', 'marketing.coupon', 'marketing.deal', 'cms.banner', 'cms.home', 'cms.page'] },
-  { key: 'orders', label: 'Orders', res: ['orders.order', 'orders.item', 'orders.return', 'logistics.shipment'] },
-  { key: 'support', label: 'Support', res: ['support.ticket', 'reviews.review', 'reviews.qa'] },
-  { key: 'sellers', label: 'Sellers', res: ['sellers.seller', 'sellers.application', 'sellers.kyc'] },
-  { key: 'customers', label: 'Customers', res: ['customers.customer'] },
-  { key: 'finance', label: 'Finance', res: ['finance.payment', 'finance.refund', 'finance.payout'] },
-  { key: 'roles', label: 'Roles & Permissions', res: ['admin.role'] },
-  { key: 'settings', label: 'Settings & Staff', res: ['admin.settings', 'admin.user'] },
-];
-
-const MODULES = SECTIONS.map((s) => {
+// Sections come from the admin sidebar (nav/access.js): add a sidebar item with `resources` and its row appears here.
+const MODULES = buildRoleSections().map((s) => {
   const rows = s.res.map((id) => ({
     id,
     perms: ALL_PERMISSIONS.filter((p) => `${p.moduleKey}.${p.resourceKey}` === id),

@@ -7,7 +7,9 @@
  *
  * Key format: `<module>.<resource>.<action>`.
  * `implies` lists keys granted automatically with this one (e.g. `edit` needs `view`).
- * `sensitive: true` / `mc: true` are UI hints only; this backend does not yet act on them.
+ * `sensitive: true` / `mc: true` are UI hints (a warning in the role editor). The two-person rule is enforced where an amount
+ * can exceed an admin's own limit (a wallet adjustment, a refund retry: see modules/approval) and where a withdrawal over
+ * the payout threshold must be paid by someone other than who approved it; other actions are guarded by permission and audited.
  */
 
 const A = {

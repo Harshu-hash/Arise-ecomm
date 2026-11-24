@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { AppError } from '../../../shared/errors/AppError.js';
+import { AppError, NotFoundError } from '../../../shared/errors/AppError.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
 import { requirePermission, userHasPermission } from '../../../shared/middleware/permission.js';
+import { scopedIds } from '../../../shared/middleware/scope.js';
+import { Order } from '../infrastructure/persistence/order.model.js';
 import { grantedReturnPermissions } from './adminReturn.routes.js';
 import { raiseReturn } from '../application/adminReturn.service.js';
 import { getAdminOrder, listAdminOrders, PARCEL_STATUSES, setParcelStatus } from '../application/adminOrder.service.js';
@@ -37,9 +39,21 @@ const statusBody = z.object({ status: z.enum(PARCEL_STATUSES), reason: z.string(
 export function createAdminOrderRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
+  // An admin limited to some sellers only sees orders with a parcel from one of them; any other order answers 404.
+  router.param('id', async (req, _res, next, id) => {
+    try {
+      const ids = await scopedIds(req, 'sellers');
+      if (!ids) return next();
+      const order = await Order.findOne(/^[a-f\d]{24}$/i.test(id) ? { _id: id } : { number: id }, 'subOrders.sellerId').lean();
+      if (order && !order.subOrders.some((sub) => ids.includes(String(sub.sellerId)))) throw new NotFoundError('That order no longer exists.');
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/', requirePermission('orders.order.view'), validate({ query: listQuery }), async (req, res) => {
-    const { data, meta } = await listAdminOrders(req.query);
+    const { data, meta } = await listAdminOrders(req.query, { sellerIds: await scopedIds(req, 'sellers') });
     return sendData(res, data, { meta });
   });
   router.get('/:id', requirePermission('orders.order.view'), validate({ params: idParams }), async (req, res) => {

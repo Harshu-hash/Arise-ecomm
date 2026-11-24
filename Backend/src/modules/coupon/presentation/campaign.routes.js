@@ -6,7 +6,7 @@ import { ROLES } from '../../../shared/constants/roles.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
 import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
-import { requirePermission } from '../../../shared/middleware/permission.js';
+import { requirePermission, requirePermissionBy } from '../../../shared/middleware/permission.js';
 import { objectIdSchema, pageQuery, parseSort } from '../../../shared/validators/common.js';
 import {
   changeCampaignStatus,
@@ -60,8 +60,7 @@ const submissionQuery = pageQuery
   .transform((query) => ({ ...query, ...parseSort(query.sort || '-submittedAt', SUBMISSION_SORTABLE, 'submittedAt') }));
 
 // Cancelling is its own permission; every other move is an edit.
-const statusPermission = (req, res, next) =>
-  requirePermission(req.body.status === CAMPAIGN_STATUS.CANCELLED ? 'marketing.campaign.cancel' : 'marketing.campaign.edit')(req, res, next);
+const statusPermission = requirePermissionBy((req) => (req.body.status === CAMPAIGN_STATUS.CANCELLED ? 'marketing.campaign.cancel' : 'marketing.campaign.edit'));
 
 // Mount path: /api/admin/v1/campaigns (promotional campaigns sellers nominate products into).
 export function createCampaignRouter() {

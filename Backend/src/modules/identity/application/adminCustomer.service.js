@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { ConflictError, NotFoundError } from '../../../shared/errors/AppError.js';
@@ -35,8 +36,9 @@ function baseFilter(query) {
   };
 }
 
-export async function listCustomers(query) {
-  const match = baseFilter(query);
+/** `customerIds`: the customers an admin is limited to (those who bought from their sellers), or null for all. */
+export async function listCustomers(query, { customerIds = null } = {}) {
+  const match = { ...baseFilter(query), ...(customerIds ? { _id: { $in: customerIds.map((id) => new mongoose.Types.ObjectId(id)) } } : {}) };
   const filter = query.status.length ? { ...match, status: { $in: query.status.map((s) => TO_DB[s]) } } : match;
   const [rows, total, facets] = await Promise.all([
     User.find(filter, LIST_FIELDS)

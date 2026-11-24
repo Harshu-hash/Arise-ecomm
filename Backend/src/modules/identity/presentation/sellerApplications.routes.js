@@ -1,14 +1,17 @@
 import { Router } from 'express';
+import mongoose from 'mongoose';
 import { z } from 'zod';
 import { env } from '../../../config/env.js';
 import { logger } from '../../../config/logger.js';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { sendMail } from '../../../infrastructure/external/notification/mailer.js';
-import { AppError, ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { sendCommand, sendData } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
-import { authenticate } from '../../../shared/middleware/authenticate.js';
-import { requirePermission, userHasPermission } from '../../../shared/middleware/permission.js';
+import { ROLES } from '../../../shared/constants/roles.js';
+import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
+import { requireAnyPermission, requirePermission, requirePermissionBy, userHasPermission } from '../../../shared/middleware/permission.js';
+import { assertInScope, scopedIds } from '../../../shared/middleware/scope.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { decryptField } from '../../../shared/utils/crypto.js';
 import { signFileToken } from '../../../shared/utils/signedUrl.js';
@@ -155,14 +158,20 @@ function buildSellersMatch(query) {
 
 export function createSellerApplicationsRouter() {
   const router = Router();
-  router.use(authenticate);
+  router.use(authenticate, authorize(ROLES.ADMIN));
+  // Every :id here is a seller. An admin limited to some sellers sees the rest as not found, in lists and by id.
+  router.param('id', (req, _res, next, id) => assertInScope(req, 'sellers', id, 'This application no longer exists.').then(() => next(), next));
+  const limitToScope = async (req, match) => {
+    const ids = await scopedIds(req, 'sellers');
+    return ids ? { ...match, _id: { $in: ids.filter(mongoose.isValidObjectId).map((id) => new mongoose.Types.ObjectId(id)) } } : match;
+  };
 
   // One aggregation covers the page of rows, the total count and the per-status tab
   // counts in a single round trip, instead of three separate queries.
   router.get('/applications', requirePermission('sellers.application.view'), validate({ query: listQuerySchema }), async (req, res, next) => {
     try {
       const query = req.query;
-      const baseMatch = buildMatch(query);
+      const baseMatch = await limitToScope(req, buildMatch(query));
       const statusFilter = query.status?.split(',').filter(Boolean);
       const statusMatch = statusFilter?.length ? [{ $match: { status: { $in: statusFilter } } }] : [];
 
@@ -247,7 +256,7 @@ export function createSellerApplicationsRouter() {
   router.get('/', requirePermission('sellers.seller.view'), validate({ query: sellersListQuerySchema }), async (req, res, next) => {
     try {
       const query = req.query;
-      const baseMatch = buildSellersMatch(query);
+      const baseMatch = await limitToScope(req, buildSellersMatch(query));
       const extra = [];
       if (query.status?.trim()) extra.push({ $match: { status: { $in: query.status.split(',').filter(Boolean) } } });
       if (query.tier?.trim()) extra.push({ $match: { tier: { $in: query.tier.split(',').filter(Boolean) } } });
@@ -299,17 +308,10 @@ export function createSellerApplicationsRouter() {
   // sections (GSTIN/PAN verification, bank penny-drop, pickup courier serviceability,
   // category gating, duplicate detection) have no backing integration yet — those come
   // back as honest empty/unverified states rather than fabricated data.
-  router.get('/:id', validate({ params: z.object({ id: objectIdSchema }) }), async (req, res, next) => {
+  // Shared by the application-review page and the full seller page, so either permission is enough: a seller
+  // account manager with only sellers.seller.view still needs to open an approved seller's page.
+  router.get('/:id', validate({ params: z.object({ id: objectIdSchema }) }), requireAnyPermission('sellers.application.view', 'sellers.seller.view'), async (req, res, next) => {
     try {
-      // Shared by the application-review page and the full seller page, so either
-      // permission is enough — a seller account manager with only sellers.seller.view
-      // still needs to open an approved seller's page.
-      const [canViewApplication, canViewSeller] = await Promise.all([
-        userHasPermission(req.auth.userId, 'sellers.application.view'),
-        userHasPermission(req.auth.userId, 'sellers.seller.view'),
-      ]);
-      if (!canViewApplication && !canViewSeller) throw new ForbiddenError();
-
       const seller = await Seller.findById(req.params.id).lean();
       if (!seller) throw new NotFoundError('This application no longer exists.');
       const [owner, canViewBank] = await Promise.all([
@@ -529,11 +531,11 @@ export function createSellerApplicationsRouter() {
   router.post(
     '/:id/application/:decision',
     validate({ params: z.object({ id: objectIdSchema, decision: z.enum(DECISIONS) }), body: decideApplicationSchema }),
+    requirePermissionBy((req) => DECISION_PERMISSION[req.params.decision]),
     async (req, res, next) => {
       try {
         const { id, decision } = req.params;
         const { reason, items } = req.body;
-        if (!(await userHasPermission(req.auth.userId, DECISION_PERMISSION[decision]))) throw new ForbiddenError();
 
         const seller = await Seller.findById(id);
         if (!seller) throw new NotFoundError('This application no longer exists.');

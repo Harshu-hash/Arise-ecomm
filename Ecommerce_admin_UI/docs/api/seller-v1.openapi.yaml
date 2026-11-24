@@ -981,35 +981,11 @@ paths:
       x-idempotent: true
       x-permission: customer_experience.message.reply
       responses: { '201': { description: Policy-compliant transaction message }, '400': { $ref: '#/components/responses/Error' } }
-  /support/help:
+  /support/channels:
     get:
-      operationId: searchSellerHelp
+      operationId: getSellerSupportChannels
       x-permission: support.ticket.view
-      responses: { '200': { description: Published shared-CMS help articles } }
-  /support/context-options:
-    get:
-      operationId: listSellerSupportContexts
-      x-permission: support.ticket.create
-      responses: { '200': { description: Seller-owned orders, listings, payouts and returns } }
-  /support/incidents:
-    get:
-      operationId: listSellerSupportIncidents
-      x-permission: support.ticket.view
-      responses: { '200': { description: Current seller-service status notices } }
-  /support/tickets/{ticketId}/reopen:
-    parameters: [{ name: ticketId, in: path, required: true, schema: { type: string } }]
-    post:
-      operationId: reopenSellerSupportTicket
-      x-idempotent: true
-      x-permission: support.ticket.reply
-      responses: { '200': { description: Reopened shared ticket with escalation state }, '409': { $ref: '#/components/responses/Error' } }
-  /support/tickets/{ticketId}/callback:
-    parameters: [{ name: ticketId, in: path, required: true, schema: { type: string } }]
-    post:
-      operationId: requestSellerSupportCallback
-      x-idempotent: true
-      x-permission: support.ticket.reply
-      responses: { '200': { description: Callback request recorded on shared ticket }, '409': { $ref: '#/components/responses/Error' } }
+      responses: { '200': { description: Platform support phone, email and hours from Settings }, '401': { $ref: '#/components/responses/Error' } }
   /analytics/filters:
     get:
       operationId: getSellerAnalyticsFilters
@@ -1873,96 +1849,6 @@ paths:
         '403': { $ref: '#/components/responses/Error' }
         '404': { $ref: '#/components/responses/Error' }
         '409': { $ref: '#/components/responses/Error' }
-  /support/customer-complaints:
-    get:
-      operationId: getSupportCustomerComplaints
-      x-permission: support.ticket.view
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/customer-complaints/{id}:
-    get:
-      operationId: getSupportCustomerComplaint
-      x-permission: support.ticket.view
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/customer-complaints/{id}/messages:
-    post:
-      operationId: postSupportCustomerComplaintMessage
-      x-permission: support.ticket.manage
-      x-idempotent: true
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody: { $ref: '#/components/requestBodies/Command' }
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/customer-complaints/{id}/resolve:
-    post:
-      operationId: postSupportCustomerComplaintResolve
-      x-permission: support.ticket.manage
-      x-idempotent: true
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody: { $ref: '#/components/requestBodies/Command' }
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/tickets:
-    get:
-      operationId: getSupportTickets
-      x-permission: support.ticket.view
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-    post:
-      operationId: postSupportTickets
-      x-permission: support.ticket.manage
-      x-idempotent: true
-      requestBody: { $ref: '#/components/requestBodies/Command' }
-      responses:
-        '201': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/tickets/{id}:
-    get:
-      operationId: getSupportTicketsId
-      x-permission: support.ticket.view
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
   /warehouses:
     get:
       operationId: getWarehouses
@@ -2643,36 +2529,6 @@ paths:
     post:
       operationId: postSettingsWebhooksIdRotateSecret
       x-permission: security.webhook.manage
-      x-idempotent: true
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody: { $ref: '#/components/requestBodies/Command' }
-      responses:
-        '201': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/tickets/{id}/close:
-    post:
-      operationId: postSupportTicketsIdClose
-      x-permission: support.ticket.manage
-      x-idempotent: true
-      parameters:
-        - { name: id, in: path, required: true, schema: { type: string } }
-      requestBody: { $ref: '#/components/requestBodies/Command' }
-      responses:
-        '200': { $ref: '#/components/responses/Data' }
-        '400': { $ref: '#/components/responses/Error' }
-        '401': { $ref: '#/components/responses/Error' }
-        '403': { $ref: '#/components/responses/Error' }
-        '404': { $ref: '#/components/responses/Error' }
-        '409': { $ref: '#/components/responses/Error' }
-  /support/tickets/{id}/messages:
-    post:
-      operationId: postSupportTicketsIdMessages
-      x-permission: support.ticket.manage
       x-idempotent: true
       parameters:
         - { name: id, in: path, required: true, schema: { type: string } }

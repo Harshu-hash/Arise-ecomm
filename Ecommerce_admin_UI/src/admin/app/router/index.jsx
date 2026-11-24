@@ -3,7 +3,7 @@ import { Navigate, createBrowserRouter } from 'react-router-dom';
 import AppLayout from '@admin/layouts/AppLayout';
 import AuthLayout from '@admin/layouts/AuthLayout';
 import { SHOW_DEV_TOOLS } from '@core/config/env';
-import { RequireAnonymous, RequireAuth } from './guards';
+import { RequireAnonymous, RequireAuth, RequireNavAccess } from './guards';
 import SessionBootstrap from './SessionBootstrap';
 
 /* Route-level code splitting: each page is its own chunk. */
@@ -33,11 +33,12 @@ const CustomerDetailPage = lazy(() => import('@admin/features/customers/pages/Cu
 /* Shipments (third-party delivery integration will extend this later) */
 const ShipmentsPage = lazy(() => import('@admin/features/logistics/pages/ShipmentsPage'));
 
+const ApprovalsPage = lazy(() => import('@admin/features/approvals/pages/ApprovalsPage'));
+
 /* Reviews & support */
 const ReviewsPage = lazy(() => import('@admin/features/reviews/pages/ReviewsPage'));
 const QaPage = lazy(() => import('@admin/features/reviews/pages/QaPage'));
-const TicketsPage = lazy(() => import('@admin/features/support/pages/TicketsPage'));
-const TicketDetailPage = lazy(() => import('@admin/features/support/pages/TicketDetailPage'));
+const LiveChatPage = lazy(() => import('@admin/features/support/pages/LiveChatPage'));
 
 /* Marketing & content */
 const CampaignsListPage = lazy(() => import('@admin/features/campaigns/pages/CampaignsListPage'));
@@ -126,8 +127,8 @@ const ROUTES = [
   // Reviews & support
   { path: '/reviews', element: <ReviewsPage /> },
   { path: '/reviews/qa', element: <QaPage /> },
-  { path: '/support/tickets', element: <TicketsPage /> },
-  { path: '/support/tickets/:id', element: <TicketDetailPage /> },
+  { path: '/support/chat', element: <LiveChatPage /> },
+  { path: '/admin/approvals', element: <ApprovalsPage /> },
 
   // Settings & staff
   { path: '/admin/settings', element: <PlatformSettingsPage /> },
@@ -163,7 +164,7 @@ export const router = createBrowserRouter([
           {
             element: <AppLayout />,
             children: [
-              ...ROUTES,
+              { element: <RequireNavAccess />, children: ROUTES },
               ...(SHOW_DEV_TOOLS
                 ? [{ path: '/dev/components', element: <ComponentGalleryPage /> }]
                 : []),

@@ -29,6 +29,19 @@ test('role rules: key slug, permission union and catalog validation', async () =
   assert.ok(normalizePermissions(['*']).length > 300 && !normalizePermissions(['*']).includes('*'));
 });
 
+test('a limited role needs its limits filled in', async () => {
+  const { missingScopeFields } = await import('../src/modules/identity/domain/services/accessRules.js');
+  const account = { scopedBy: ['sellers'] };
+  const finance = { scopedBy: ['refundLimit', 'walletAdjustLimit'] };
+  assert.deepEqual(Object.keys(missingScopeFields([account], null)), ['scope.sellers']);
+  assert.deepEqual(Object.keys(missingScopeFields([account], { sellers: [] })), ['scope.sellers'], 'an empty list means no limit');
+  assert.deepEqual(missingScopeFields([account], { sellers: ['s1'] }), {});
+  assert.deepEqual(Object.keys(missingScopeFields([finance], { refundLimit: 500000 })), ['scope.walletAdjustLimit']);
+  assert.deepEqual(missingScopeFields([finance], { refundLimit: 0, walletAdjustLimit: 100000 }), {}, 'zero is a real limit: everything needs approval');
+  assert.deepEqual(Object.keys(missingScopeFields([account, finance], { sellers: ['s1'] })).sort(), ['scope.refundLimit', 'scope.walletAdjustLimit']);
+  assert.deepEqual(missingScopeFields([{ scopedBy: [] }, {}], null), {}, 'an unlimited role asks for nothing');
+});
+
 test('settings schemas accept every default and reject bad or unknown values', async () => {
   const { SETTINGS_SECTIONS } = await import('../src/modules/admin/domain/constants/platformSettings.js');
   const { SECTION_SCHEMAS } = await import('../src/modules/admin/domain/services/settingsRules.js');

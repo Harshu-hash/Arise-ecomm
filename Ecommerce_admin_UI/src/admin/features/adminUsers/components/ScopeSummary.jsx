@@ -8,8 +8,6 @@ export default function ScopeSummary({ scope, scopedBy }) {
   const parts = [];
   if (scope?.categories?.length) parts.push(`${scope.categories.length} categories`);
   if (scope?.sellers?.length) parts.push(`${scope.sellers.length} sellers`);
-  if (scope?.warehouses?.length) parts.push(`${scope.warehouses.length} warehouses`);
-  if (scope?.queues?.length) parts.push(`${scope.queues.length} support queues`);
   if (scope?.refundLimit) parts.push(`refunds up to ${formatINR(scope.refundLimit)}`);
   if (scope?.walletAdjustLimit) parts.push(`wallet up to ${formatINR(scope.walletAdjustLimit)}`);
 

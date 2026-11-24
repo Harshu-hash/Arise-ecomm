@@ -1,3 +1,5 @@
+import { NotFoundError } from '../../../shared/errors/AppError.js';
+import { scopedCustomerIds } from '../../../shared/middleware/scope.js';
 import { Router } from 'express';
 import { z } from 'zod';
 import { ROLES } from '../../../shared/constants/roles.js';
@@ -33,9 +35,19 @@ const listQuery = pageQuery
 export function createAdminCustomersRouter() {
   const router = Router();
   router.use(authenticate, authorize(ROLES.ADMIN));
+  // An admin limited to some sellers sees only customers who bought from them; any other customer answers 404.
+  router.param('id', async (req, _res, next, id) => {
+    try {
+      const customers = await scopedCustomerIds(req);
+      if (customers && !customers.includes(id)) throw new NotFoundError('That customer does not exist.');
+      return next();
+    } catch (error) {
+      return next(error);
+    }
+  });
 
   router.get('/', requirePermission('customers.customer.view'), validate({ query: listQuery }), async (req, res) => {
-    const { data, meta } = await listCustomers(req.query);
+    const { data, meta } = await listCustomers(req.query, { customerIds: await scopedCustomerIds(req) });
     return sendData(res, data, { meta });
   });
   router.get('/:id', requirePermission('customers.customer.view'), validate({ params: idParams }), async (req, res) => {

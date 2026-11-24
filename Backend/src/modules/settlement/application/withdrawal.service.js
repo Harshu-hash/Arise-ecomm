@@ -160,8 +160,8 @@ export async function payWithdrawal(id, { txnNo, utr = '' }, auth) {
 const escapeRegex = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 /** Withdrawals, newest first; for one seller (their panel) or all (the admin queue). */
-export async function listWithdrawals({ sellerId = null, status, q, page = 1, pageSize = 25 }, { admin = false } = {}) {
-  const base = { ...(sellerId ? { sellerId: String(sellerId) } : {}), ...(q ? { $or: [{ number: new RegExp(escapeRegex(q.slice(0, 60)), 'i') }, { sellerName: new RegExp(escapeRegex(q.slice(0, 60)), 'i') }] } : {}) };
+export async function listWithdrawals({ sellerId = null, sellerIds = null, status, q, page = 1, pageSize = 25 }, { admin = false } = {}) {
+  const base = { ...(sellerId ? { sellerId: String(sellerId) } : sellerIds ? { sellerId: { $in: sellerIds } } : {}), ...(q ? { $or: [{ number: new RegExp(escapeRegex(q.slice(0, 60)), 'i') }, { sellerName: new RegExp(escapeRegex(q.slice(0, 60)), 'i') }] } : {}) };
   const wanted = status ? String(status).split(',').filter(Boolean) : [];
   const filter = { ...base, ...(wanted.length ? { status: { $in: wanted } } : {}) };
   const [rows, total, byStatus] = await Promise.all([
@@ -172,8 +172,8 @@ export async function listWithdrawals({ sellerId = null, status, q, page = 1, pa
   return { data: rows.map((row) => toWithdrawalDto(row, { admin })), meta: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)), facets: { status: Object.fromEntries(byStatus.map((entry) => [entry._id, entry.n])) } } };
 }
 
-export async function getWithdrawal(id, { sellerId = null, admin = false } = {}) {
-  const row = await Withdrawal.findOne({ _id: id, ...(sellerId ? { sellerId: String(sellerId) } : {}) });
+export async function getWithdrawal(id, { sellerId = null, sellerIds = null, admin = false } = {}) {
+  const row = await Withdrawal.findOne({ _id: id, ...(sellerId ? { sellerId: String(sellerId) } : sellerIds ? { sellerId: { $in: sellerIds } } : {}) });
   if (!row) throw new NotFoundError('That withdrawal does not exist.');
   return toWithdrawalDto(row, { admin });
 }

@@ -38,8 +38,9 @@ export const toAdminRow = (review) => ({
   updatedAt: review.updatedAt.toISOString(),
 });
 
-export async function listReviewsForAdmin(query) {
-  const match = {};
+/** `sellerIds`: the sellers an admin is limited to (their role scope), or null for all. */
+export async function listReviewsForAdmin(query, { sellerIds = null } = {}) {
+  const match = sellerIds ? { sellerId: { $in: sellerIds } } : {};
   if (query.q) {
     const pattern = new RegExp(escapeRegex(query.q), 'i');
     match.$or = [{ productName: pattern }, { authorName: pattern }, { body: pattern }];

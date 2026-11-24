@@ -8,10 +8,12 @@ import { useSessionStore } from '@core/auth/sessionStore';
  * `handlers` maps an event name to a callback; events are only "something changed" hints, so callbacks
  * should refetch over HTTP. Missed events are not replayed, so every (re)connect also fires `session:ready`.
  * No-op against the mock API, which has no socket server.
+ * Returns a ref to the live socket (null in mock mode), for the few screens that send a hint back (chat typing).
  */
 export default function useRealtime(audience, handlers) {
   const latest = useRef(handlers);
   latest.current = handlers;
+  const socketRef = useRef(null);
 
   useEffect(() => {
     if (IS_MOCK) return undefined;
@@ -21,8 +23,14 @@ export default function useRealtime(audience, handlers) {
       // A function, so each reconnect sends the current (possibly refreshed) access token.
       auth: (done) => done({ token: useSessionStore.getState().accessToken }),
     });
+    socketRef.current = socket;
     const names = [...new Set([...Object.keys(latest.current), 'session:ready'])];
     names.forEach((name) => socket.on(name, (payload) => latest.current[name]?.(payload)));
-    return () => { socket.disconnect(); };
+    return () => {
+      socketRef.current = null;
+      socket.disconnect();
+    };
   }, [audience]);
+
+  return socketRef;
 }

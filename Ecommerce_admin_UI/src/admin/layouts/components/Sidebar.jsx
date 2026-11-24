@@ -2,16 +2,19 @@ import { Menu } from 'antd';
 import { useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { CHROME, LAYOUT } from '@theme/tokens';
+import { useSessionStore } from '@core/auth/sessionStore';
+import { canSeeNavItem } from '@admin/nav/access';
 import { NAV_GROUPS } from '@admin/nav/navigation';
 import { NAV_ICONS } from './navIcons';
 
 /**
- * Sidebar navigation. Every signed-in admin sees the full menu — the panel no
- * longer filters items by permission.
+ * Sidebar navigation. An item shows only when the admin holds a permission on one of the
+ * resources it declares (nav/access.js); a group with nothing visible disappears.
  */
 export default function Sidebar({ collapsed, onNavigate }) {
   const navigate = useNavigate();
   const { pathname } = useLocation();
+  const permissions = useSessionStore((s) => s.permissions);
 
   const { items, openKeys } = useMemo(() => {
     const built = [];
@@ -19,7 +22,7 @@ export default function Sidebar({ collapsed, onNavigate }) {
     let currentSection = null;
 
     for (const group of NAV_GROUPS) {
-      const groupItems = group.items;
+      const groupItems = group.items.filter((item) => canSeeNavItem(item, permissions));
       if (!groupItems.length) continue;
 
       // Emit an uppercase section divider whenever the section changes.
@@ -51,7 +54,7 @@ export default function Sidebar({ collapsed, onNavigate }) {
     }
 
     return { items: built, openKeys: activeGroup ? [activeGroup] : [] };
-  }, [pathname]);
+  }, [pathname, permissions]);
 
   const selected = useMemo(() => {
     // Longest matching path wins, so /orders/cancellations does not also

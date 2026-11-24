@@ -3,7 +3,9 @@ import { z } from 'zod';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { sendCommand } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
-import { authenticate } from '../../../shared/middleware/authenticate.js';
+import { ROLES } from '../../../shared/constants/roles.js';
+import { authenticate, authorize } from '../../../shared/middleware/authenticate.js';
+import { requireAnyPermission } from '../../../shared/middleware/permission.js';
 
 const revealSchema = z.object({
   kind: z.string().min(1).max(40),
@@ -18,9 +20,10 @@ const revealSchema = z.object({
 // who looked at what and when, which is the actual point of a "reveal" control.
 export function createPiiRouter() {
   const router = Router();
-  router.use(authenticate);
+  router.use(authenticate, authorize(ROLES.ADMIN));
 
-  router.post('/reveal', validate({ body: revealSchema }), async (req, res, next) => {
+  // Only an admin who may see personal data can log having revealed it; before this any signed-in user could write audit entries.
+  router.post('/reveal', requireAnyPermission('customers.pii.view', 'sellers.bank.view_full', 'customers.customer.view'), validate({ body: revealSchema }), async (req, res, next) => {
     try {
       const { kind, entityType, entityId, entityLabel } = req.body;
       await recordAudit({

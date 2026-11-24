@@ -1,7 +1,7 @@
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { ROLES } from '../../../shared/constants/roles.js';
-import { ConflictError, NotFoundError } from '../../../shared/errors/AppError.js';
-import { permissionsFromRoles, versionOf } from '../domain/services/accessRules.js';
+import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { missingScopeFields, permissionsFromRoles, versionOf } from '../domain/services/accessRules.js';
 import { Role } from '../infrastructure/persistence/role.model.js';
 import { AuthSession } from '../infrastructure/persistence/session.model.js';
 import { User } from '../infrastructure/persistence/user.model.js';
@@ -125,8 +125,14 @@ export async function getAdminUser(id, actorPermissions) {
   };
 }
 
+function assertScopeFilled(roles, scope) {
+  const missing = missingScopeFields(roles, scope);
+  if (Object.keys(missing).length) throw new ValidationError('Fill in the limits this role needs.', missing);
+}
+
 export async function inviteAdminUser({ name, email, roleIds, scope }, actor) {
   const roles = await findRolesForAssignment(roleIds);
+  assertScopeFilled(roles, scope);
   const result = await issueInvite({
     role: ROLES.ADMIN,
     email,
@@ -161,6 +167,9 @@ export async function updateAdminUser(id, { version, ...input }, actor) {
 
   const patch = {};
   for (const field of ['name', 'scope', 'defaultLanding']) if (input[field] !== undefined) patch[field] = input[field];
+
+  // changing the roles or the scope must leave every limit the (new) roles need filled in
+  if (input.scope !== undefined || input.roleIds) assertScopeFilled(await findRolesForAssignment(input.roleIds ?? before.roleIds ?? []), input.scope !== undefined ? input.scope : before.scope);
 
   const currentRoleIds = [...(before.roleIds ?? [])].sort().join();
   if (input.roleIds && [...input.roleIds].sort().join() !== currentRoleIds) {

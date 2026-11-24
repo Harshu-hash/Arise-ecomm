@@ -85,7 +85,8 @@ function listFilter({ q, status, paymentMethod, sellerId, state, city, pincode, 
 const csv = (value) => (value ? String(value).split(',').filter(Boolean) : []);
 
 /** Orders, newest first by default, with per-status counts for the tabs (over everything the filters match except the tab). */
-export async function listAdminOrders(query) {
+/** `sellerIds`: the sellers an admin is limited to (their role scope), or null for all. An order shows if any of its parcels is theirs. */
+export async function listAdminOrders(query, { sellerIds = null } = {}) {
   const page = Math.max(1, Number(query.page ?? 1));
   const pageSize = Math.min(200, Math.max(1, Number(query.pageSize ?? 25)));
   const sort = query.sort || '-placedAt';
@@ -94,12 +95,13 @@ export async function listAdminOrders(query) {
   const now = Date.now();
   const sla = await getSettingsSection('orders');
   const input = { ...query, status: csv(query.status), paymentMethod: csv(query.paymentMethod) };
-  const filter = listFilter(input, sla, now);
+  const scoped = (filter) => (sellerIds ? { $and: [filter, { 'subOrders.sellerId': { $in: sellerIds } }] } : filter);
+  const filter = scoped(listFilter(input, sla, now));
 
   const [rows, total, facetRows] = await Promise.all([
     Order.find(filter).sort({ [field]: direction, _id: direction }).skip((page - 1) * pageSize).limit(pageSize).lean(),
     Order.countDocuments(filter),
-    Order.aggregate([{ $match: listFilter({ ...input, status: [] }, sla, now) }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
+    Order.aggregate([{ $match: scoped(listFilter({ ...input, status: [] }, sla, now)) }, { $group: { _id: '$status', n: { $sum: 1 } } }]),
   ]);
   const shipments = await getShipmentsBySubOrder(rows.flatMap((order) => order.subOrders.map((sub) => sub._id)));
   const withReturn = new Set((await Return.find({ orderId: { $in: rows.map((order) => order._id) } }, 'orderId').lean()).map((row) => String(row.orderId)));

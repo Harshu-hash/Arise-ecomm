@@ -7,13 +7,17 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import { useGetSupportChannelsQuery } from '@features/support';
+import { useGetChatQuery, useGetSupportChannelsQuery } from '@features/support';
+import { selectIsAuthenticated } from '@features/auth';
+import { useSelector } from 'react-redux';
 
 const channelIcons = { PHONE: 'phone', EMAIL: 'mail', CHAT: 'message-circle', URL: 'external-link' };
 
 const ContactUsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { data, error, isLoading, refetch } = useGetSupportChannelsQuery();
+  const authenticated = useSelector(selectIsAuthenticated);
+  const unread = useGetChatQuery(undefined, { skip: !authenticated }).data?.unreadCount || 0;
 
   if (isLoading) return <FullScreenLoader message="Loading support options..." />;
   if (error || !data) return <ErrorState message={error?.message} onRetry={refetch} />;
@@ -40,12 +44,17 @@ const ContactUsScreen = ({ navigation }) => {
             key={channel.id}
             activeOpacity={0.8}
             style={styles.optionRow}
-            onPress={() => Linking.openURL(channel.href)}>
+            onPress={() =>
+              channel.type === 'CHAT' ? navigation.navigate('Chat') : Linking.openURL(channel.href)
+            }>
             <View style={styles.optionIconBox}>
               <Icon name={channelIcons[channel.type]} size={19} color={COLORS.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.optionTitle}>{channel.label}</Text>
+              <Text style={styles.optionTitle}>
+                {channel.label}
+                {channel.type === 'CHAT' && unread > 0 ? `  (${unread} new)` : ''}
+              </Text>
               <Text style={styles.optionSubtitle}>{channel.description}</Text>
             </View>
             <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
@@ -55,29 +64,14 @@ const ContactUsScreen = ({ navigation }) => {
         <TouchableOpacity
           activeOpacity={0.8}
           style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('RaiseTicket', {})}
+          onPress={() => navigation && navigation.navigate('ChatHistory')}
         >
           <View style={styles.optionIconBox}>
-            <Icon name="file-text" size={19} color={COLORS.primary} />
+            <Icon name="clock" size={19} color={COLORS.primary} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>Raise a Ticket</Text>
-            <Text style={styles.optionSubtitle}>For detailed issues that need investigation</Text>
-          </View>
-          <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          activeOpacity={0.8}
-          style={styles.optionRow}
-          onPress={() => navigation && navigation.navigate('MyTickets')}
-        >
-          <View style={styles.optionIconBox}>
-            <Icon name="clipboard" size={19} color={COLORS.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.optionTitle}>My Support Tickets</Text>
-            <Text style={styles.optionSubtitle}>Track existing complaints and requests</Text>
+            <Text style={styles.optionTitle}>Past chats</Text>
+            <Text style={styles.optionSubtitle}>Read your earlier conversations with us</Text>
           </View>
           <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
         </TouchableOpacity>

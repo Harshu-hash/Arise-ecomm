@@ -13,7 +13,7 @@ const notificationSchema = new mongoose.Schema(
     body: { type: String, required: true, maxlength: 500 },
     deduplicationKey: { type: String, required: true, immutable: true },
     target: {
-      type: { type: String, enum: ['NONE', 'PRODUCT', 'ORDER', 'SHIPMENT', 'TICKET'], default: 'NONE' },
+      type: { type: String, enum: ['NONE', 'PRODUCT', 'ORDER', 'SHIPMENT', 'TICKET', 'CHAT'], default: 'NONE' },
       entityId: { type: String, default: null },
     },
     severity: { type: String, enum: ['info', 'warning', 'error'], default: 'info' }, // seller bell
