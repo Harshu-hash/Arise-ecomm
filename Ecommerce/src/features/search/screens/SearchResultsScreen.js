@@ -316,8 +316,9 @@ const SearchResultsScreen = ({ navigation, route }) => {
       {/* Results */}
       <Text style={styles.resultCount}>
         {data?.total ?? results.length} result{(data?.total ?? results.length) !== 1 ? 's' : ''}
-        {query ? ` for "${query}"` : ''}
+        {query ? ` for "${data?.correctedQuery ?? query}"` : ''}
       </Text>
+      {data?.correctedQuery ? <Text style={styles.emptySubtitle}>{`Showing results for "${data.correctedQuery}" instead of "${query}"`}</Text> : null}
 
       {isLoading && results.length === 0 ? (
         <View style={styles.loadingWrap}>
@@ -334,6 +335,15 @@ const SearchResultsScreen = ({ navigation, route }) => {
               ? 'Try removing some filters to see more results.'
               : `We couldn't find any matches for "${query}". Try a different search.`}
           </Text>
+          {activeFilterCount === 0 && data?.tryInstead?.length ? (
+            <View style={styles.tryRow}>
+              {data.tryInstead.map(text => (
+                <TouchableOpacity key={text} activeOpacity={0.85} style={styles.tryChip} onPress={() => navigation?.push('SearchResults', { query: text })}>
+                  <Text style={styles.clearFiltersText}>{text}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
           {activeFilterCount > 0 ? (
             <TouchableOpacity
               activeOpacity={0.85}
@@ -712,6 +722,8 @@ const styles = StyleSheet.create({
     marginTop: SPACING.xs,
     lineHeight: 18,
   },
+  tryRow: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: SPACING.s, marginTop: SPACING.m },
+  tryChip: { borderWidth: 1, borderColor: COLORS.primary, borderRadius: RADIUS.s, paddingHorizontal: SPACING.m, paddingVertical: SPACING.xs + 2 },
   clearFiltersBtn: {
     marginTop: SPACING.l,
     borderWidth: 1,

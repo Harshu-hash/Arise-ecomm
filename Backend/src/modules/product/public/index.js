@@ -19,3 +19,7 @@ export {
   releaseStock,
   returnStock,
 } from '../application/stockReservation.service.js';
+
+// Read access for the analytics module (it aggregates; it never writes these).
+export { Offer } from '../infrastructure/persistence/offer.model.js';
+export { Product } from '../infrastructure/persistence/product.model.js';

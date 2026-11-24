@@ -16,7 +16,6 @@ import useListQuery from '@ui/hooks/useListQuery';
 import useUrlTableState from '@ui/hooks/useUrlTableState';
 import { financeApi, financeKeys } from '../api/finance.api';
 import useExport from '../useExport';
-import RefundModeModal from '../components/RefundModeModal';
 
 const MODE_LABEL = {
   ORIGINAL: 'Back to source',
@@ -36,7 +35,6 @@ export default function RefundsPage() {
   const state = useUrlTableState({ defaultSort: '-initiatedAt' });
   const runExport = useExport('refunds');
   const [retrying, setRetrying] = useState(null);
-  const [switching, setSwitching] = useState(null);
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: financeKeys.refunds({ ...state.queryParams, tab: state.tab }),
@@ -65,11 +63,11 @@ export default function RefundsPage() {
     },
     {
       key: 'orderId', title: 'Order', dataIndex: 'orderId', priority: 1,
-      render: (v) => (
+      render: (v) => v ? (
         <Link to={`/orders/${v}`}>
           <Typography.Text className="mono" style={{ fontSize: 12 }}>{v}</Typography.Text>
         </Link>
-      ),
+      ) : <Typography.Text type="secondary">—</Typography.Text>,
     },
     { key: 'customerName', title: 'Customer', dataIndex: 'customerName', priority: 2 },
     {
@@ -119,11 +117,6 @@ export default function RefundsPage() {
               <Button size="small" onClick={() => setRetrying(row)}>Retry</Button>
             </>
           ) : null}
-          {!['COMPLETED'].includes(row.status) ? (
-            <>
-              <Button size="small" type="text" onClick={() => setSwitching(row)}>Change mode</Button>
-            </>
-          ) : null}
         </Space>
       ),
     },
@@ -157,10 +150,6 @@ export default function RefundsPage() {
               value: v, label: v.toLowerCase(),
             })),
           },
-          {
-            key: 'mode', label: 'Paid to', kind: 'select', width: 170,
-            options: Object.entries(MODE_LABEL).map(([value, label]) => ({ value, label })),
-          },
           { key: 'slaBreached', label: 'Past promise', kind: 'boolean' },
           { key: 'initiatedAt', label: 'Initiated', kind: 'dateRange' },
         ]}
@@ -180,8 +169,6 @@ export default function RefundsPage() {
         tabs={[
           { key: 'all', label: 'All' },
           { key: 'FAILED', label: 'Failed' },
-          { key: 'PENDING_DETAILS', label: 'Awaiting details' },
-          { key: 'INITIATED', label: 'Initiated' },
           { key: 'PROCESSING', label: 'Processing' },
           { key: 'COMPLETED', label: 'Completed' },
         ]}
@@ -222,15 +209,6 @@ export default function RefundsPage() {
         reasonLabel="Note"
         showNote={false}
         confirmLabel="Retry refund"
-      />
-
-      <RefundModeModal
-        refund={switching}
-        onClose={() => setSwitching(null)}
-        onDone={() => {
-          invalidate();
-          setSwitching(null);
-        }}
       />
     </Flex>
   );

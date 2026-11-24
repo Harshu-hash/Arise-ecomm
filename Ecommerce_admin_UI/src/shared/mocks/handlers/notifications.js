@@ -18,6 +18,23 @@ export const notificationHandlers = [
     return ok([...db.pushBroadcasts].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)));
   }),
 
+  mswHttp.get(`${BASE}/push-broadcasts/audience`, async ({ request }) => {
+    const g = await guard(request, new URL(request.url), 'notifications.broadcast.view');
+    if (g.response) return g.response;
+    return ok({ customers: 48210, customersWithPush: 31500, sellers: 3180, pushConfigured: false });
+  }),
+
+  mswHttp.post(`${BASE}/push-broadcasts/:broadcastId/cancel`, async ({ request, params }) => {
+    const g = await guard(request, new URL(request.url), 'notifications.broadcast.send');
+    if (g.response) return g.response;
+    const broadcast = findById('pushBroadcasts', params.broadcastId);
+    if (!broadcast) return notFound('Broadcast not found.');
+    if (broadcast.status !== 'SCHEDULED') return validationFailed({ status: 'Only a broadcast that has not started yet can be cancelled.' });
+    update('pushBroadcasts', broadcast.id, { status: 'CANCELLED' });
+    scheduleSave();
+    return ok(findById('pushBroadcasts', broadcast.id));
+  }),
+
   mswHttp.post(`${BASE}/push-broadcasts`, async ({ request }) => {
     const g = await guard(request, new URL(request.url), 'notifications.broadcast.send');
     if (g.response) return g.response;
@@ -37,7 +54,9 @@ export const notificationHandlers = [
       createdAt: now,
       createdByName: g.user.name,
       sentAt: body.scheduleAt ? null : now,
-      estimatedRecipients: body.estimatedRecipients ?? 0,
+      inboxCount: body.scheduleAt ? 0 : 1200,
+      pushSent: body.scheduleAt ? 0 : 900,
+      pushFailed: 0,
     });
     writeAudit({ actor: g.user, action: 'notification.broadcast_send', entityType: 'pushBroadcast', entityId: broadcast.id, entityLabel: broadcast.title });
     scheduleSave();

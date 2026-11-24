@@ -1,4 +1,4 @@
-import { Col, Flex, Row, Table, Typography } from 'antd';
+import { Alert, Col, Flex, Row, Table, Typography } from 'antd';
 import { formatINRCompact, formatNumber, formatPercent } from '@core/utils/money';
 import { BarListChart, ChartCard, DonutChart, StatTileRow as Tiles } from '@ui/charts';
 
@@ -74,7 +74,7 @@ export const DOMAIN_RENDERERS = {
         items={[
           { label: 'Live listings', value: t.liveListings },
           { label: 'In QC queue', value: t.qcQueueSize },
-          { label: 'High-priority QC', value: t.qcHighPriority },
+          { label: 'QC waiting 2+ days', value: t.qcHighPriority },
           { label: 'Out of stock', value: t.outOfStockPct, format: 'percent' },
         ]}
       />
@@ -90,7 +90,7 @@ export const DOMAIN_RENDERERS = {
         loading={loading}
         items={[
           { label: 'Active sellers', value: t.activeSellers },
-          { label: 'Avg rating', value: t.avgRating, format: 'number' },
+          ...(t.avgRating == null ? [] : [{ label: 'Avg rating', value: t.avgRating, format: 'number' }]),
           { label: 'Avg cancellation', value: t.avgCancellationPct, format: 'percent' },
         ]}
       />
@@ -202,7 +202,7 @@ export const DOMAIN_RENDERERS = {
           { label: 'Coupon redemptions', value: t.couponRedemptions },
           { label: 'Discount given', valuePaise: t.couponDiscountGivenPaise, format: 'money' },
           { label: 'Coupon-driven GMV', valuePaise: t.couponNetGmvPaise, format: 'money' },
-          { label: 'Flash sale GMV', valuePaise: t.flashSaleGmvPaise, format: 'money' },
+          ...(t.flashSaleGmvPaise == null ? [] : [{ label: 'Flash sale GMV', valuePaise: t.flashSaleGmvPaise, format: 'money' }]),
         ]}
       />
       <Row gutter={[12, 12]}>
@@ -233,6 +233,7 @@ export const DOMAIN_RENDERERS = {
 
   support: (t, data, loading) => (
     <Flex vertical gap={16}>
+      {data?.notBuilt && <Alert showIcon type="info" message="The support desk is not set up yet" description="Ticket numbers will appear here once support tickets are being recorded." />}
       <Tiles
         loading={loading}
         items={[

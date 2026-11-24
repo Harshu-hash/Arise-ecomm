@@ -8,6 +8,7 @@ import { enqueueWebhookReceipt } from '../infrastructure/queue/webhook.queue.js'
 import { RECEIPT_STATUS, WebhookReceipt } from '../infrastructure/webhooks/webhookReceipt.model.js';
 import { processDueAccountDeletions } from '../modules/customer/application/privacy.service.js';
 import { autoApproveOverdueReturns, autoPassOverdueQc, chasePickups } from '../modules/order/public/index.js';
+import { dispatchDueBroadcasts } from '../modules/notification/public/index.js';
 import { expireStaleReservations } from '../modules/product/public/index.js';
 import { rebuildRatingSummaries, sendReviewReminders } from '../modules/review/public/index.js';
 import { accrueMissing, releaseDue } from '../modules/settlement/public/index.js';
@@ -76,6 +77,11 @@ async function remindToReview() {
   if (sent) logger.info({ sent }, 'Sent rate-your-purchase reminders');
 }
 
+async function sendDueBroadcasts() {
+  const sent = await dispatchDueBroadcasts();
+  if (sent) logger.info({ sent }, 'Sent scheduled push broadcasts');
+}
+
 async function releaseWalletMoney() {
   const [credited, released] = [await accrueMissing(), await releaseDue()];
   if (credited || released) logger.info({ credited, released }, 'Credited missed deliveries and released settled money to seller wallets');
@@ -91,5 +97,6 @@ export async function maintenanceJobProcessor(job) {
   if (job.name === MAINTENANCE_JOBS.ACCOUNT_DELETION) return processDueAccountDeletions();
   if (job.name === MAINTENANCE_JOBS.REVIEW_REMINDERS) return remindToReview();
   if (job.name === MAINTENANCE_JOBS.RATING_REBUILD) return rebuildRatings();
+  if (job.name === MAINTENANCE_JOBS.BROADCAST_DISPATCH) return sendDueBroadcasts();
   throw new Error(`Unknown maintenance job ${job.name}`);
 }

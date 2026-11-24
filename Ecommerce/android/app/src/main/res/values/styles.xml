@@ -4,6 +4,8 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- The colour behind the animated splash, so launch never flashes white before it starts. -->
+        <item name="android:windowBackground">@color/splashBackground</item>
     </style>
 
 </resources>

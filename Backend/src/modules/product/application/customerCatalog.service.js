@@ -14,7 +14,7 @@ import { Product } from '../infrastructure/persistence/product.model.js';
 import { RecentView } from '../infrastructure/persistence/recentView.model.js';
 import { Variant } from '../infrastructure/persistence/variant.model.js';
 import { availableUnits } from '../domain/services/stockRules.js';
-import { cardMatches, rankByPopularity, rankByRelevance, tokenize } from '../domain/services/searchRules.js';
+import { cardMatchesLoosely, correctTokens, rankByPopularity, rankByRelevance, tokenize, vocabularyOf, withSynonyms } from '../domain/services/searchRules.js';
 
 // Customer read model. A product is shown only once an admin approved it (Product LIVE),
 // it has at least one LIVE offer, an image, and its category is visible to customers.
@@ -128,15 +128,26 @@ export async function searchCustomerProducts({ q, categoryId, brandId, categorie
   if (!visible) return { items: [], total: 0, nextCursor: null, facets, sortOptions: SORT_OPTIONS };
 
   const filter = { categoryId: { $in: visible }, ...(brandId ? { brandId } : {}) };
-  const tokens = tokenize(q);
-  // Every word must appear in the title, brand or category, in any order ("nike shoes" finds "Nike Revolution Running Shoes").
-  if (tokens.length) {
-    filter.$and = tokens.map((token) => {
-      const pattern = new RegExp(escapeRegex(token), 'i');
-      return { $or: [{ title: pattern }, { brandName: pattern }, { categoryPath: pattern }] };
-    });
+  let tokens = tokenize(q);
+  const find = (words) => liveCards({
+    ...filter,
+    // Every word (or a synonym) must appear in the title, brand, category or description, in any order ("nike shoes" finds "Nike Revolution Running Shoes").
+    ...(words.length ? { $and: words.map((word) => {
+      const pattern = new RegExp(withSynonyms(word).map(escapeRegex).join('|'), 'i');
+      return { $or: [{ title: pattern }, { brandName: pattern }, { categoryPath: pattern }, { description: pattern }] };
+    }) } : {}),
+  });
+  let matched = await find(tokens);
+  // Nothing sells under the words as typed: try the nearest spelling on the shelf ("addidas" -> "adidas").
+  let correctedQuery = null;
+  const fixed = !matched.length && tokens.length ? correctTokens(tokens, vocabularyOf(await catalogSnapshot())) : null;
+  if (fixed) {
+    matched = await find(fixed);
+    if (matched.length) {
+      correctedQuery = fixed.join(' ');
+      tokens = fixed;
+    }
   }
-  const matched = await liveCards(filter);
 
   const range = PRICE_RANGES.find((item) => item.id === priceRangeId);
   let items = matched.filter((card) => (
@@ -156,6 +167,9 @@ export async function searchCustomerProducts({ q, categoryId, brandId, categorie
     nextCursor: cursor + limit < items.length ? String(cursor + limit) : null,
     facets: { ...facets, categories: distinct('category'), brands: distinct('brand') },
     sortOptions: SORT_OPTIONS,
+    correctedQuery,
+    // A search that finds nothing offers real places to go instead.
+    tryInstead: matched.length ? [] : await getCatalogHighlights(6),
   };
 }
 
@@ -181,6 +195,19 @@ const attributeValues = (variants, pattern) => [...new Set(
     .filter(([code]) => pattern.test(code))
     .map(([, value]) => String(value))),
 )];
+
+// What else a customer picks between variants besides colour and size ("8/128" vs "8/256", storage, pack of...): one group per
+// variant-defining attribute that has more than one value among the sellable variants, in the order they were listed.
+export const variantOptions = (variants, nameByCode) => {
+  const values = new Map();
+  for (const variant of variants) {
+    for (const [code, value] of Object.entries(variant.attributes)) {
+      if (/colou?r|size/i.test(code) || !value) continue;
+      values.set(code, [...new Set([...(values.get(code) ?? []), value])]);
+    }
+  }
+  return [...values].filter(([, list]) => list.length > 1).map(([code, list]) => ({ code, name: nameByCode.get(code) ?? code, values: list }));
+};
 
 const toText = (value) => (Array.isArray(value) ? value.join(', ') : String(value));
 
@@ -229,6 +256,7 @@ export async function getCustomerProduct(productId) {
       label: variant.label,
       color: attributeValues([variant], /colou?r/i)[0] ?? null,
       size: attributeValues([variant], /size/i)[0] ?? null,
+      attributes: Object.fromEntries(Object.entries(variant.attributes ?? {}).map(([code, value]) => [code, toText(value)])),
       pricePaise: best.sellingPricePaise,
       mrpPaise: Math.max(best.mrpPaise, best.sellingPricePaise, 1),
       campaign: best.campaign ?? null,
@@ -243,6 +271,7 @@ export async function getCustomerProduct(productId) {
     reviewCount: summary?.ratingCount ?? 0, // every rating comes with a written review for now
     color: sellable.find((variant) => variant.color)?.color ?? '',
     sizes: [...new Set(sellable.map((v) => v.size).filter(Boolean))],
+    options: variantOptions(sellable, nameByCode),
     variants: sellable,
     description: product.description || null,
     fit: product.fit,
@@ -376,7 +405,7 @@ const countBy = (cards, pick) => {
 export async function suggestFromCatalog(q) {
   const tokens = tokenize(q);
   if (!tokens.length) return { suggestions: [], related: [] };
-  const matched = rankByRelevance((await catalogSnapshot()).filter((card) => cardMatches(card, tokens)), tokens);
+  const matched = rankByRelevance((await catalogSnapshot()).filter((card) => cardMatchesLoosely(card, tokens)), tokens);
   if (!matched.length) return { suggestions: [], related: [] };
 
   const products = matched.slice(0, SUGGESTED_PRODUCTS).map((card) => ({

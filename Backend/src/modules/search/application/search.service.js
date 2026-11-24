@@ -2,7 +2,7 @@ import { logger } from '../../../config/logger.js';
 import { ttlMemo } from '../../../shared/utils/ttlMemo.js';
 import { getCatalogHighlights, suggestFromCatalog } from '../../product/public/index.js';
 import { cleanQuery } from '../domain/services/searchQueryRules.js';
-import { SearchHistory, SearchQueryStat } from '../infrastructure/persistence/search.models.js';
+import { SearchHistory, SearchQuerySeen, SearchQueryStat } from '../infrastructure/persistence/search.models.js';
 
 const DAY_MS = 86_400_000;
 const TRENDING_DAYS = 7;
@@ -13,12 +13,17 @@ const RECENT_SHOWN = 8;
 
 const dayOf = (date) => date.toISOString().slice(0, 10);
 
-/** Counts a search that found something toward trending. Best effort: never slows or fails the search itself. */
-export async function recordSearch(rawQuery, total) {
+/** Counts a search that found something toward trending, once per searcher (`who`: customer id or address) per query per day. Best effort: never slows or fails the search itself. */
+export async function recordSearch(rawQuery, total, who) {
   const query = cleanQuery(rawQuery);
   if (!query || !(total > 0)) return;
   const now = new Date();
   try {
+    if (who) {
+      const slot = `${who}|${query.key}|${dayOf(now)}`;
+      if (await SearchQuerySeen.exists({ slot })) return;
+      await SearchQuerySeen.updateOne({ slot }, { $setOnInsert: { expireAt: new Date(now.getTime() + DAY_MS) } }, { upsert: true });
+    }
     await SearchQueryStat.updateOne(
       { key: query.key, day: dayOf(now) },
       { $inc: { count: 1 }, $setOnInsert: { text: query.text, expireAt: new Date(now.getTime() + 14 * DAY_MS) } },

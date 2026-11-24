@@ -1,4 +1,5 @@
 import { baseApi } from '@core/api/baseApi';
+import { safeIdempotencyKey } from '@core/api/idempotency';
 import { PAYMENT_ENDPOINTS } from './payment.endpoints';
 import {
   mapPayment,
@@ -14,7 +15,7 @@ export const paymentApi = baseApi.injectEndpoints({
         url: PAYMENT_ENDPOINTS.intent(sessionId),
         method: 'POST',
         data: { method },
-        headers: { 'Idempotency-Key': idempotencyKey },
+        headers: { 'Idempotency-Key': safeIdempotencyKey(idempotencyKey) },
       }),
       transformResponse: mapPayment,
     }),
@@ -36,7 +37,7 @@ export const paymentApi = baseApi.injectEndpoints({
         url: PAYMENT_ENDPOINTS.orders,
         method: 'POST',
         data: { checkoutSessionId, paymentId },
-        headers: { 'Idempotency-Key': idempotencyKey },
+        headers: { 'Idempotency-Key': safeIdempotencyKey(idempotencyKey) },
       }),
       transformResponse: mapPlacedOrder,
       invalidatesTags: [
@@ -54,7 +55,7 @@ export const paymentApi = baseApi.injectEndpoints({
         url: PAYMENT_ENDPOINTS.setupSession,
         method: 'POST',
         data: { returnUrl },
-        headers: { 'Idempotency-Key': idempotencyKey },
+        headers: { 'Idempotency-Key': safeIdempotencyKey(idempotencyKey) },
       }),
       transformResponse: mapPaymentMethodSetup,
     }),

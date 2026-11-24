@@ -7,12 +7,10 @@ import DateText from '@ui/components/DateText';
 import PageHeader from '@ui/components/PageHeader';
 import { notificationKeys, notificationsApi } from '../api/notifications.api';
 
-const AUDIENCES = [
-  { label: 'Customers', value: 'CUSTOMERS', count: 48210 },
-  { label: 'Sellers', value: 'SELLERS', count: 3180 },
-  { label: 'Admin staff', value: 'ADMINS', count: 46 },
-];
-const PLATFORMS = [{ label: 'Android', value: 'ANDROID' }, { label: 'iOS', value: 'IOS' }, { label: 'Web', value: 'WEB' }];
+// Customers and sellers get the message in their notification list; customers with the app on a chosen phone type also get a push.
+const AUDIENCES = [{ label: 'Customers', value: 'CUSTOMERS' }, { label: 'Sellers', value: 'SELLERS' }];
+const PLATFORMS = [{ label: 'Android', value: 'ANDROID' }, { label: 'iOS', value: 'IOS' }];
+const STATUS_COLOR = { SENT: 'green', SCHEDULED: 'blue', SENDING: 'processing', FAILED: 'red', CANCELLED: 'default', EXPIRED: 'orange' };
 
 function PhonePreview({ values }) {
   return (
@@ -40,7 +38,22 @@ export default function PushBroadcastPage() {
   const [scheduleMode, setScheduleMode] = useState('NOW');
   const values = Form.useWatch([], form) ?? {};
   const history = useQuery({ queryKey: notificationKeys.broadcasts, queryFn: notificationsApi.broadcasts });
-  const estimatedRecipients = useMemo(() => (values.audiences ?? []).reduce((sum, key) => sum + (AUDIENCES.find((item) => item.value === key)?.count ?? 0), 0), [values.audiences]);
+  const platforms = values.platforms?.length ? values.platforms : ['ANDROID', 'IOS'];
+  const audience = useQuery({ queryKey: notificationKeys.audience(platforms), queryFn: () => notificationsApi.audience(platforms) });
+  const estimatedRecipients = useMemo(() => {
+    const counts = audience.data;
+    if (!counts) return 0;
+    const picked = values.audiences ?? [];
+    return (picked.includes('CUSTOMERS') ? counts.customers : 0) + (picked.includes('SELLERS') ? counts.sellers : 0);
+  }, [audience.data, values.audiences]);
+  const cancel = useMutation({
+    mutationFn: notificationsApi.cancelBroadcast,
+    onSuccess: () => {
+      message.success('Broadcast cancelled.');
+      queryClient.invalidateQueries({ queryKey: notificationKeys.broadcasts });
+    },
+    onError: (error) => message.error(error?.message ?? 'Could not cancel the broadcast.'),
+  });
   const send = useMutation({
     mutationFn: (payload) => notificationsApi.sendBroadcast(payload),
     onSuccess: (broadcast) => {
@@ -56,13 +69,12 @@ export default function PushBroadcastPage() {
     ...formValues,
     scheduleAt: scheduleMode === 'LATER' ? formValues.scheduleAt?.toISOString() : null,
     expiresAt: formValues.expiresAt?.toISOString() ?? null,
-    estimatedRecipients,
   });
 
   return (
     <Flex vertical gap={16}>
       <PageHeader title="Firebase push broadcasts" breadcrumbs={[{ label: 'Marketing' }, { label: 'Push Notifications' }]} subtitle="Compose, target, preview and schedule Firebase Cloud Messaging broadcasts for every Arise user type." />
-      <Alert showIcon type="info" message="UI preview mode" description="This screen records mock broadcasts only. No Firebase project or production device token is contacted." />
+      {audience.data && !audience.data.pushConfigured && <Alert showIcon type="warning" message="Firebase is not set up on the server" description="Messages will reach the notification lists of customers and sellers, but no phone push is sent until FCM_SERVICE_ACCOUNT_JSON is configured." />}
       <Row gutter={[16, 16]}>
         <Col xs={24} xl={16}>
           <Card title="Create broadcast">
@@ -90,7 +102,7 @@ export default function PushBroadcastPage() {
                 {scheduleMode === 'LATER' && <Col xs={24} md={12}><Form.Item name="scheduleAt" label="Send date and time" rules={[{ required: true }]}><DatePicker showTime style={{ width: '100%' }} disabledDate={(date) => date && date < dayjs().startOf('day')} /></Form.Item></Col>}
                 <Col xs={24} md={12}><Form.Item name="expiresAt" label="Optional expiry"><DatePicker showTime style={{ width: '100%' }} disabledDate={(date) => date && date < dayjs().startOf('day')} /></Form.Item></Col>
               </Row>
-              <Alert style={{ marginBottom: 16 }} type="warning" showIcon message={`Estimated audience: ${estimatedRecipients.toLocaleString('en-IN')} users`} description="Actual delivery depends on notification permission, active Firebase tokens and platform eligibility." />
+              <Alert style={{ marginBottom: 16 }} type="warning" showIcon message={`Notification list: ${estimatedRecipients.toLocaleString('en-IN')} people`} description={`${(audience.data?.customersWithPush ?? 0).toLocaleString('en-IN')} customers also have the app on the chosen platforms and can get a phone push (unless they turned offers off). Sellers see it in their panel bell.`} />
               <Flex justify="flex-end"><Button htmlType="submit" type="primary" size="large" icon={scheduleMode === 'LATER' ? <ClockCircleOutlined /> : <SendOutlined />} loading={send.isPending}>{scheduleMode === 'LATER' ? 'Schedule broadcast' : 'Send broadcast'}</Button></Flex>
             </Form>
           </Card>
@@ -98,7 +110,7 @@ export default function PushBroadcastPage() {
         <Col xs={24} xl={8}>
           <PhonePreview values={values} />
           <Card title="Delivery summary" size="small" style={{ marginTop: 16 }}>
-            <Statistic title="Estimated recipients" value={estimatedRecipients} />
+            <Statistic title="Notification list reach" value={estimatedRecipients} loading={audience.isLoading} />
             <Descriptions size="small" column={1} style={{ marginTop: 12 }} items={[
               { key: 'audience', label: 'Audience', children: (values.audiences ?? []).join(', ') || 'Not selected' },
               { key: 'platforms', label: 'Platforms', children: (values.platforms ?? []).join(', ') || 'Not selected' },
@@ -111,9 +123,10 @@ export default function PushBroadcastPage() {
         <Table rowKey="id" loading={history.isLoading} dataSource={history.data ?? []} pagination={{ pageSize: 8 }} columns={[
           { title: 'Campaign', dataIndex: 'campaignName', render: (value, row) => <div><Typography.Text strong>{value}</Typography.Text><div><Typography.Text type="secondary">{row.title}</Typography.Text></div></div> },
           { title: 'Audience', dataIndex: 'audiences', render: (items = []) => <Space size={[0, 4]} wrap>{items.map((item) => <Tag key={item}>{item}</Tag>)}</Space> },
-          { title: 'Reach', dataIndex: 'estimatedRecipients', render: (value) => Number(value ?? 0).toLocaleString('en-IN') },
-          { title: 'Status', dataIndex: 'status', render: (value) => <Tag color={value === 'SENT' ? 'green' : 'blue'}>{value}</Tag> },
+          { title: 'Reach', dataIndex: 'inboxCount', render: (value, row) => <div>{Number(value ?? 0).toLocaleString('en-IN')}<div><Typography.Text type="secondary">{`${Number(row.pushSent ?? 0).toLocaleString('en-IN')} pushed${row.pushFailed ? `, ${row.pushFailed} failed` : ''}`}</Typography.Text></div></div> },
+          { title: 'Status', dataIndex: 'status', render: (value, row) => <div><Tag color={STATUS_COLOR[value]}>{value}</Tag>{value === 'SCHEDULED' && row.scheduleAt && <div><DateText value={row.scheduleAt} withTime /></div>}{row.failureReason && <div><Typography.Text type="danger">{row.failureReason}</Typography.Text></div>}</div> },
           { title: 'Created', dataIndex: 'createdAt', render: (value) => <DateText value={value} withTime /> },
+          { title: '', key: 'actions', render: (_, row) => row.status === 'SCHEDULED' && <Button size="small" danger loading={cancel.isPending && cancel.variables === row.id} onClick={() => cancel.mutate(row.id)}>Cancel</Button> },
         ]} />
       </Card>
     </Flex>

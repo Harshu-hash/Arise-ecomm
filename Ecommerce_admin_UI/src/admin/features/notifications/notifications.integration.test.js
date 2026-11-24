@@ -31,10 +31,13 @@ describe('push broadcasts', () => {
     const response = await call('/push-broadcasts', {
       method: 'POST',
       token,
-      body: { title: 'Sale is live', message: 'Open Arise to shop now.', campaignName: 'Sale launch', audiences: ['CUSTOMERS', 'SELLERS'], platforms: ['ANDROID', 'WEB'], estimatedRecipients: 1200 },
+      body: { title: 'Sale is live', message: 'Open Arise to shop now.', campaignName: 'Sale launch', audiences: ['CUSTOMERS', 'SELLERS'], platforms: ['ANDROID', 'IOS'] },
     });
     expect(response.status).toBe(201);
     expect(response.json.data.status).toBe('SENT');
     expect(db.pushBroadcasts).toHaveLength(1);
+    expect((await call('/push-broadcasts/audience', { token })).json.data.customers).toBeGreaterThan(0);
+    const later = await call('/push-broadcasts', { method: 'POST', token, body: { title: 'T', message: 'M', campaignName: 'C', audiences: ['CUSTOMERS'], platforms: ['IOS'], scheduleAt: '2099-01-01T00:00:00Z' } });
+    expect((await call(`/push-broadcasts/${later.json.data.id}/cancel`, { method: 'POST', token })).json.data.status).toBe('CANCELLED');
   });
 });

@@ -18,7 +18,7 @@ Object.assign(process.env, {
 });
 process.on('exit', () => rmSync(process.env.UPLOAD_DIR, { recursive: true, force: true }));
 
-const { cardMatches, rankByPopularity, rankByRelevance, relevanceScore, tokenize } = await import('../src/modules/product/domain/services/searchRules.js');
+const { cardMatches, cardMatchesLoosely, correctTokens, rankByPopularity, rankByRelevance, relevanceScore, tokenize, vocabularyOf } = await import('../src/modules/product/domain/services/searchRules.js');
 const { cleanQuery } = await import('../src/modules/search/domain/services/searchQueryRules.js');
 
 test('search rules: words match in any order, the best name match ranks first, sold-out items sink', () => {
@@ -38,6 +38,17 @@ test('search rules: words match in any order, the best name match ranks first, s
 
   const sales = new Map([['Nike Revolution Running Shoes', 9]]);
   assert.deepEqual(rankByPopularity([exact, longer], tokenize('shoes'), sales).map((c) => c.name), ['Nike Revolution Running Shoes', 'Running Shoes']);
+});
+
+test('search rules: synonyms match, a misspelt word is corrected to the nearest word on the shelf', () => {
+  const card = { name: 'Nike Running Shoes', brand: 'Nike', category: 'Shoes', rootCategory: 'Fashion', inStock: true };
+  assert.ok(cardMatchesLoosely(card, ['sneakers']));
+  assert.ok(!cardMatchesLoosely(card, ['laptop']));
+  const vocabulary = vocabularyOf([card, { ...card, name: 'Adidas Shoes', brand: 'Adidas' }]);
+  assert.deepEqual(correctTokens(['addidas', 'shoes'], vocabulary), ['adidas', 'shoes']);
+  assert.deepEqual(correctTokens(['nike'], vocabulary), null, 'a real word is left alone');
+  assert.deepEqual(correctTokens(['zzzzzz'], vocabulary), null, 'nothing close, nothing changed');
+  assert.deepEqual(correctTokens(['abc'], vocabulary), null, 'very short words are not guessed');
 });
 
 test('search queries worth remembering: tidy, not too short or long, never contact details', () => {
@@ -70,6 +81,7 @@ test('search over HTTP: any-order words, relevance and popularity, suggestions, 
   const { Variant } = await import('../src/modules/product/infrastructure/persistence/variant.model.js');
   const { Order } = await import('../src/modules/order/public/index.js');
   const { SearchQueryStat, SearchHistory } = await import('../src/modules/search/infrastructure/persistence/search.models.js');
+  const { SearchQuerySeen } = await import('../src/modules/search/infrastructure/persistence/search.models.js');
   await Promise.all([Category.init(), Brand.init(), Product.init(), Offer.init(), Variant.init(), Order.init(), SearchQueryStat.init(), SearchHistory.init()]);
 
   const rootId = new mongoose.Types.ObjectId();
@@ -141,14 +153,29 @@ test('search over HTTP: any-order words, relevance and popularity, suggestions, 
   assert.deepEqual(empty.trending.slice(0, 2), ['Nike', 'Acme']);
   assert.ok(empty.trending.includes('Fashion'));
   await SearchQueryStat.deleteMany({}); // forget the searches the checks above made
+  await SearchQuerySeen.deleteMany({});
   await call('GET', '/search?q=nike%20shoes');
   await call('GET', '/search?q=nike%20shoes&cursor=12'); // paging is not a new search
   await call('GET', '/search?q=nike%20sandals'); // found nothing: not counted
-  await call('GET', '/search?q=Nike%20Shoes');
+  await call('GET', '/search?q=Nike%20Shoes'); // the same searcher again: not counted twice
+  await new Promise((resolve) => setTimeout(resolve, 200));
+  assert.equal((await SearchQueryStat.findOne({ key: 'nike shoes' })).count, 1, 'repeating a search does not move trending');
+  await SearchQuerySeen.deleteMany({}); // a different person searching the same thing
+  await call('GET', '/search?q=nike%20shoes');
   for (let i = 0; i < 20 && !(await SearchQueryStat.countDocuments({ count: { $gte: 2 } })); i += 1) await new Promise((resolve) => setTimeout(resolve, 50));
   const trending = (await call('GET', '/search/suggestions?q=')).body.data.trending;
   assert.equal(trending[0], 'nike shoes');
   assert.ok(!trending.includes('nike sandals'));
+
+  // typos, synonyms, descriptions, and a search that finds nothing
+  const typo = (await call('GET', '/search?q=nkie%20shoes')).body.data;
+  assert.equal(typo.correctedQuery, 'nike shoes');
+  assert.ok(typo.total > 0);
+  assert.equal((await call('GET', '/search?q=nike%20shoes')).body.data.correctedQuery, null);
+  const none = (await call('GET', '/search?q=qqqqxxxx')).body.data;
+  assert.equal(none.total, 0);
+  assert.ok(none.tryInstead.length > 0, 'a miss offers somewhere to go');
+  assert.ok((await call('GET', '/search?q=sneakers')).body.data.total > 0, 'a synonym (sneakers = shoes) finds shoes');
 
   // recent searches: the signed-in customer's own, newest first, repeats move up, capped, never contact details
   const me = signAccessToken({ sub: String(new mongoose.Types.ObjectId()), role: 'CUSTOMER' });

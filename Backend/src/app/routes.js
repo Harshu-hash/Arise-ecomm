@@ -41,6 +41,10 @@ import { createCustomerReviewRouter } from '../modules/review/presentation/revie
 import { createAdminReviewRouter } from '../modules/review/presentation/adminReview.routes.js';
 import { createCustomerQuestionRouter } from '../modules/review/presentation/question.routes.js';
 import { createAdminAnswerRouter, createAdminQuestionRouter } from '../modules/review/presentation/adminQuestion.routes.js';
+import { createAdminRefundRouter } from '../modules/order/presentation/adminRefund.routes.js';
+import { createAdminPaymentRouter } from '../modules/order/presentation/adminPayment.routes.js';
+import { createAdminAnalyticsRouter, createAdminDashboardRouter, createAdminMoneyRouter, createSellerAnalyticsRouter, createSellerDashboardRouter } from '../modules/analytics/presentation/analytics.routes.js';
+import { createAdminBroadcastRouter } from '../modules/notification/presentation/broadcast.routes.js';
 import { createAdminAbuseRouter } from '../modules/review/presentation/adminAbuse.routes.js';
 import { createSellerReviewRouter } from '../modules/review/presentation/sellerReview.routes.js';
 import { createInviteRouter } from '../modules/identity/presentation/invite.routes.js';
@@ -256,9 +260,15 @@ export function createRoutes() {
   root.use('/api/admin/v1/coupons', createCouponRouter());
   root.use('/api/admin/v1/reviews', createAdminReviewRouter());
   root.use('/api/admin/v1/abuse-reports', createAdminAbuseRouter());
+  root.use('/api/admin/v1/push-broadcasts', createAdminBroadcastRouter());
+  root.use('/api/admin/v1/dashboard', createAdminDashboardRouter());
+  root.use('/api/admin/v1/finance', createAdminMoneyRouter());
+  root.use('/api/admin/v1/reports/analytics', createAdminAnalyticsRouter());
   root.use('/api/admin/v1/questions', createAdminQuestionRouter());
   root.use('/api/admin/v1/answers', createAdminAnswerRouter());
   root.use('/api/admin/v1/orders', createAdminOrderRouter());
+  root.use('/api/admin/v1/payments', createAdminPaymentRouter());
+  root.use('/api/admin/v1/refunds', createAdminRefundRouter());
   root.use('/api/admin/v1/returns', createAdminReturnRouter());
   root.use('/api/admin/v1/invoices', createAdminInvoiceRouter());
   root.use('/api/admin/v1/settlements', createAdminSettlementRouter());
@@ -290,6 +300,8 @@ export function createRoutes() {
   root.use('/api/seller/v1/finance', createSellerWalletRouter());
   root.use('/api/seller/v1/settlements', createSellerSettlementRouter());
   root.use('/api/seller/v1/dashboard', createSellerAlertRouter());
+  root.use('/api/seller/v1/dashboard', createSellerDashboardRouter());
+  root.use('/api/seller/v1/analytics', createSellerAnalyticsRouter());
   root.use('/api/seller/v1/banner-ads', createBannerAdSellerRouter());
   root.use('/api/seller/v1/campaigns', createSellerCampaignRouter());
   root.use('/api/seller/v1/coupons', createSellerCouponRouter());

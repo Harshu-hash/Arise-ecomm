@@ -85,6 +85,7 @@ const RAW = {
     AUTHORIZED: ['Authorized', T.progress],
     CAPTURED: ['Captured', T.good],
     FAILED: ['Failed', T.bad],
+    CANCELLED: ['Cancelled', T.idle],
     REFUNDED: ['Refunded', T.idle],
     PARTIALLY_REFUNDED: ['Partially refunded', T.waiting],
   },

@@ -284,11 +284,15 @@ const ProductDetailContent = ({ product, navigation }) => {
   const [selectedColor, setSelectedColor] = useState(product.color);
   const [selectedSize, setSelectedSize] = useState(null);
   // The picked size/colour selects a variant, which owns its own price, stock and photos.
-  const activeVariant = selectedSize
-    ? product.variants.find(
-        v => v.size === selectedSize && (!v.color || !selectedColor || v.color === selectedColor),
-      ) ?? null
-    : null;
+  // `options`: other things to pick between variants (storage, RAM/ROM, pack size...), starting on the first variant's choices.
+  const options = product.options ?? [];
+  const [selectedOptions, setSelectedOptions] = useState(() => ({ ...product.variants[0]?.attributes }));
+  const variantMatches = v =>
+    (!v.size || v.size === selectedSize) &&
+    options.every(o => v.attributes?.[o.code] === selectedOptions[o.code]) &&
+    (!v.color || !selectedColor || v.color === selectedColor);
+  const activeVariant =
+    (selectedSize || (options.length > 0 && product.sizes.length === 0)) ? product.variants.find(variantMatches) ?? null : null;
   // What goes in the cart: the picked variant, or for a product with no sizes the one that matches the colour.
   // The server picks the seller and checks stock; with no variant it takes the product's cheapest.
   const cartVariant =
@@ -363,7 +367,7 @@ const ProductDetailContent = ({ product, navigation }) => {
         .map(v => [v.color, { name: v.color, image: v.images[0] || productImages[0] }]),
     ).values(),
   ];
-  const variantLabel = [selectedColor, selectedSize && `Size ${selectedSize}`].filter(Boolean).join(', ');
+  const variantLabel = [selectedColor, ...options.map(o => selectedOptions[o.code]), selectedSize && `Size ${selectedSize}`].filter(Boolean).join(', ');
 
   const requireSize = () => {
     if (product.sizes.length > 0 && !selectedSize) {
@@ -703,6 +707,28 @@ const ProductDetailContent = ({ product, navigation }) => {
 
           </>
           )}
+
+          {options.map(option => (
+            <View key={option.code}>
+              <View style={[styles.padded, styles.sizeHeader]}>
+                <Text style={styles.sizeTitle}>{`Select ${option.name}`}</Text>
+              </View>
+              <View style={styles.sizeRow}>
+                {option.values.map(value => (
+                  <TouchableOpacity
+                    key={value}
+                    activeOpacity={0.8}
+                    onPress={() => setSelectedOptions(current => ({ ...current, [option.code]: value }))}
+                    style={[styles.sizeBox, selectedOptions[option.code] === value && styles.sizeBoxActive]}
+                  >
+                    <Text style={[styles.sizeText, selectedOptions[option.code] === value && styles.sizeTextActive]}>
+                      {value}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ))}
 
           {product.sizes.length > 0 && (
           <>

@@ -138,6 +138,10 @@ export const customerCheckoutPaymentFixtureAdapter = async config => {
     sessionsByKey.set(key, session);
     return response(config, { data: session }, 201);
   }
+  if (config.url === '/checkout/preview' && config.method === 'post') {
+    const session = createSession(config, config.data || {});
+    return response(config, { data: { totals: session.totals, couponCode: session.couponCode, blockers: [], warnings: [] } });
+  }
   const sessionMatch = config.url?.match(/^\/checkout\/sessions\/([^/]+)$/);
   if (sessionMatch && config.method === 'get') {
     const session = sessions.get(decodeURIComponent(sessionMatch[1]));

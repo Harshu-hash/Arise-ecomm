@@ -156,6 +156,9 @@ test('orders: checkout prices per seller, pays once, places one order, and cance
   assert.equal(session.totals.taxPaise, Math.round(22_400 * 12 / 112) + Math.round(22_400 * 12 / 112)); // GST is inside the price
   assert.equal(session.totals.payablePaise, 44_800 + 12_000 + 500);
   assert.equal(session.lines.length, 2);
+  // the preview the checkout screen shows is the same price the session will charge, and creates nothing
+  const preview = (await call('POST', '/checkout/preview', { source: 'CART' })).body.data;
+  assert.deepEqual(preview.totals, session.totals);
   assert.deepEqual(await stockOf(mug), [5, 0]); // nothing is held until payment starts
 
   // a price change after the customer saw the total: nothing is charged or held, the app is told to review

@@ -9,7 +9,7 @@ import { authenticate, authorize } from '../../../shared/middleware/authenticate
 import { idempotent } from '../../../shared/middleware/idempotency.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { confirmFromClient, getPayment, toPaymentDto } from '../../payment/public/index.js';
-import { createIntent, createSession, getSession, revalidate, setAddress, setPaymentMethod } from '../application/checkout.service.js';
+import { createIntent, createSession, getSession, previewCheckout, revalidate, setAddress, setPaymentMethod } from '../application/checkout.service.js';
 import { getCustomerInvoice, listCustomerInvoices, sendPdf } from '../application/invoice.service.js';
 import { cancelReturn, createReturn, getReturn, getReturnableItems, listReturns } from '../application/return.service.js';
 import { cancelOrder, createOrder, getOrder, getOrderTimeline, getShipmentTracking, listOrders } from '../application/order.service.js';
@@ -66,6 +66,7 @@ export function createCustomerOrderRouter() {
   const customerOnly = [authenticate, authorize(ROLES.CUSTOMER)];
   const me = (req) => req.auth.userId;
 
+  router.post('/checkout/preview', ...customerOnly, validate({ body: sessionBody }), route(async (req, res) => sendData(res, await previewCheckout(me(req), req.body))));
   router.post('/checkout/sessions', ...customerOnly, validate({ body: sessionBody }), idempotent(), route(async (req, res) =>
     sendCommand(res, await createSession(me(req), req.body), { status: 201 })));
   router.get('/checkout/sessions/:checkoutSessionId', ...customerOnly, validate({ params: sessionParams }), route(async (req, res) =>

@@ -33,6 +33,7 @@ const paymentSchema = new mongoose.Schema(
         providerRefundId: { type: String, default: null },
         amountPaise: { type: Number, required: true },
         reason: { type: String, default: null },
+        initiatedAt: { type: Date, default: null }, // when the refund was first asked for (older entries have none)
         failureReason: { type: String, default: null }, // why Razorpay refused it, when it did
       }],
       default: [],

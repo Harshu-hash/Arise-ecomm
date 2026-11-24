@@ -1,6 +1,7 @@
 import { baseApi } from '@core/api/baseApi';
+import { safeIdempotencyKey } from '@core/api/idempotency';
 import { CHECKOUT_ENDPOINTS } from './checkout.endpoints';
-import { mapCheckoutSession } from './checkout.mapper';
+import { mapCheckoutPreview, mapCheckoutSession } from './checkout.mapper';
 
 export const checkoutApi = baseApi.injectEndpoints({
   endpoints: builder => ({
@@ -9,10 +10,16 @@ export const checkoutApi = baseApi.injectEndpoints({
         url: CHECKOUT_ENDPOINTS.sessions,
         method: 'POST',
         data,
-        headers: { 'Idempotency-Key': idempotencyKey },
+        headers: { 'Idempotency-Key': safeIdempotencyKey(idempotencyKey) },
       }),
       transformResponse: mapCheckoutSession,
       invalidatesTags: [{ type: 'Checkout', id: 'CURRENT' }],
+    }),
+    getCheckoutPreview: builder.query({
+      query: data => ({ url: CHECKOUT_ENDPOINTS.preview, method: 'POST', data }),
+      transformResponse: mapCheckoutPreview,
+      providesTags: [{ type: 'Checkout', id: 'CURRENT' }],
+      keepUnusedDataFor: 30,
     }),
     getCheckoutSession: builder.query({
       query: sessionId => ({ url: CHECKOUT_ENDPOINTS.session(sessionId) }),
@@ -47,6 +54,7 @@ export const checkoutApi = baseApi.injectEndpoints({
 
 export const {
   useCreateCheckoutSessionMutation,
+  useGetCheckoutPreviewQuery,
   useGetCheckoutSessionQuery,
   useRevalidateCheckoutSessionMutation,
   useUpdateCheckoutAddressMutation,

@@ -7,9 +7,9 @@ import {
   KeyboardAvoidingView,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
@@ -56,9 +56,7 @@ const LoginScreen = ({ navigation, route }) => {
         contentContainerStyle={[styles.scrollContent, { paddingTop: Math.max(insets.top, 24) }]}
         keyboardShouldPersistTaps="handled"
       >
-        <View style={styles.logoCircle}>
-          <Icon name="shopping-bag" size={28} color={COLORS.primary} />
-        </View>
+        <Image source={require('../../../assets/images/arise-logo.png')} style={styles.logo} resizeMode="contain" />
 
         <Text style={styles.title}>Login</Text>
         <Text style={styles.subtitle}>
@@ -129,13 +127,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.xxl,
   },
-  logoCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: COLORS.primaryLight,
-    alignItems: 'center',
-    justifyContent: 'center',
+  logo: {
+    width: 72,
+    height: 72,
     marginBottom: SPACING.l,
   },
   title: {

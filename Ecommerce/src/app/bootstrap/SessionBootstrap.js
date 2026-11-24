@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Platform } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { selectSessionRestored } from '@features/auth';
 import { selectOnboardingRestored } from '@features/onboarding/redux/onboarding.selectors';
 import { useGetAppConfigQuery } from '@features/home';
+import SplashScreen from '@features/splash/screens/SplashScreen';
 import MaintenanceScreen from '@features/appUpdate/screens/MaintenanceScreen';
 import UpdateRequiredScreen from '@features/appUpdate/screens/UpdateRequiredScreen';
 import { APP_CONFIG } from '@configs/app.config';
@@ -32,6 +33,8 @@ const SessionBootstrap = ({ children }) => {
   const preferencesRestored = useSelector(selectOnboardingRestored);
   const [cachedConfig, setCachedConfig] = useState(readCachedConfig);
   const bootReady = restored && preferencesRestored;
+  const [splashDone, setSplashDone] = useState(false);
+  const finishSplash = useCallback(() => setSplashDone(true), []);
   const { data, isLoading, error, refetch } = useGetAppConfigQuery(undefined, { skip: !bootReady });
   const appConfig = data || cachedConfig;
   const environmentErrors = validateRuntimeEnvironment();
@@ -54,6 +57,8 @@ const SessionBootstrap = ({ children }) => {
         message={environmentErrors.join('\n')}
       />
     );
+  // The animated intro plays while the session restores, and holds its last frame until the app is ready.
+  if (!splashDone) return <SplashScreen ready={bootReady} onFinish={finishSplash} />;
   if (!bootReady) return <FullScreenLoader message="Preparing Arise..." />;
   if (isLoading && !appConfig) return <FullScreenLoader message="Checking app availability..." />;
   if (error && !appConfig)

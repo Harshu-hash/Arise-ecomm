@@ -19,6 +19,12 @@ export async function findCustomers({ q, ids, limit }) {
 /** How many of these ids are real, active customers (audience validation and reach estimates). */
 export const countCustomers = (ids) => User.countDocuments({ ...CUSTOMER, ...(ids ? { _id: { $in: ids } } : {}) });
 
+/** Active customer ids after `afterId`, oldest first, for walking everyone in batches (broadcasts). */
+export async function listCustomerIds({ afterId = null, limit = 500 } = {}) {
+  const rows = await User.find({ ...CUSTOMER, ...(afterId ? { _id: { $gt: afterId } } : {}) }, '_id').sort({ _id: 1 }).limit(limit).lean();
+  return rows.map((row) => String(row._id));
+}
+
 /** A customer's name and email for sending them mail; never to join on. */
 export async function getCustomerContact(id) {
   const user = await User.findOne({ ...CUSTOMER, _id: id }, 'name email').lean();

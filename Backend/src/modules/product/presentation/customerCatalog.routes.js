@@ -29,7 +29,7 @@ export function createCustomerSearchRouter() {
     try {
       const result = await searchCustomerProducts(req.query);
       // The first page of a typed search counts toward trending; paging and filtering do not.
-      if (req.query.q && req.query.cursor === 0) recordSearch(req.query.q, result.total);
+      if (req.query.q && req.query.cursor === 0) recordSearch(req.query.q, result.total, req.ip);
       return sendData(res, result);
     } catch (error) {
       return next(error);

@@ -1,4 +1,5 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
+import { skipToken } from '@reduxjs/toolkit/query';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -14,7 +15,7 @@ import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import { useToast } from '../../../contexts/ToastContext';
 import { useGetAddressesQuery } from '@features/address';
-import { useCreateCheckoutSessionMutation } from '../api/checkout.query';
+import { useCreateCheckoutSessionMutation, useGetCheckoutPreviewQuery } from '../api/checkout.query';
 
 const SectionBadge = ({ number }) => (
   <View style={styles.sectionBadge}>
@@ -66,20 +67,39 @@ const CheckoutScreen = ({ navigation, route }) => {
   );
   const itemTotal = directPurchase ? calculatedItemTotal : (cart?.totals.subtotal ?? 0);
   const mrpTotal = directPurchase ? calculatedMrpTotal : (cart?.totals.mrp ?? 0);
-  const deliveryFee = directPurchase
-    ? calculatedItemTotal >= 500
-      ? 0
-      : 40
-    : (cart?.totals.deliveryFee ?? 0);
-  const platformFee = directPurchase ? 5 : (cart?.totals.platformFee ?? 0);
+  // The server prices delivery per seller and address, and sets the platform fee; the figures below are only the estimate shown
+  // until its answer arrives, so the total here is the one the payment screen will charge.
+  const previewArgs = useMemo(() => {
+    if (!address) return skipToken;
+    if (!directPurchase) {
+      return cart?.items.length ? { source: 'CART', addressId: address.id, cartVersion: cart.version } : skipToken;
+    }
+    return {
+      source: 'BUY_NOW',
+      addressId: address.id,
+      items: directItems.map(item => ({ productId: item.productId || item.id, variantLabel: item.variant || 'Standard', quantity: item.qty })),
+    };
+  }, [address, directPurchase, directItems, cart]);
+  const { data: preview } = useGetCheckoutPreviewQuery(previewArgs);
+  const quoted = preview?.totals;
+  const deliveryFee = quoted
+    ? quoted.deliveryFee
+    : directPurchase
+      ? calculatedItemTotal >= 500
+        ? 0
+        : 40
+      : (cart?.totals.deliveryFee ?? 0);
+  const platformFee = quoted ? quoted.platformFee : directPurchase ? 5 : (cart?.totals.platformFee ?? 0);
   const productDiscount = directPurchase
     ? calculatedMrpTotal - calculatedItemTotal
     : (cart?.totals.productDiscount ?? 0);
   const couponDiscount = directPurchase ? 0 : (cart?.totals.couponDiscount ?? 0);
   const totalSavings = productDiscount + couponDiscount;
-  const grandTotal = directPurchase
-    ? Math.max(itemTotal + deliveryFee + platformFee, 0)
-    : (cart?.totals.payable ?? 0);
+  const grandTotal = quoted
+    ? quoted.payable
+    : directPurchase
+      ? Math.max(itemTotal + deliveryFee + platformFee, 0)
+      : (cart?.totals.payable ?? 0);
 
   const handleQtyChange = async (item, delta) => {
     if (directPurchase) {

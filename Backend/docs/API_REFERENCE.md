@@ -114,6 +114,10 @@ Categories carry `commissionPct` (0–40, at most two decimals) or `null`: the s
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/admin/v1/refunds` | admin `finance.refund.view` | Refund entries on payments (one per cancelled parcel, returned item or sent-back parcel); id is `<paymentId>:<key>`. `?page&pageSize&sort(initiatedAt,amountPaise,status,ageDays)&q`, `status` (FAILED, PROCESSING, COMPLETED), `type` (RETURN, CANCELLATION), `slaBreached`, `initiatedAt[gte/lte]`. `meta.summary`: owed not yet paid, failed, past the 7-day promise. Refunds always go to the original payment method. |
+| `POST` | `/api/admin/v1/refunds/:id/retry` | admin `finance.refund.retry` | Asks the gateway again for a FAILED refund (a returned item goes back through its return, which also settles the seller). 409 if it is not failed. |
+| `POST` | `/api/admin/v1/refunds/:id/mode` | admin `finance.refund.switch_mode` | Always 409: wallet and bank refunds are not built. |
+| `GET` | `/api/admin/v1/payments` | admin `finance.payment.view` | Every payment attempt: `?page&pageSize&sort(createdAt,amountPaise,status)&q` (payment id, gateway ref, order number), `status` (CAPTURED, PENDING, FAILED, CANCELLED), `method` (UPI,CARD,COD), `gateway` (Razorpay,CASH), `createdAt[gte/lte]`, `amountPaise[gte/lte]`. Rows carry the order number, customer name, refunded (successful refunds only) and net. Cash on delivery counts as CAPTURED once every live parcel is delivered. `meta.summary`: captured, cash not yet collected, failed attempts. |
 | `POST` | `/webhooks/v1/payments/razorpay` | Razorpay HMAC signature (`x-razorpay-signature`) | Receives Razorpay payment/refund events; verifies the signature on the raw body, stores a deduplicated receipt (unique `x-razorpay-event-id`), enqueues it to the `webhooks` queue for idempotent processing, and acknowledges fast so Razorpay retries stay harmless. Not rate-limited by IP (signature-gated). |
 
 ## shipping
@@ -198,6 +202,10 @@ A product's rating is kept in `review_summaries` (running totals of published re
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/admin/v1/push-broadcasts` | admin `notifications.broadcast.view` | The 100 newest broadcasts: `status` (SCHEDULED, SENDING, SENT, FAILED, CANCELLED, EXPIRED), `inboxCount` (notification lists it reached), `pushSent`, `pushFailed`. |
+| `GET` | `/api/admin/v1/push-broadcasts/audience` | admin `notifications.broadcast.view` | `?platforms=ANDROID,IOS` → `{ customers, customersWithPush, sellers, pushConfigured }`. |
+| `POST` | `/api/admin/v1/push-broadcasts` | admin `notifications.broadcast.send` | `{ title(65), message(240), campaignName, audiences: CUSTOMERS\|SELLERS[], platforms: ANDROID\|IOS[], imageUrl? (https), deepLink? (arise:// or https://), priority, sound, collapseKey?, scheduleAt?, expiresAt? }`. No `scheduleAt` = send now (in the background). Everyone in the audience gets it in their notification list (category OFFER, once per broadcast); customers with an active phone on a chosen platform who have not turned offers off also get an FCM push. Sellers are in-app only (no seller push tokens). A scheduled broadcast is sent by the minute job `notifications.broadcasts`; one past its `expiresAt` is marked EXPIRED. |
+| `POST` | `/api/admin/v1/push-broadcasts/:id/cancel` | admin `notifications.broadcast.send` | Only while SCHEDULED; otherwise 409. |
 
 ## admin
 
@@ -426,12 +434,22 @@ The maintenance worker completes due requests every 15 minutes. It revokes sessi
 | `POST` | `/api/customer/v1/search/recent` | Bearer JWT (customer) | `{ query }` remembers a search (a repeat moves to the top; the newest 20 are kept for 90 days). Contact details, very short or very long text are ignored. Returns the list. |
 | `DELETE` | `/api/customer/v1/search/recent` | Bearer JWT (customer) | Clears the history (also cleared when the account is deleted). |
 
-Product search (`GET /search`, listed under catalog) matches **every word** of `q` in any order against the name, brand and category (`nike shoes` = `shoes nike`). `sort=relevance` puts the best name/brand match first and sold-out items last; `sort=popularity` ranks by units sold in the last 90 days (refreshed every 10 minutes); `sort=rating` ranks by average rating. A typed search that finds something counts toward trending (first page only, no customer is recorded). Not built: spell correction, synonyms, and searching descriptions.
+Product search (`GET /search`, listed under catalog) matches **every word** of `q` in any order against the name, brand and category (`nike shoes` = `shoes nike`). `sort=relevance` puts the best name/brand match first and sold-out items last; `sort=popularity` ranks by units sold in the last 90 days (refreshed every 10 minutes); `sort=rating` ranks by average rating. A typed search that finds something counts toward trending (first page only, no customer is recorded). Words also match a few synonyms (`sneakers` = `shoes`) and the product description. When nothing matches, a misspelt word is swapped for the nearest word on the shelf and the response carries `correctedQuery` (`null` otherwise); when still nothing, `tryInstead` lists popular brands/departments to try. A searcher (customer or network address) counts toward trending once per query per day.
 
 ## analytics
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET` | `/api/admin/v1/dashboard/summary` | admin `dashboard.dashboard.view` | `?days=` (1-120) → `kpis` (GMV, orders, units, AOV, new customers, cancellation and return rate, active sellers, live listings; net revenue only with `dashboard.finance_widgets.view`), each with `deltaPct` against the previous `days`; daily `series` and `previousSeries`; `paymentMix`, `topStates`, `topCategories/Sellers/Products`, order `funnel`. GMV counts parcels that were not cancelled or sent back. Days are IST. |
+| `GET` | `/api/admin/v1/dashboard/action-center` | admin `dashboard.action_center.view` | What is waiting on someone: seller applications, listings in QC, orders not accepted (24h) / not dispatched (48h), failed deliveries, returns awaiting QC, failed refunds, withdrawals to approve. Tiles the caller cannot open are left out. |
+| `GET` | `/api/admin/v1/dashboard/alerts` | admin | Always empty for now (nothing generates admin alerts); `POST .../alerts/:id/read` is a no-op. |
+| `GET` | `/api/admin/v1/finance/overview` | admin `dashboard.finance_widgets.view` | Money position: payable now, held, wallet liability, COD outstanding, commission, TCS/TDS, refunds pending / failed. |
+| `GET` | `/api/admin/v1/reports/analytics/:domain` | admin `reports.*.view` | `?days=` (1-90). Domains: sales, customers, catalog, sellers, fulfilment, returns, finance, marketing, support. Support is `notBuilt`; ads, referrals, flash sales and campaign open rates are zero/empty (not tracked). |
+| `GET` | `/api/seller/v1/dashboard/summary` | seller / staff | Last 30 days for the signed-in seller: GMV, orders, live listings, orders to process, returns pending, payout due, account health (cancellation, late dispatch over 48h, returns), tips. |
+| `GET` | `/api/seller/v1/dashboard/activity` | seller / staff | Latest events on the seller's parcels. |
+| `GET` | `/api/seller/v1/analytics/filters` | seller / staff | The seller's own categories, brands and SKUs. |
+| `GET` | `/api/seller/v1/analytics/:view` | seller / staff | `overview`, `products`, `traffic`, `operations`, `finance`; `?from=&to=` (IST days, default last 30), `compare`, and `categoryId` / `brandId` (names), `sku`, `fulfillmentType` filters. Storefront traffic (impressions, views, add-to-cart) and ads are not tracked: those are zero/empty, and the "conversion funnel" is the order funnel (placed to delivered). |
+| `GET` | `/api/seller/v1/analytics/recommendations` | seller / staff | Always empty for now. |
 
 ## system
 

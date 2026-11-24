@@ -1,5 +1,6 @@
 export {
   useCreateCheckoutSessionMutation,
+  useGetCheckoutPreviewQuery,
   useGetCheckoutSessionQuery,
   useRevalidateCheckoutSessionMutation,
   useUpdateCheckoutAddressMutation,

@@ -25,6 +25,8 @@ export const searchProductsResponseSchema = apiEnvelope(
     items: z.array(productCardDtoSchema),
     total: z.number().int().nonnegative(),
     nextCursor: z.string().nullable(),
+    correctedQuery: z.string().nullable().optional(), // the spelling the server searched instead
+    tryInstead: z.array(z.string()).optional(), // where to go when nothing matched
     facets: z.object({
       categories: z.array(z.string().min(1)),
       brands: z.array(z.string().min(1)),

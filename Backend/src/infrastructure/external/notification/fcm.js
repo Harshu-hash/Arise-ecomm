@@ -47,14 +47,31 @@ export const fcm = {
   /**
    * Sends one push. Returns { sent: true }, or { sent: false, invalidToken: true } when Firebase says this token is dead
    * (the app was uninstalled or the token rotated), so the caller can stop using it. Other failures throw.
-   * `data` values must be strings.
+   * `data` values must be strings. Optional: `image`, `priority` ('high' | 'normal'), `sound` (false = silent), `collapseKey`
+   * (a newer push with the same key replaces an older one still waiting), `ttlSeconds` (drop it if undelivered by then).
    */
-  async send({ token: deviceToken, title, body, data = {} }) {
+  async send({ token: deviceToken, title, body, data = {}, image, priority = 'high', sound = true, collapseKey, ttlSeconds }) {
     const { project_id: project } = serviceAccount();
     const response = await fetch(`https://fcm.googleapis.com/v1/projects/${project}/messages:send`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${await token()}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { token: deviceToken, notification: { title, body }, data, android: { priority: 'high' } } }),
+      body: JSON.stringify({
+        message: {
+          token: deviceToken,
+          notification: { title, body, ...(image ? { image } : {}) },
+          data,
+          android: {
+            priority,
+            ...(collapseKey ? { collapse_key: collapseKey } : {}),
+            ...(ttlSeconds ? { ttl: `${ttlSeconds}s` } : {}),
+            notification: { ...(sound ? { sound: 'default' } : {}) },
+          },
+          apns: {
+            headers: { 'apns-priority': priority === 'high' ? '10' : '5', ...(collapseKey ? { 'apns-collapse-id': collapseKey } : {}) },
+            payload: { aps: { ...(sound ? { sound: 'default' } : {}), ...(image ? { 'mutable-content': 1 } : {}) } },
+          },
+        },
+      }),
       signal: AbortSignal.timeout(10_000),
     });
     if (response.ok) return { sent: true };

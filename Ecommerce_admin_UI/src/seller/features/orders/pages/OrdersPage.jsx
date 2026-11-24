@@ -22,7 +22,7 @@ export default function OrdersPage() {
   // A new order, or a courier/customer change to one, shows up here at once; a reconnect refetches what was missed.
   const refreshOrders = () => queryClient.invalidateQueries({ queryKey: ['seller', 'orders'] });
   useRealtime('seller', { 'order:changed': refreshOrders, 'session:ready': refreshOrders });
-  const state = useUrlTableState({ defaultSort: '-placedAt', defaultTab: 'NEW' });
+  const state = useUrlTableState({ defaultSort: '-placedAt', defaultTab: 'all' });
   const [pendingId, setPendingId] = useState(null);
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
@@ -66,6 +66,7 @@ export default function OrdersPage() {
   });
 
   const TABS = [
+    { key: 'all', label: 'All', count: ['NEW', 'PROCESSING', 'SHIPPED', 'DELIVERED', 'RTO', 'CANCELLED'].reduce((total, stage) => total + (counts[stage] ?? 0), 0) },
     { key: 'NEW', label: 'New', count: counts.NEW },
     { key: 'PROCESSING', label: 'To ship', count: counts.PROCESSING },
     { key: 'SHIPPED', label: 'Shipped', count: counts.SHIPPED },

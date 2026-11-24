@@ -25,6 +25,11 @@ export async function getSellerSummaries(sellerIds) {
 const unsellableSellerIds = ttlMemo(async () => (await Seller.find(UNSELLABLE_FILTER, '_id').lean()).map((row) => id(row._id)), 15_000, () => 'all');
 onCatalogChange(unsellableSellerIds.clear);
 
+/** Ids of every seller who is approved/active (on holiday or not), for notices that go to all sellers. */
+export async function listActiveSellerIds() {
+  return (await Seller.find({ status: { $in: SELLABLE_STATUSES } }, '_id').lean()).map((row) => id(row._id));
+}
+
 /** Ids of sellers whose listings must not be shown or sold right now. May lag a change by a few seconds. */
 export const getUnsellableSellerIds = () => unsellableSellerIds();
 

@@ -48,6 +48,8 @@ export default function AddProductPage() {
   const [videos, setVideos] = useState([]);
   const [complianceDocuments, setComplianceDocuments] = useState([]);
   const [variants, setVariants] = useState([]);
+  // Auto-generated SKUs share a random per-listing prefix, so two listings never get the same SKU.
+  const [skuPrefix] = useState(() => `SKU-${Math.random().toString(36).slice(2, 8).toUpperCase()}`);
   const [saving, setSaving] = useState(false);
   const [savingDraft, setSavingDraft] = useState(false);
 
@@ -413,7 +415,7 @@ export default function AddProductPage() {
                   variantAttrs={variantAttrs}
                   value={variants}
                   onChange={setVariants}
-                  skuPrefix="SKU"
+                  skuPrefix={skuPrefix}
                 />
               ) : (
                 <Typography.Text type="secondary">

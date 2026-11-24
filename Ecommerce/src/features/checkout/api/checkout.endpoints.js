@@ -1,5 +1,6 @@
 export const CHECKOUT_ENDPOINTS = {
   sessions: '/checkout/sessions',
+  preview: '/checkout/preview',
   session: sessionId => `/checkout/sessions/${encodeURIComponent(sessionId)}`,
   address: sessionId => `/checkout/sessions/${encodeURIComponent(sessionId)}/address`,
   paymentMethod: sessionId => `/checkout/sessions/${encodeURIComponent(sessionId)}/payment-method`,

@@ -174,7 +174,8 @@ function mergeItems(entries) {
   return [...byOffer].map(([offerId, quantity]) => ({ offerId, quantity }));
 }
 
-export async function createSession(customerId, { source = 'CART', addressId, cartVersion, items: requested }) {
+// What is being bought and where it goes: shared by the checkout preview and the real session.
+async function prepare(customerId, { source = 'CART', addressId, cartVersion, items: requested }) {
   let items;
   let couponCode = null;
   let version = null;
@@ -199,6 +200,20 @@ export async function createSession(customerId, { source = 'CART', addressId, ca
   const address = addressId ? await getAddress(customerId, addressId) : await getDefaultAddress(customerId);
   if (!address) throw failure(404, 'ADDRESS_NOT_FOUND', 'Select a delivery address.');
 
+  return { items, couponCode, version, address };
+}
+
+/** What the order would cost to this address right now (real delivery quote, platform fee), without creating anything. */
+export async function previewCheckout(customerId, body) {
+  const { items, couponCode, address } = await prepare(customerId, { ...body, cartVersion: undefined });
+  const quote = await priceSession({ customerId, items, couponCode, address });
+  if (!quote.lines.length) throw noLines(quote);
+  return { totals: quote.totals, couponCode: quote.couponCode, blockers: quote.blockers, warnings: quote.warnings };
+}
+
+export async function createSession(customerId, body) {
+  const { source = 'CART' } = body;
+  const { items, couponCode, version, address } = await prepare(customerId, body);
   const quote = await priceSession({ customerId, items, couponCode, address });
   if (!quote.lines.length) throw noLines(quote);
   const { paymentPendingTimeoutMins } = await getSettingsSection('orders');

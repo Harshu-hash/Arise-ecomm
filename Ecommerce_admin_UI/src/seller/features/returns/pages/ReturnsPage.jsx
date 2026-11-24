@@ -39,7 +39,7 @@ const columns = [
 export default function ReturnsPage() {
   const navigate = useNavigate();
   const [analyticsOpen, setAnalyticsOpen] = useState(false);
-  const state = useUrlTableState({ defaultSort: '-requestedAt', defaultTab: 'REQUESTED' });
+  const state = useUrlTableState({ defaultSort: '-requestedAt', defaultTab: 'all' });
 
   const { rows, meta, loading, error, refetch, fetching } = useListQuery({
     queryKey: returnKeys.list({ ...state.queryParams, tab: state.tab }),
@@ -50,6 +50,7 @@ export default function ReturnsPage() {
   const counts = meta?.counts ?? {};
   const analytics = useQuery({ queryKey: returnKeys.analytics, queryFn: returnsApi.analytics, enabled: analyticsOpen });
   const TABS = [
+    { key: 'all', label: 'All', count: ['REQUESTED', 'IN_PROGRESS', 'COMPLETED'].reduce((total, stage) => total + (counts[stage] ?? 0), 0) },
     { key: 'REQUESTED', label: 'Needs decision', count: counts.REQUESTED },
     { key: 'IN_PROGRESS', label: 'In progress', count: counts.IN_PROGRESS },
     { key: 'COMPLETED', label: 'Completed', count: counts.COMPLETED },

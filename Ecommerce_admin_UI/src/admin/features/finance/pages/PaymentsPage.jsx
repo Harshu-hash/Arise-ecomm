@@ -39,11 +39,11 @@ export default function PaymentsPage() {
     },
     {
       key: 'orderId', title: 'Order', dataIndex: 'orderId', priority: 1,
-      render: (v) => (
+      render: (v) => v ? (
         <Link to={`/orders/${v}`}>
           <Typography.Text className="mono" style={{ fontSize: 12 }}>{v}</Typography.Text>
         </Link>
-      ),
+      ) : <Typography.Text type="secondary">—</Typography.Text>,
     },
     {
       key: 'customerName', title: 'Customer', dataIndex: 'customerName', priority: 2,
@@ -119,11 +119,11 @@ export default function PaymentsPage() {
         schema={[
           {
             key: 'method', label: 'Method', kind: 'multiSelect', width: 170,
-            options: ['UPI', 'CARD', 'NETBANKING', 'COD', 'WALLET'].map((v) => ({ value: v, label: v })),
+            options: ['UPI', 'CARD', 'COD'].map((v) => ({ value: v, label: v })),
           },
           {
             key: 'gateway', label: 'Gateway', kind: 'select', width: 150,
-            options: ['Razorpay', 'PayU', 'CASH'].map((v) => ({ value: v, label: v })),
+            options: ['Razorpay', 'CASH'].map((v) => ({ value: v, label: v })),
           },
           { key: 'createdAt', label: 'Captured', kind: 'dateRange' },
           { key: 'amountPaise', label: 'Amount', kind: 'numberRange', money: true },
@@ -146,6 +146,7 @@ export default function PaymentsPage() {
           { key: 'CAPTURED', label: 'Captured' },
           { key: 'PENDING', label: 'Pending' },
           { key: 'FAILED', label: 'Failed' },
+          { key: 'CANCELLED', label: 'Cancelled' },
         ]}
         onExport={() => runExport(state.queryParams)}
         exportPerm="finance.payment.export"

@@ -110,7 +110,7 @@ export async function refundPayment(paymentId, { key = 'all', amountPaise = null
   if (existing && existing.status !== REFUND_STATUS.FAILED) return payment;
   const amount = amountPaise ?? payment.amountPaise - refundedPaise(payment);
   if (amount < 1 || refundedPaise(payment) + amount > payment.amountPaise) throw new ConflictError('REFUND_TOO_LARGE', 'That is more than is left to refund on this payment.');
-  const entry = existing ?? payment.refunds[payment.refunds.push({ key, status: REFUND_STATUS.PENDING, amountPaise: amount, reason }) - 1];
+  const entry = existing ?? payment.refunds[payment.refunds.push({ key, status: REFUND_STATUS.PENDING, amountPaise: amount, reason, initiatedAt: new Date() }) - 1];
   try {
     const refund = await paymentGateway.refund({ providerPaymentId: payment.providerPaymentId, amountPaise: amount, notes: { reason }, idempotencyKey: `refund_${payment._id}_${key}`.replace(/[^A-Za-z0-9_-]/g, '_') }); // Razorpay allows only letters, digits, _ and -
     entry.status = refund.providerStatus === 'processed' ? REFUND_STATUS.SUCCEEDED : REFUND_STATUS.PENDING;

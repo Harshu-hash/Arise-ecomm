@@ -1,0 +1,11 @@
+<resources>
+
+    <!-- Android 12+ draws its own launch screen before the app starts: make it the animation's navy with no icon, so it hands off seamlessly. -->
+    <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <item name="android:windowBackground">@color/splashBackground</item>
+        <item name="android:windowSplashScreenBackground">@color/splashBackground</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_blank</item>
+    </style>
+
+</resources>

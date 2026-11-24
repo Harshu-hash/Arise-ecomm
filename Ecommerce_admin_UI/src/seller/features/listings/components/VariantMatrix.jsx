@@ -26,14 +26,14 @@ function comboKey(combo) {
   return combo.map((c) => `${c.code}:${c.value}`).join('|');
 }
 
-function defaultRow(combo, index, skuPrefix) {
+function defaultRow(combo, sku) {
   const attributes = Object.fromEntries(combo.map((c) => [c.code, c.value]));
   return {
     key: comboKey(combo),
     attributes,
     label: combo.map((c) => c.value).join(' · '),
-    sku: `${skuPrefix}-${index + 1}`,
-    sellerSku: `${skuPrefix}-${index + 1}`,
+    sku,
+    sellerSku: sku,
     barcode: '',
     taxCode: '',
     mrpPaise: null,
@@ -151,9 +151,16 @@ export default function VariantMatrix({ variantAttrs, value = [], onChange, skuP
         r,
       ]),
     );
-    const nextRows = combos.map(
-      (combo, i) => existing.get(comboKey(combo)) ?? defaultRow(combo, i, skuPrefix),
-    );
+    // A new row takes the next number no other row already uses, so editing the options never repeats a SKU.
+    const taken = new Set((value ?? []).flatMap((r) => [r.sku, r.sellerSku]));
+    let counter = 0;
+    const nextSku = () => {
+      do counter += 1;
+      while (taken.has(`${skuPrefix}-${counter}`));
+      taken.add(`${skuPrefix}-${counter}`);
+      return `${skuPrefix}-${counter}`;
+    };
+    const nextRows = combos.map((combo) => existing.get(comboKey(combo)) ?? defaultRow(combo, nextSku()));
     onChange?.(nextRows);
   };
 
