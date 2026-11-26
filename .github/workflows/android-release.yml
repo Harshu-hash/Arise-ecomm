@@ -20,7 +20,7 @@ jobs:
         env: { ENV_FILE: "${{ secrets.ENV_FILE }}" }
       - run: echo "$KEYSTORE_BASE64" | base64 -d > "$RUNNER_TEMP/release.keystore"
         env: { KEYSTORE_BASE64: "${{ secrets.KEYSTORE_BASE64 }}" }
-      - run: ./gradlew assembleRelease
+      - run: bash ./gradlew assembleRelease
         working-directory: Ecommerce/android
         env:
           ARISE_UPLOAD_STORE_FILE: ${{ runner.temp }}/release.keystore
