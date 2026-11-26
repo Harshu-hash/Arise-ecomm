@@ -14,7 +14,6 @@ jobs:
         with: { node-version: 20, cache: npm, cache-dependency-path: Ecommerce/package-lock.json }
       - uses: actions/setup-java@v4
         with: { distribution: temurin, java-version: 17 }
-      - uses: android-actions/setup-android@v3
       - run: npm ci
       # .env is gitignored; the whole file lives in the ENV_FILE secret.
       - run: printf '%s' "$ENV_FILE" > .env
