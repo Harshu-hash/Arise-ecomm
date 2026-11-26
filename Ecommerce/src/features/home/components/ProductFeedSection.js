@@ -53,13 +53,13 @@ const ProductFeedCard = ({ product, onPress }) => {
  * keep their own natural image heights and stagger against the other column, matching
  * the reference design without needing item-measurement machinery.
  */
-const ProductFeedSection = ({ products, onPressProduct }) => {
+const ProductFeedSection = ({ products, onPressProduct, title = 'You May Also Like' }) => {
   const leftColumn = products.filter((_, index) => index % 2 === 0);
   const rightColumn = products.filter((_, index) => index % 2 === 1);
 
   return (
     <View style={styles.wrapper}>
-      <Text style={styles.sectionTitle}>You May Also Like</Text>
+      {title ? <Text style={styles.sectionTitle}>{title}</Text> : null}
       <View style={styles.grid}>
         <View style={styles.column}>
           {leftColumn.map(product => (

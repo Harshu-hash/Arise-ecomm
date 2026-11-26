@@ -13,18 +13,14 @@ import Icon from 'react-native-vector-icons/Feather';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
-import { StatusBarManager, GradientBackground, ProductCard } from '../../../shared/components';
+import { StatusBarManager, GradientBackground } from '../../../shared/components';
+import ProductFeedSection from '../../home/components/ProductFeedSection';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import { useGetPromotionQuery } from '../api/offers.api';
 
 const DEFAULT_GRADIENT = ['#7A0C1E', '#CC0C39', '#FF6A3D'];
 const buildGradient = (accent) => (accent ? ['#7A0C1E', accent, '#FF8A3D'] : DEFAULT_GRADIENT);
-const TRUST_CHIPS = [
-  { icon: 'truck', label: 'Free Delivery' },
-  { icon: 'refresh-cw', label: 'Easy Returns' },
-  { icon: 'shield', label: 'Assured' },
-];
 
 const pad = (n) => String(n).padStart(2, '0');
 const useCountdown = (seconds) => {
@@ -34,10 +30,11 @@ const useCountdown = (seconds) => {
     const id = setInterval(() => setLeft((v) => (v > 0 ? v - 1 : 0)), 1000);
     return () => clearInterval(id);
   }, []);
-  const h = Math.floor(left / 3600);
+  const d = Math.floor(left / 86400);
+  const h = Math.floor((left % 86400) / 3600);
   const m = Math.floor((left % 3600) / 60);
   const s = left % 60;
-  return { h: pad(h), m: pad(m), s: pad(s) };
+  return { d, h: pad(h), m: pad(m), s: pad(s) };
 };
 
 const DealDetailScreen = ({ navigation, route }) => {
@@ -69,17 +66,12 @@ const DealDetailScreen = ({ navigation, route }) => {
   const secondsRemaining = promotion?.endsAt
     ? Math.max(0, Math.floor((new Date(promotion.endsAt).getTime() - Date.now()) / 1000))
     : 0;
-  const { h, m, s } = useCountdown(secondsRemaining);
-  const [copied, setCopied] = useState(false);
+  const { d, h, m, s } = useCountdown(secondsRemaining);
 
-  const related = useMemo(() => promotion?.relatedProducts || [], [promotion?.relatedProducts]);
+  const related = useMemo(() => (promotion?.relatedProducts || []).map((p) => ({ ...p, title: p.name })), [promotion?.relatedProducts]);
 
   const handleShare = () => {
     Share.share({ message: `Check out this deal: ${deal.label} — ${deal.value}` }).catch(() => {});
-  };
-  const handleCopy = () => {
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1600);
   };
   const handleGrab = () => navigation && navigation.navigate('SearchResults', { deal });
 
@@ -137,47 +129,12 @@ const DealDetailScreen = ({ navigation, route }) => {
           <Icon name="clock" size={14} color={COLORS.offerRed} />
           <Text style={styles.timerLabel}>Grab this deal in</Text>
           <View style={styles.timerBlocks}>
-            {[h, m, s].map((v, i) => (
+            {[...(d ? [`${d}d`] : []), h, m, s].map((v, i, all) => (
               <React.Fragment key={i}>
                 <View style={styles.timerBlock}><Text style={styles.timerNum}>{v}</Text></View>
-                {i < 2 ? <Text style={styles.timerColon}>:</Text> : null}
+                {i < all.length - 1 ? <Text style={styles.timerColon}>:</Text> : null}
               </React.Fragment>
             ))}
-          </View>
-        </View>
-
-        <View style={styles.card}>
-          <View style={styles.rowBetween}>
-            <View>
-              <Text style={styles.couponEyebrow}>SAVE EXTRA WITH</Text>
-              <Text style={styles.couponCode}>{promotion?.couponCode || 'NO CODE NEEDED'}</Text>
-              <Text style={styles.couponHint}>
-                {promotion?.couponHint || 'Eligibility and final savings are confirmed in cart.'}
-              </Text>
-            </View>
-            <TouchableOpacity onPress={handleCopy} style={[styles.copyBtn, copied && styles.copyBtnDone]}>
-              <Icon name={copied ? 'check' : 'copy'} size={13} color={COLORS.white} />
-              <Text style={styles.copyText}>{copied ? 'Copied' : 'COPY'}</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        <View style={styles.trustRow}>
-          {TRUST_CHIPS.map((c) => (
-            <View key={c.label} style={styles.trustChip}>
-              <Icon name={c.icon} size={14} color={COLORS.primary} />
-              <Text style={styles.trustText}>{c.label}</Text>
-            </View>
-          ))}
-        </View>
-
-        <View style={styles.highlightCard}>
-          <View style={styles.highlightIconWrap}>
-            <Icon name="trending-up" size={18} color={COLORS.ratingGreen} />
-          </View>
-          <View style={styles.highlightBody}>
-            <Text style={styles.highlightTitle}>Trending across the country</Text>
-            <Text style={styles.highlightSub}>Over 2 lakh shoppers grabbed this deal this week.</Text>
           </View>
         </View>
 
@@ -186,16 +143,11 @@ const DealDetailScreen = ({ navigation, route }) => {
           <Text style={styles.sectionCount}>{related.length} items</Text>
         </View>
 
-        <View style={styles.grid}>
-          {related.map((p) => (
-            <ProductCard
-              key={p.id}
-              product={{ name: p.title, price: p.price, mrp: p.mrp, image: p.image, discount: p.badge }}
-              onPress={() => navigation && navigation.navigate('ProductDetail', { productId: p.id })}
-              style={styles.gridCard}
-            />
-          ))}
-        </View>
+        <ProductFeedSection
+          title={null}
+          products={related}
+          onPressProduct={(p) => navigation && navigation.navigate('ProductDetail', { productId: p.id })}
+        />
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={styles.footer}>
@@ -238,31 +190,10 @@ const styles = StyleSheet.create({
   timerNum: { color: COLORS.white, fontSize: 12, fontWeight: '800', letterSpacing: 0.5 },
   timerColon: { color: COLORS.offerRed, fontSize: 14, fontWeight: '800' },
 
-  card: { backgroundColor: COLORS.white, marginHorizontal: SPACING.l, marginTop: SPACING.m, padding: SPACING.l, borderRadius: RADIUS.m, borderWidth: 1, borderColor: COLORS.cardBorder },
-  rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  couponEyebrow: { fontSize: 10.5, fontWeight: '700', color: COLORS.textSecondary, letterSpacing: 1 },
-  couponCode: { fontSize: 20, fontWeight: '800', color: COLORS.primary, marginTop: 2, letterSpacing: 1.2 },
-  couponHint: { fontSize: 11.5, color: COLORS.textSecondary, marginTop: 2 },
-  copyBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: COLORS.primary, paddingHorizontal: SPACING.m, paddingVertical: 8, borderRadius: RADIUS.s },
-  copyBtnDone: { backgroundColor: COLORS.ratingGreen },
-  copyText: { color: COLORS.white, fontSize: 11.5, fontWeight: '800', letterSpacing: 0.5 },
-
-  trustRow: { flexDirection: 'row', gap: SPACING.s, marginHorizontal: SPACING.l, marginTop: SPACING.m },
-  trustChip: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, backgroundColor: COLORS.white, paddingVertical: SPACING.s, borderRadius: RADIUS.s, borderWidth: 1, borderColor: COLORS.cardBorder },
-  trustText: { fontSize: 11.5, fontWeight: '600', color: COLORS.textPrimary },
-
-  highlightCard: { flexDirection: 'row', alignItems: 'center', gap: SPACING.m, backgroundColor: COLORS.ratingGreenBg, marginHorizontal: SPACING.l, marginTop: SPACING.m, padding: SPACING.m, borderRadius: RADIUS.m },
-  highlightIconWrap: { width: 34, height: 34, borderRadius: 17, backgroundColor: COLORS.white, alignItems: 'center', justifyContent: 'center' },
-  highlightBody: { flex: 1 },
-  highlightTitle: { fontSize: 13, fontWeight: '700', color: COLORS.textPrimary },
-  highlightSub: { fontSize: 11.5, color: COLORS.textSecondary, marginTop: 2 },
-
   sectionHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginHorizontal: SPACING.l, marginTop: SPACING.xl, marginBottom: SPACING.s },
   sectionTitle: { fontSize: 15, fontWeight: '700', color: COLORS.textPrimary },
   sectionCount: { fontSize: 12, color: COLORS.textSecondary },
 
-  grid: { flexDirection: 'row', flexWrap: 'wrap', paddingHorizontal: SPACING.l - 4, justifyContent: 'space-between' },
-  gridCard: { width: '48%', marginHorizontal: 4, marginBottom: SPACING.m },
 
   footer: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: COLORS.white, borderTopWidth: 1, borderTopColor: COLORS.cardBorder },
   footerRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: SPACING.l, paddingVertical: SPACING.m, gap: SPACING.m },

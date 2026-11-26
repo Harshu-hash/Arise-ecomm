@@ -1,21 +1,23 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
-import { SPACING, RADIUS } from '../../../constants/spacing';
-import { StatusBarManager, ProductCard } from '../../../shared/components';
+import { SPACING } from '../../../constants/spacing';
+import { StatusBarManager } from '../../../shared/components';
+import ProductFeedSection from '../../home/components/ProductFeedSection';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
 import EmptyState from '../../../shared/EmptyState/EmptyState';
 import { useGetFlashSaleQuery } from '../api/flashSale.api';
 
 const formatTime = (totalSeconds) => {
-  const h = Math.floor(totalSeconds / 3600);
+  const d = Math.floor(totalSeconds / 86400);
+  const h = Math.floor((totalSeconds % 86400) / 3600);
   const m = Math.floor((totalSeconds % 3600) / 60);
   const s = totalSeconds % 60;
   const pad = (n) => String(n).padStart(2, '0');
-  return `${pad(h)}:${pad(m)}:${pad(s)}`;
+  return `${d ? `${d}d ` : ''}${pad(h)}h ${pad(m)}m ${pad(s)}s`;
 };
 
 const FlashSaleScreen = ({ navigation, route }) => {
@@ -71,21 +73,9 @@ const FlashSaleScreen = ({ navigation, route }) => {
         <View style={styles.backBtn} />
       </View>
 
-      <FlatList
-        data={sale.items}
-        keyExtractor={(item) => item.id}
-        numColumns={2}
-        columnWrapperStyle={styles.row}
-        contentContainerStyle={styles.gridContent}
-        showsVerticalScrollIndicator={false}
-        renderItem={({ item }) => (
-          <ProductCard
-            product={{ ...item, name: item.title }}
-            onPress={() => handlePressProduct(item)}
-            style={styles.card}
-          />
-        )}
-      />
+      <ScrollView showsVerticalScrollIndicator={false}>
+        <ProductFeedSection title={null} products={sale.items} onPressProduct={handlePressProduct} />
+      </ScrollView>
     </View>
   );
 };
@@ -122,15 +112,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     opacity: 0.9,
     marginTop: 2,
-  },
-  gridContent: {
-    padding: SPACING.l,
-  },
-  row: {
-    gap: SPACING.m,
-  },
-  card: {
-    marginBottom: SPACING.m,
   },
 });
 

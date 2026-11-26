@@ -42,7 +42,7 @@ const CartScreen = ({ navigation }) => {
   const [couponSheetOpen, setCouponSheetOpen] = useState(false);
   const toast = useToast();
   const isAuthenticated = useSelector(selectIsAuthenticated);
-  const { data: cart, error, isLoading, isFetching, refetch } = useGetCartQuery();
+  const { data: cart, error, isLoading, isFetching, refetch } = useGetCartQuery(undefined, { skip: !isAuthenticated });
   const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
   const [removeCartItem] = useRemoveCartItemMutation();
   const [updateCartItem] = useUpdateCartItemMutation();

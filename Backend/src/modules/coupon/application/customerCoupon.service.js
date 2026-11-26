@@ -75,13 +75,12 @@ export async function evaluateCouponsForCart(customerId, lines, { code = null, n
     ? { code: String(code).trim().toUpperCase() }
     : { $or: [{ visibility: 'PUBLIC', 'audience.type': { $in: ['ALL', 'NEW'] } }, ...(customerObjectId ? [{ 'audience.type': 'CUSTOM', 'audience.customerIds': customerObjectId }] : [])] };
   // Aggregation, so the running status comes from the one definition the admin console uses.
-  const running = await Coupon.aggregate([
-    { $match: match },
+  const [running, history] = await Promise.all([Coupon.aggregate([
+    { $match: { ...match, state: COUPON_STATE.LIVE, endsAt: { $gte: now } } }, // ACTIVE implies both; lets the state/endsAt index narrow the scan
     { $addFields: { status: statusExpr(now) } },
     { $match: { status: COUPON_STATUS.ACTIVE } },
     { $limit: MAX_LISTED },
-  ]);
-  const history = await getCustomerCouponHistory(customerId);
+  ]), getCustomerCouponHistory(customerId)]);
   const cart = {
     customer: { id: String(customerId), ordersCount: history.ordersCount },
     items: lines.map((line) => ({ productId: line.productId, sellerId: line.sellerId, pricePaise: line.unitPricePaise, qty: line.quantity })),

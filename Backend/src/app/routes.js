@@ -194,7 +194,7 @@ export function createRoutes() {
         ...(extras.suggested.length ? [{ id: 'suggested', type: 'SUGGESTED_PRODUCTS', status: 'READY', items: extras.suggested }] : []),
         // One section per campaign, so the published layout can place each flash sale / deal on its own.
         ...campaigns.flashSales.map((sale) => ({ id: `flash-sale-${sale.id}`, type: 'FLASH_SALE', campaignId: sale.id, status: 'READY', items: [sale] })),
-        ...campaigns.topValueDeals.map((deal) => ({ id: `top-value-deal-${deal.id}`, type: 'TOP_VALUE_DEALS', campaignId: deal.id, status: 'READY', items: [deal] })),
+        ...campaigns.topValueDeals.map((deal) => ({ id: `top-value-deal-${deal.id}`, type: 'TOP_VALUE_DEALS', campaignId: deal.id, status: 'READY', items: deal.products })),
         ...(extras.brands.length ? [{ id: 'brand-spotlight', type: 'BRAND_SPOTLIGHT', status: 'READY', items: extras.brands }] : []),
         ...(feed.length ? [{ id: 'product-feed', type: 'PRODUCT_FEED', status: 'READY', items: feed }] : []),
       ];

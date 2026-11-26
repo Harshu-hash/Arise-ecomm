@@ -23,6 +23,8 @@ configureApiInterceptors({
     }
   },
   onSessionExpired: () => {
+    // A guest's 401 has no session to end; resetting the cache would refetch every screen, 401 again, and loop forever.
+    if (!store.getState().auth.accessToken && !store.getState().auth.refreshToken) return;
     secureSessionStorage.clear().catch(() => {});
     store.dispatch(sessionCleared());
     store.dispatch(baseApi.util.resetApiState());

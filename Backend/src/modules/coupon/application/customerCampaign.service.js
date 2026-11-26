@@ -11,7 +11,7 @@ import { CampaignSubmission } from '../infrastructure/persistence/campaignSubmis
 const TYPE_LABEL = { FLASH_DEAL: 'FLASH DEAL', OFFER: 'OFFER', SALE_EVENT: 'SALE EVENT', CLEARANCE: 'CLEARANCE' }; // the app tests the tag text
 const ACCENT = { FLASH_DEAL: '#CC0C39', OFFER: '#7C3AED', SALE_EVENT: '#D97706', CLEARANCE: '#0F766E' };
 const TILES_PER_PROMOTION = 6;
-const RELATED_LIMIT = 12;
+const HOME_PRODUCTS_PER_DEAL = 3;
 
 // Open (still taking entries), scheduled and active campaigns all run on their dates; paused, ended, cancelled and draft ones never show.
 const liveNow = (now) => ({ status: { $in: [C.OPEN, C.SCHEDULED, C.ACTIVE] }, startsAt: { $lte: now }, endsAt: { $gte: now } });
@@ -105,12 +105,12 @@ export async function listHomeCampaignSections(now = new Date()) {
       .filter((campaign) => entries.get(String(campaign._id)).length)
       .map((campaign) => {
         const list = entries.get(String(campaign._id));
+        // A taste of the deal: a few of its own products; tapping one opens the deal with all of them.
         return {
           id: String(campaign._id),
-          imageUrl: list[0].imageUrl,
-          label: campaign.name,
-          value: `Up to ${Math.max(...list.map((entry) => entry.discountPct))}% Off`,
-          tag: campaign.tagline || null,
+          products: list.slice(0, HOME_PRODUCTS_PER_DEAL).map((entry) => ({
+            id: entry.id, campaignId: String(campaign._id), imageUrl: entry.imageUrl, label: entry.name, value: `${entry.discountPct}% off`, tag: campaign.tagline || null,
+          })),
         };
       }),
   };
@@ -154,7 +154,7 @@ async function livePromotion(campaignId, now) {
 
 export async function getPromotion(campaignId, now = new Date()) {
   const { campaign, entries } = await livePromotion(campaignId, now);
-  return { ...promotionCard(campaign, entries), relatedProducts: entries.slice(0, RELATED_LIMIT).map(productCard) };
+  return { ...promotionCard(campaign, entries), relatedProducts: entries.map(productCard) }; // the deal page lists every product in the deal
 }
 
 export async function listPromotionProducts(campaignId, { cursor, limit }, now = new Date()) {

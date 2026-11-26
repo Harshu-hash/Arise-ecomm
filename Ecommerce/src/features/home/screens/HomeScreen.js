@@ -25,7 +25,7 @@ import { categoryApi } from '@features/category';
 
 const FOR_YOU_TAB_ID = 'foryou'; // reserved first tab served by the backend: the main home feed
 const FEED_PAGE_SIZE = 20; // the first page /home sends; a shorter first page means there is nothing more
-const LOAD_MORE_DISTANCE = 800; // px from the end of the scroll at which the next page is fetched
+const LOAD_MORE_SCREENS = 3; // fetch the next page this many screen-heights before the end, so it lands before the shopper gets there
 const DEFAULT_HEADER_HEIGHT = 272;
 const AD_SHEET_PARALLAX_DISTANCE = 50;
 const AD_SHEET_PARALLAX_SCROLL_RANGE = 160;
@@ -147,7 +147,7 @@ const HomeScreen = ({ navigation }) => {
   const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
     useNativeDriver: true,
     listener: ({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
-      if (contentOffset.y + layoutMeasurement.height > contentSize.height - LOAD_MORE_DISTANCE) loadMoreFeed();
+      if (contentOffset.y + layoutMeasurement.height > contentSize.height - LOAD_MORE_SCREENS * layoutMeasurement.height) loadMoreFeed();
     },
   });
   // Below the pinned hero and ad banners, sections appear in the order the admin's published layout set.
@@ -185,7 +185,7 @@ const HomeScreen = ({ navigation }) => {
           <BrandsSpotlightSection
             key={section.id}
             brands={section.items}
-            onPressBrand={brand => navigation?.navigate('Brands', { brandId: brand.id })}
+            onPressBrand={brand => navigation?.navigate('SearchResults', { brandId: brand.id, query: brand.name })}
             onSeeAll={() => navigation?.navigate('Brands')}
           />
         );
@@ -194,7 +194,7 @@ const HomeScreen = ({ navigation }) => {
           <TopValueDealsSection
             key={section.id}
             deals={section.items}
-            onPressDeal={deal => navigation?.navigate('DealDetail', { deal })}
+            onPressDeal={deal => navigation?.navigate('DealDetail', { dealId: deal.campaignId ?? deal.id, deal })}
           />
         );
       case HOME_SECTION_TYPES.productFeed:

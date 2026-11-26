@@ -28,7 +28,7 @@ const startSchema = z
       .min(3)
       .max(254)
       .refine(
-        (value) => z.email().safeParse(value).success || /^[6-9]\d{9}$/.test(value.replace(/\D/g, '').slice(-10)),
+        (value) => z.email().safeParse(value).success || /^(?:\+?91|0)?[6-9]\d{9}$/.test(value.replace(/[\s-]/g, '')),
         'Enter a valid email or Indian mobile number.',
       ),
     purpose: z.enum(['LOGIN', 'SIGNUP', 'PASSWORD_RESET']),

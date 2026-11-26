@@ -112,6 +112,9 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
   const activeTab = tabs[activeIndex] || tabs[0];
   const activeIsFlipkart = activeTab?.id === 'arise';
 
+  // Nothing to switch between: draw no switcher (an empty track shows as a grey bar).
+  if (tabs.length < 2) return null;
+
   return (
     <View style={styles.container}>
       <View style={styles.track} onLayout={handleTrackLayout}>
@@ -132,7 +135,7 @@ const TopBrandTabs = ({ tabs, activeId, onSelect }) => {
                 tab.gradient || (isFlipkartTab ? ['#FFE11B', '#FFC200'] : ['#E52E2E', '#900C1F']);
               const opacity = slideAnim.interpolate({
                 inputRange: positionsInput.length > 1 ? positionsInput : [0, 1],
-                outputRange: positionsInput.map(v => (v === i ? 1 : 0)),
+                outputRange: positionsInput.length > 1 ? positionsInput.map(v => (v === i ? 1 : 0)) : [1, 1], // a lone tab is always the active one
                 extrapolate: 'clamp',
               });
               return (

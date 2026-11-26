@@ -126,6 +126,7 @@ const homeCards = ttlMemo(
   (categoryIds) => liveCards({ categoryId: { $in: categoryIds } }),
   15_000,
   (categoryIds) => categoryIds.join(','),
+  { staleWhileRevalidate: true }, // rebuilding the shelf takes seconds; never make a shopper wait for it after the first fill
 );
 onCatalogChange(homeCards.clear);
 
@@ -326,7 +327,7 @@ export async function getCustomerProduct(productId) {
 const catalogSnapshot = ttlMemo(async () => {
   const visible = await visibleCategoryIds(null);
   return visible ? homeCards(visible) : [];
-}, 15_000, () => 'all');
+}, 15_000, () => 'all', { staleWhileRevalidate: true });
 onCatalogChange(catalogSnapshot.clear);
 
 const feedCard = (card) => ({

@@ -112,6 +112,7 @@ export const flashSaleItemSchema = z.object({
 
 export const dealCardSchema = z.object({
   id: z.string().min(1),
+  campaignId: z.string().min(1).optional(),
   imageUrl: z.string().url(),
   label: z.string().min(1),
   value: z.string().min(1),

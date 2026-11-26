@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   View,
   Text,
@@ -15,10 +15,12 @@ import { StatusBarManager } from '../../../shared/components';
 import AppButton from '../../../shared/buttons/AppButton';
 import TextField from '../../../shared/inputs/TextField';
 import { useStartAuthMutation } from '../api/auth.query';
+import { useIdentifierField } from '../validators/identifier';
 
 const ForgotPasswordScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const [identifier, setIdentifier] = useState('');
+  const field = useIdentifierField();
+  const { value: identifier, setValue: setIdentifier } = field;
   const [startAuth, { isLoading, error }] = useStartAuthMutation();
   const returnTo = route?.params?.returnTo;
 
@@ -31,7 +33,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
   };
 
   const handleSendOtp = async () => {
-    if (!identifier.trim()) return;
+    if (!field.valid) return;
     try {
       const challenge = await startAuth({
         identifier: identifier.trim(),
@@ -77,7 +79,9 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
           placeholder="Enter mobile number or email"
           leftIcon="mail"
           autoCapitalize="none"
-          error={error?.fieldErrors?.identifier}
+          error={field.error ?? error?.fieldErrors?.identifier}
+          onBlur={field.onBlur}
+          maxLength={254}
           style={styles.field}
         />
 
@@ -85,7 +89,7 @@ const ForgotPasswordScreen = ({ navigation, route }) => {
           title="Send OTP"
           onPress={handleSendOtp}
           loading={isLoading}
-          disabled={!identifier.trim()}
+          disabled={!field.valid}
           fullWidth
           size="lg"
           style={styles.cta}

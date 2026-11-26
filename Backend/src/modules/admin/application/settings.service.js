@@ -1,6 +1,7 @@
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { SENSITIVE_SETTINGS_SECTIONS, SETTINGS_SECTIONS } from '../domain/constants/platformSettings.js';
+import { ttlMemo } from '../../../shared/utils/ttlMemo.js';
 import { SECTION_SCHEMAS } from '../domain/services/settingsRules.js';
 import { PlatformSetting } from '../infrastructure/persistence/platformSetting.model.js';
 
@@ -25,11 +26,13 @@ export async function listSettings() {
 }
 
 // Read one section's effective values (stored over defaults) for other modules, e.g. getSettingsSection('orders').
-export async function getSettingsSection(sectionId) {
+// shortcut: cached 10s per process (cleared on any edit here), so another replica can show an old value for up to 10s.
+const readSection = ttlMemo(async (sectionId) => {
   const section = SECTIONS_BY_ID.get(sectionId);
   if (!section) throw new NotFoundError('That settings section does not exist.');
   return serializeSection(section, await PlatformSetting.findOne({ key: sectionId }).lean()).values;
-}
+}, 10_000, (sectionId) => sectionId);
+export const getSettingsSection = (sectionId) => readSection(sectionId);
 
 export async function updateSettingsSection(sectionId, { values, reason }, actor) {
   const section = SECTIONS_BY_ID.get(sectionId);
@@ -52,6 +55,7 @@ export async function updateSettingsSection(sectionId, { values, reason }, actor
     { $set: { values: parsed.data, updatedBy: actor.userId, updatedByName: actor.name ?? null }, $inc: { version: 1 } },
     { upsert: true, new: true },
   ).lean();
+  readSection.clear();
 
   const result = serializeSection(section, saved);
   await recordAudit({

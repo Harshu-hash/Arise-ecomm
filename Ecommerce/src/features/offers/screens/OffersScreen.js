@@ -10,6 +10,8 @@ import ErrorState from '../../../shared/ErrorState/ErrorState';
 import OfferThemeSection from '../components/OfferThemeSection';
 import { useGetPromotionsQuery } from '../api/offers.api';
 
+const PREVIEW_ITEMS = 3; // a taste only; "See All" or a tap opens the deal with every product
+
 const OffersScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const { data, isLoading, error, refetch } = useGetPromotionsQuery();
@@ -63,7 +65,7 @@ const OffersScreen = ({ navigation }) => {
           <OfferThemeSection
             key={section.id}
             title={section.title}
-            items={section.items}
+            items={section.items.slice(0, PREVIEW_ITEMS)}
             variant={section.variant}
             gradient={section.gradient}
             backgroundImage={section.backgroundImageUrl}

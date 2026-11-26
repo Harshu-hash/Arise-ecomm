@@ -3,7 +3,7 @@ import { View, Text, Image, StyleSheet, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
-/** 3-column brand ad row — image with an AD tag, discount headline + subtitle below. */
+/** 3-column brand row — logo centred in a tile, discount headline + subtitle below. */
 const BrandsSpotlightSection = ({ brands, onPressBrand, onSeeAll }) => (
   <View style={styles.wrapper}>
     <View style={styles.titleRow}>
@@ -23,10 +23,7 @@ const BrandsSpotlightSection = ({ brands, onPressBrand, onSeeAll }) => (
           style={styles.card}
         >
           <View style={styles.imageBox}>
-            <Image source={{ uri: brand.image }} style={styles.image} resizeMode="cover" />
-            <View style={styles.adTag}>
-              <Text style={styles.adTagText}>AD</Text>
-            </View>
+            <Image source={{ uri: brand.image }} style={styles.image} resizeMode="contain" />
           </View>
           <Text style={styles.discount} numberOfLines={1}>
             {brand.discount}
@@ -76,25 +73,15 @@ const styles = StyleSheet.create({
     position: 'relative',
     borderRadius: RADIUS.s,
     overflow: 'hidden',
-    backgroundColor: COLORS.mutedBg,
+    backgroundColor: COLORS.white,
+    borderWidth: 1,
+    borderColor: COLORS.cardBorder,
+    aspectRatio: 1.35,
+    padding: SPACING.s, // logos come in all shapes: contain them, centred, instead of cropping
   },
   image: {
     width: '100%',
-    aspectRatio: 1.35,
-  },
-  adTag: {
-    position: 'absolute',
-    right: 6,
-    top: 6,
-    backgroundColor: 'rgba(255,255,255,0.85)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 3,
-  },
-  adTagText: {
-    color: COLORS.textPrimary,
-    fontSize: 9,
-    fontWeight: '700',
+    height: '100%',
   },
   discount: {
     fontSize: 13,

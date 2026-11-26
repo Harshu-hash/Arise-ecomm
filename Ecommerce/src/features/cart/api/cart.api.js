@@ -7,13 +7,18 @@ const cartMutation = (builder, query, extra = {}) =>
     query,
     ...extra,
     transformResponse: mapCart,
-    invalidatesTags: (_, error) =>
-      error
-        ? []
-        : [
-            { type: 'Cart', id: 'CURRENT' },
-            { type: 'Coupon', id: 'ELIGIBLE' },
-          ],
+    // The response is already the whole re-priced cart: store it instead of refetching GET /cart.
+    async onQueryStarted(arg, api) {
+      const custom = extra.onQueryStarted?.(arg, api);
+      try {
+        const { data } = await api.queryFulfilled;
+        api.dispatch(cartApi.util.upsertQueryData('getCart', undefined, data));
+      } catch {
+        // failed: the custom handler (if any) undoes its optimistic patch
+      }
+      await custom;
+    },
+    invalidatesTags: (_, error) => (error ? [] : [{ type: 'Coupon', id: 'ELIGIBLE' }]),
   });
 
 export const cartApi = baseApi.injectEndpoints({
