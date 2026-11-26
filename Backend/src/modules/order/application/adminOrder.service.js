@@ -27,7 +27,7 @@ function slaOf(order, sla, now) {
   return { slaLabel: label, slaDueAt: dueAt?.toISOString() ?? null, slaBreached: Boolean(dueAt && dueAt.getTime() < now) };
 }
 
-const paymentStatusOf = (order) => (order.paymentMethod === 'cod' ? (isCodCollected(order) ? 'CAPTURED' : 'PENDING') : order.refundedPaise >= order.totals.payablePaise ? 'REFUNDED' : order.refundedPaise > 0 ? 'PARTIALLY_REFUNDED' : 'CAPTURED');
+const paymentStatusOf = (order) => (order.paymentMethod === 'cod' ? (isCodCollected(order) ? 'CAPTURED' : 'PENDING') : order.refundedPaise >= order.totals.payablePaise + (order.totals.walletCreditPaise ?? 0) ? 'REFUNDED' : order.refundedPaise > 0 ? 'PARTIALLY_REFUNDED' : 'CAPTURED');
 
 function toRow(order, shipments, sla, now = Date.now(), hasReturn = false) {
   const first = order.subOrders[0]?.items[0];

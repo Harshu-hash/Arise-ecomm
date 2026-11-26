@@ -32,7 +32,15 @@ function serializePage(row, { withBody = false } = {}) {
     requiresReacceptance: row.requiresReacceptance,
     publishedAt: row.publishedAt,
     versions: serializeVersions(row.versions),
-    ...(withBody ? { body: row.body } : {}),
+    ...(withBody ? {
+      body: row.body,
+      links: {
+        website: row.links?.website ?? null,
+        careers: row.links?.careers ?? null,
+        press: row.links?.press ?? null,
+        social: row.links?.social ?? null,
+      },
+    } : {}),
   };
 }
 
@@ -53,18 +61,29 @@ export async function getPublishedPage(slug) {
   await ensureSeeded();
   const page = await StaticPage.findOne({ slug, status: PAGE_STATUS.PUBLISHED }, 'slug title body publishedAt').lean();
   if (!page) return null;
-  return { slug: page.slug, title: page.title, body: page.body, publishedAt: page.publishedAt };
+  return {
+    slug: page.slug,
+    title: page.title,
+    body: page.body,
+    links: {
+      website: page.links?.website ?? null,
+      careers: page.links?.careers ?? null,
+      press: page.links?.press ?? null,
+      social: page.links?.social ?? null,
+    },
+    publishedAt: page.publishedAt,
+  };
 }
 
 /** Saving a page publishes it at once; a material change asks customers to re-accept it. */
-export async function publishPage(id, { body, materialChange, note }, actor) {
+export async function publishPage(id, { body, materialChange, note, links }, actor) {
   const editedByName = (await getUserAuthorization(actor.userId))?.name ?? 'Admin';
   const now = new Date();
   const updated = await StaticPage.findByIdAndUpdate(
     id,
     {
-      $set: { body, status: PAGE_STATUS.PUBLISHED, requiresReacceptance: materialChange, publishedAt: now },
-      $push: { versions: { $each: [{ body, editedBy: actor.userId, editedByName, editedAt: now, note: note || null }], $slice: -MAX_PAGE_VERSIONS } },
+      $set: { body, status: PAGE_STATUS.PUBLISHED, requiresReacceptance: materialChange, publishedAt: now, ...(links ? { links } : {}) },
+      $push: { versions: { $each: [{ body, ...(links ? { links } : {}), editedBy: actor.userId, editedByName, editedAt: now, note: note || null }], $slice: -MAX_PAGE_VERSIONS } },
     },
     { new: true },
   ).lean();

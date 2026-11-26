@@ -6,6 +6,7 @@ export const SETTINGS_SECTIONS = [
     label: 'General',
     values: {
       platformName: 'Arise',
+      logoUrl: '', // brand logo (a CMS upload); '' until one is uploaded
       supportEmail: 'support@arise.test',
       supportPhone: '1800-123-4567',
       businessAddress: '',
@@ -48,6 +49,27 @@ export const SETTINGS_SECTIONS = [
     id: 'payments',
     label: 'Payments',
     values: { enabledMethods: ['UPI', 'CARDS', 'NETBANKING', 'WALLET', 'COD'], codEnabled: true, walletUsageCapPct: 50 },
+  },
+  {
+    id: 'homeHeader',
+    label: 'Home header',
+    // The colour the app's home header fades from when the "For You" tab is selected.
+    values: { forYouColor: '#FFCB9D', forYouImage: '', forYouImageOpacity: 100 }, // forYouImage: a CMS upload shown behind the header, '' for none
+  },
+  {
+    id: 'referral',
+    label: 'Refer & Earn',
+    // Rewards are store credit in the customer's wallet, paid when the invited friend's first qualifying order is delivered.
+    values: {
+      enabled: false,
+      referrerRewardPaise: 10_000,
+      refereeRewardPaise: 5_000,
+      minOrderPaise: 49_900,
+      rewardExpiryDays: 90,
+      maxRewardsPerReferrer: 20,
+      autoApprove: false,
+      terms: '',
+    },
   },
   {
     id: 'tax',

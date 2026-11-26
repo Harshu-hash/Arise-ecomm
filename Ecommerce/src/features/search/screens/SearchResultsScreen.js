@@ -95,6 +95,7 @@ const SearchResultsScreen = ({ navigation, route }) => {
   const query = route?.params?.query || '';
   const categoryId = route?.params?.categoryId;
   const brandId = route?.params?.brandId;
+  const sellerId = route?.params?.sellerId;
 
   const [sortId, setSortId] = useState('relevance');
   const [filters, setFilters] = useState(EMPTY_FILTERS);
@@ -112,14 +113,15 @@ const SearchResultsScreen = ({ navigation, route }) => {
   );
 
   const requestKey = useMemo(
-    () => JSON.stringify({ query, categoryId, brandId, filters, sortId }),
-    [brandId, categoryId, filters, query, sortId],
+    () => JSON.stringify({ query, categoryId, brandId, sellerId, filters, sortId }),
+    [brandId, categoryId, filters, query, sellerId, sortId],
   );
   const requestArgs = useMemo(
     () => ({
       q: query,
       categoryId,
       brandId,
+      sellerId,
       categories: filters.categories.join(','),
       brands: filters.brands.join(','),
       priceRangeId: filters.priceRangeId || undefined,
@@ -128,7 +130,7 @@ const SearchResultsScreen = ({ navigation, route }) => {
       cursor: cursor || undefined,
       limit: 12,
     }),
-    [brandId, categoryId, cursor, filters, query, sortId],
+    [brandId, categoryId, cursor, filters, query, sellerId, sortId],
   );
   const { data, error, isLoading, isFetching, refetch } = useSearchProductsQuery(requestArgs);
 
@@ -236,7 +238,7 @@ const SearchResultsScreen = ({ navigation, route }) => {
             style={{ marginRight: SPACING.s }}
           />
           <Text style={styles.searchBarText} numberOfLines={1}>
-            {query || 'Search for items...'}
+            {query || route?.params?.title || 'Search for items...'}
           </Text>
         </TouchableOpacity>
 

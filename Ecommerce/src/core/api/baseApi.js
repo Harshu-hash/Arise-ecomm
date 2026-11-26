@@ -25,6 +25,8 @@ export const API_TAGS = [
   'Chat',
   'StaticContent',
   'FeatureFlag',
+  'SellerInquiry',
+  'AriseRating',
 ];
 
 export const baseApi = createApi({

@@ -1,7 +1,7 @@
 import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { attributeSetDetails } from '../../attribute/public/index.js';
 import { getBrandImages, getSizeChartForDisplay } from '../../catalog/public/index.js';
-import { getCategoryForListing, visibleCategoryIds } from '../../category/public/index.js';
+import { findCategoryForCatalog, visibleCategoryIds } from '../../category/public/index.js';
 import { dealPriceForVariant, getCampaignDealPrices } from '../../coupon/public/index.js';
 import { getUnsellableSellerIds } from '../../identity/public/index.js';
 import { urlForKey } from '../../media/public/index.js';
@@ -96,23 +96,45 @@ function toCard(product, offers, summary = null) {
 }
 
 async function liveCards(filter) {
-  const products = await Product.find({ ...filter, status: 'LIVE', 'images.0': { $exists: true } })
-    .sort({ createdAt: -1, _id: -1 })
-    .limit(MAX_CANDIDATES)
-    .lean();
+  const [products, unsellableSellerIds] = await Promise.all([
+    Product.find({ ...filter, status: 'LIVE', 'images.0': { $exists: true } })
+      .sort({ createdAt: -1, _id: -1 })
+      .limit(MAX_CANDIDATES)
+      .lean(),
+    getUnsellableSellerIds(),
+  ]);
   // Offers of sellers who may not sell right now (suspended, on holiday, ...) are not on the shelf; a product left with none disappears.
-  const offers = await withCampaignPrices(await Offer.find({ productId: { $in: products.map((p) => p._id) }, status: 'LIVE', sellerId: { $nin: await getUnsellableSellerIds() } }).lean());
+  const productIds = products.map((product) => product._id);
+  const rawOffers = await Offer.find({ productId: { $in: productIds }, status: 'LIVE', sellerId: { $nin: unsellableSellerIds } }).lean();
+  const [offers, ratings] = await Promise.all([
+    withCampaignPrices(rawOffers),
+    getRatingSummaries(productIds),
+  ]);
   const byProduct = new Map();
   for (const offer of offers) {
     const key = String(offer.productId);
     byProduct.set(key, [...(byProduct.get(key) ?? []), offer]);
   }
-  const ratings = await getRatingSummaries([...byProduct.keys()]);
   return products.flatMap((product) => {
     const own = byProduct.get(String(product._id));
     return own ? [toCard(product, own, ratings.get(String(product._id)))] : [];
   });
 }
+
+// Home and recommendation sections ask for the same shelf together; share that in-flight read instead of rebuilding it.
+const homeCards = ttlMemo(
+  (categoryIds) => liveCards({ categoryId: { $in: categoryIds } }),
+  15_000,
+  (categoryIds) => categoryIds.join(','),
+);
+onCatalogChange(homeCards.clear);
+
+const customerAttributeDetails = ttlMemo(
+  (attributeSetId) => attributeSetDetails(attributeSetId),
+  60_000,
+  (attributeSetId) => String(attributeSetId ?? ''),
+);
+onCatalogChange(customerAttributeDetails.clear);
 
 const discount = (card) => (card.mrpPaise - card.pricePaise) / card.mrpPaise;
 const SORTERS = {
@@ -122,12 +144,16 @@ const SORTERS = {
   rating: (a, b) => (b.rating ?? 0) - (a.rating ?? 0) || b.ratingCount - a.ratingCount,
 };
 
-export async function searchCustomerProducts({ q, categoryId, brandId, categories, brands, priceRangeId, minRating, sort, cursor, limit }) {
+export async function searchCustomerProducts({ q, categoryId, brandId, sellerId, categories, brands, priceRangeId, minRating, sort, cursor, limit }) {
   const visible = await visibleCategoryIds(categoryId ?? null);
   const facets = { categories: [], brands: [], priceRanges: PRICE_RANGES, ratings: RATING_FILTERS };
   if (!visible) return { items: [], total: 0, nextCursor: null, facets, sortOptions: SORT_OPTIONS };
 
-  const filter = { categoryId: { $in: visible }, ...(brandId ? { brandId } : {}) };
+  const filter = {
+    categoryId: { $in: visible },
+    ...(brandId ? { brandId } : {}),
+    ...(sellerId ? { _id: { $in: await Offer.distinct('productId', { sellerId, status: 'LIVE' }) } } : {}),
+  };
   let tokens = tokenize(q);
   const find = (words) => liveCards({
     ...filter,
@@ -174,11 +200,11 @@ export async function searchCustomerProducts({ q, categoryId, brandId, categorie
 }
 
 /** Newest approved products for the home feed card grid. */
-export async function listHomeProductFeed({ categoryId = null, limit = 20 } = {}) {
+export async function listHomeProductFeed({ categoryId = null, limit = 20, offset = 0 } = {}) {
   const visible = await visibleCategoryIds(categoryId);
   if (!visible) return [];
-  const cards = await liveCards({ categoryId: { $in: visible } });
-  return cards.slice(0, limit).map((card) => ({
+  const cards = await homeCards(visible);
+  return cards.slice(offset, offset + limit).map((card) => ({
     id: card.id,
     brand: card.brand,
     name: card.name,
@@ -213,18 +239,26 @@ const toText = (value) => (Array.isArray(value) ? value.join(', ') : String(valu
 
 export async function getCustomerProduct(productId) {
   const notFound = () => new NotFoundError('Product not found.');
-  const product = await Product.findOne({ _id: productId, status: 'LIVE' }).lean();
+  const [product, visibleCategories] = await Promise.all([
+    Product.findOne({ _id: productId, status: 'LIVE' }).lean(),
+    visibleCategoryIds(),
+  ]);
   if (!product) throw notFound();
-  if (!(await visibleCategoryIds()).includes(String(product.categoryId))) throw notFound();
-  const [offers, variants, category, sizeChart] = await Promise.all([
-    Offer.find({ productId: product._id, status: 'LIVE', sellerId: { $nin: await getUnsellableSellerIds() } }).lean().then(withCampaignPrices),
+  if (!visibleCategories.includes(String(product.categoryId))) throw notFound();
+  const offersPromise = getUnsellableSellerIds()
+    .then((unsellableSellerIds) => Offer.find({ productId: product._id, status: 'LIVE', sellerId: { $nin: unsellableSellerIds } }).lean())
+    .then(withCampaignPrices);
+  const categoryPromise = findCategoryForCatalog(product.categoryId);
+  const definitionsPromise = categoryPromise.then((category) => customerAttributeDetails(category?.attributeSetId ?? null));
+  const [offers, variants, sizeChart, ratings, { attributes: definitions }] = await Promise.all([
+    offersPromise,
     Variant.find({ productId: product._id }).lean(),
-    getCategoryForListing(product.categoryId),
     getSizeChartForDisplay(product.sizeChartId),
+    getRatingSummaries([product._id]),
+    definitionsPromise,
   ]);
   if (!offers.length) throw notFound();
-  const { attributes: definitions } = await attributeSetDetails(category?.attributeSetId ?? null);
-  const summary = (await getRatingSummaries([product._id])).get(String(product._id));
+  const summary = ratings.get(String(product._id));
   const nameByCode = new Map(definitions.map((definition) => [definition.code, definition.name]));
 
   const keys = product.images.length ? product.images : variants.flatMap((variant) => variant.images);
@@ -291,7 +325,7 @@ export async function getCustomerProduct(productId) {
 // Every visible live product as a card, shared by the three home sections below; refreshed every 15s.
 const catalogSnapshot = ttlMemo(async () => {
   const visible = await visibleCategoryIds(null);
-  return visible ? liveCards({ categoryId: { $in: visible } }) : [];
+  return visible ? homeCards(visible) : [];
 }, 15_000, () => 'all');
 onCatalogChange(catalogSnapshot.clear);
 
@@ -300,6 +334,43 @@ const feedCard = (card) => ({
   pricePaise: card.pricePaise, mrpPaise: card.mrpPaise, rating: card.rating, ratingCount: card.ratingCount,
 });
 const discountPct = (card) => Math.round(discount(card) * 100);
+
+/**
+ * What goes under a product page. Pure, so it is tested without a database.
+ * similar: the same shelf (same category), same brand first, then the nearest price.
+ * suggested: everything else, the product's own wider category first, then the categories this shopper has been looking at,
+ *   then the best discounts; what they already viewed goes last (never dropped, so a small catalogue still fills the rail).
+ */
+export function relatedFrom(cards, productId, viewedIds = new Set(), { similarLimit = 10, suggestedLimit = 12 } = {}) {
+  const self = cards.find((card) => card.id === String(productId));
+  if (!self) return { similar: [], suggested: [] };
+  const others = cards.filter((card) => card.id !== self.id);
+  const gap = (card) => Math.abs(card.pricePaise - self.pricePaise);
+  const sameBrand = (card) => (card.brandId && card.brandId === self.brandId ? 1 : 0);
+  const similar = others
+    .filter((card) => card.rootCategory === self.rootCategory && card.category === self.category)
+    .sort((a, b) => sameBrand(b) - sameBrand(a) || gap(a) - gap(b))
+    .slice(0, similarLimit);
+
+  const taken = new Set(similar.map((card) => card.id));
+  const viewedRoots = new Set(others.filter((card) => viewedIds.has(card.id)).map((card) => card.rootCategory));
+  const rank = (card) => (card.rootCategory === self.rootCategory ? 0 : viewedRoots.has(card.rootCategory) ? 1 : 2);
+  const rest = others.filter((card) => !taken.has(card.id));
+  const byInterest = (a, b) => rank(a) - rank(b) || discount(b) - discount(a);
+  const suggested = [
+    ...rest.filter((card) => !viewedIds.has(card.id)).sort(byInterest),
+    ...rest.filter((card) => viewedIds.has(card.id)).sort(byInterest),
+  ].slice(0, suggestedLimit);
+  return { similar, suggested };
+}
+
+export async function listRelatedProducts(productId, { userId = null } = {}) {
+  const [cards, views] = await Promise.all([
+    catalogSnapshot(),
+    userId ? RecentView.find({ userId }).sort({ viewedAt: -1 }).limit(12).lean() : [],
+  ]);
+  return relatedFrom(cards, productId, new Set(views.map((view) => String(view.productId))));
+}
 
 /** Remembers that a signed-in customer opened a product (best effort; never blocks the product page). */
 export async function recordProductView(userId, productId) {

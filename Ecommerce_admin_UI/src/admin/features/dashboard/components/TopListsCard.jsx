@@ -24,6 +24,7 @@ export default function TopListsCard({ data, loading }) {
       size="small"
       title="Top performers"
       loading={loading}
+      style={{ height: '100%' }}
       extra={<Segmented size="small" value={tab} onChange={setTab} options={TABS} />}
     >
       <Table

@@ -9,17 +9,21 @@ const response = (config, data, status = 200) => ({
   request: null,
 });
 
+let sellerLead = null;
+
 export const customerSellerFixtureAdapter = async config => {
+  if (config.url === '/seller-leads/me' && config.method === 'get') {
+    return response(config, { data: sellerLead });
+  }
   if (config.url === '/seller-leads' && config.method === 'post') {
+    sellerLead ??= {
+      id: `seller-lead-${Date.now()}`,
+      status: 'RECEIVED',
+      submittedAt: new Date().toISOString(),
+    };
     return response(
       config,
-      {
-        data: {
-          id: `seller-lead-${Date.now()}`,
-          status: 'RECEIVED',
-          submittedAt: new Date().toISOString(),
-        },
-      },
+      { data: sellerLead },
       201,
     );
   }

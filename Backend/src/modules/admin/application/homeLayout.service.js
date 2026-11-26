@@ -209,7 +209,17 @@ export async function listCategoryTabs() {
 }
 
 export async function updateCategoryTab(id, patch, actor) {
-  const updated = await CategoryTab.findByIdAndUpdate(id, { $set: patch }, { new: true }).lean();
+  const updated = await CategoryTab.findByIdAndUpdate(
+    id,
+    {
+      $set: {
+        ...patch,
+        ...(patch.icon !== undefined ? { iconOverridden: true } : {}),
+        ...(patch.gradient !== undefined ? { gradientOverridden: true } : {}),
+      },
+    },
+    { new: true },
+  ).lean();
   if (!updated) throw new NotFoundError('That tab no longer exists.');
   await recordAudit({ action: 'cms.home.category_tab.edit', subjectType: 'categoryTab', subjectId: id, after: patch, actor });
   return serializeCategoryTab(updated);
@@ -254,7 +264,12 @@ export async function applyCategoryTabOverrides(tabs) {
     .filter((tab) => byCategory.get(tab.id)?.active !== false)
     .map((tab) => {
       const row = byCategory.get(tab.id);
-      return row ? { ...tab, label: row.label, icon: row.icon, gradient: row.gradient ?? tab.gradient } : tab;
+      return row ? {
+        ...tab,
+        label: row.label,
+        icon: row.iconOverridden ? row.icon : tab.icon,
+        gradient: row.gradientOverridden ? row.gradient ?? tab.gradient : tab.gradient,
+      } : tab;
     })
     .sort((a, b) => rank(a) - rank(b));
 }

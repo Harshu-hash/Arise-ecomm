@@ -9,6 +9,7 @@ import { removeOrderedItems } from '../../cart/public/index.js';
 import { recordOrderPlaced } from '../../coupon/public/index.js';
 import { findCommittedPayment, Payment, recordCapture, recordFailure, recordRefund, refundPayment } from '../../payment/public/index.js';
 import { commitStock } from '../../product/public/index.js';
+import { debitWallet } from '../../wallet/public/index.js';
 import { canAdvance, getShipment, getShipmentsBySubOrder, recordTracking, SHIPROCKET, TRACKING_EVENT } from '../../shipping/public/index.js';
 import { CheckoutSession, SESSION_STATUS } from '../infrastructure/persistence/checkoutSession.model.js';
 import { Order, ORDER_STATUS } from '../infrastructure/persistence/order.model.js';
@@ -93,14 +94,20 @@ export async function placeOrder({ sessionId, customerId = null }) {
       }], { session: s });
       await recordOrderPlaced({ orderId: created._id, customerId: session.customerId, couponCode: quote.couponCode, discountPaise: quote.totals.couponDiscountPaise }, s);
       await CheckoutSession.updateOne({ _id: session._id }, { $set: { status: SESSION_STATUS.PLACED, orderId: created._id } }, { session: s });
-      await Payment.updateOne({ _id: payment._id }, { $set: { orderId: created._id } }, { session: s });
+      // Store credit is taken in the same transaction as the order; if it was spent elsewhere meanwhile, nothing is placed and the card payment is refunded.
+      if (quote.totals.walletCreditPaise > 0) {
+        await debitWallet({ userId: session.customerId, type: 'ORDER_PAYMENT', title: `Order ${created.number}`, reference: created.number, amountPaise: quote.totals.walletCreditPaise, key: `order:${session._id}` }, s);
+      }
+      await Payment.updateOne({ _id: payment._id }, { $set: { orderId: created._id, walletCreditPaise: quote.totals.walletCreditPaise ?? 0 } }, { session: s });
       return created;
     });
   } catch (error) {
-    if (error instanceof Unfulfillable) {
+    if (error instanceof Unfulfillable || ['WALLET_INSUFFICIENT', 'WALLET_FROZEN'].includes(error?.code)) {
+      const walletShort = !(error instanceof Unfulfillable);
       await CheckoutSession.updateOne({ _id: session._id }, { $set: { status: SESSION_STATUS.EXPIRED } });
-      if (payment.method !== 'cod') await refundPayment(payment._id, { reason: 'Items sold out before payment completed' }).catch((err) => logger.error({ err, paymentId: String(payment._id) }, 'Refund after unfulfillable order failed'));
+      if (payment.method !== 'cod') await refundPayment(payment._id, { reason: walletShort ? 'Wallet balance changed before the order was placed' : 'Items sold out before payment completed' }).catch((err) => logger.error({ err, paymentId: String(payment._id) }, 'Refund after unfulfillable order failed'));
       notifyUnfulfillable({ customerId: session.customerId, sessionId: session._id, amountPaise: payment.method === 'cod' ? 0 : payment.amountPaise });
+      if (walletShort) throw failure(409, 'WALLET_INSUFFICIENT', 'Your wallet balance changed before the order could be placed. The payment will be refunded.');
       throw failure(409, 'ORDER_UNFULFILLABLE', payment.method === 'cod' ? 'Some items sold out before the order could be placed. Nothing was charged.' : 'Some items sold out before the payment completed. The payment will be refunded.');
     }
     if (error?.code === 11000) return Order.findOne({ checkoutSessionId: session._id });
@@ -159,7 +166,7 @@ export const toOrderDto = (order, shipments = new Map(), taken = new Map(), revi
   placedAt: order.placedAt.toISOString(),
   status: order.status,
   paymentMethod: order.paymentMethod,
-  paymentStatus: order.paymentMethod === 'cod' ? (isCodCollected(order) ? 'PAID' : 'COD_PENDING') : order.refundedPaise >= order.totals.payablePaise ? 'REFUNDED' : 'PAID',
+  paymentStatus: order.paymentMethod === 'cod' ? (isCodCollected(order) ? 'PAID' : 'COD_PENDING') : order.refundedPaise >= order.totals.payablePaise + (order.totals.walletCreditPaise ?? 0) ? 'REFUNDED' : 'PAID',
   deliveryCode: null,
   address: order.address,
   amountPaise: order.totals.payablePaise,

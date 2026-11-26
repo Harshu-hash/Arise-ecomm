@@ -1,10 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Linking } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import { useGetStaticPageQuery } from '../api/staticPage.api';
 
 const LINKS = [
   { id: 'website', icon: 'globe', label: 'Visit our website' },
@@ -15,6 +16,8 @@ const LINKS = [
 
 const AboutScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
+  const { data: page, isLoading, isError } = useGetStaticPageQuery('about');
+  const visibleLinks = LINKS.filter(link => page?.links?.[link.id]);
 
   return (
     <View style={styles.container}>
@@ -27,6 +30,9 @@ const AboutScreen = ({ navigation }) => {
         <Text style={styles.headerTitle}>About Arise</Text>
       </View>
 
+      {isLoading ? (
+        <ActivityIndicator style={styles.loader} color={COLORS.textPrimary} />
+      ) : (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         <View style={styles.logoBox}>
           <Icon name="shopping-bag" size={30} color={COLORS.primary} />
@@ -35,14 +41,17 @@ const AboutScreen = ({ navigation }) => {
         <Text style={styles.versionText}>Version 1.0.0</Text>
 
         <Text style={styles.description}>
-          Arise is a multi-vendor marketplace connecting customers with eligible sellers and products
-          across categories including electronics, fashion, home essentials and more — delivered
-          to your doorstep with trusted quality and secure payments.
+          {isError ? 'Could not load information about Arise. Please try again later.' : page?.body || 'Information about Arise has not been published yet.'}
         </Text>
 
         <View style={styles.listGroup}>
-          {LINKS.map((link) => (
-            <TouchableOpacity key={link.id} activeOpacity={0.7} style={styles.linkRow}>
+          {visibleLinks.map((link) => (
+            <TouchableOpacity
+              key={link.id}
+              activeOpacity={0.7}
+              accessibilityRole="link"
+              onPress={() => Linking.openURL(page.links[link.id]).catch(() => {})}
+              style={styles.linkRow}>
               <Icon name={link.icon} size={18} color={COLORS.primary} style={styles.linkIcon} />
               <Text style={styles.linkLabel}>{link.label}</Text>
               <Icon name="chevron-right" size={16} color={COLORS.textTertiary} />
@@ -52,6 +61,7 @@ const AboutScreen = ({ navigation }) => {
 
         <Text style={styles.copyright}>© 2026 Arise Marketplace. All rights reserved.</Text>
       </ScrollView>
+      )}
     </View>
   );
 };
@@ -75,6 +85,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: '500',
     color: COLORS.textPrimary,
+  },
+  loader: {
+    marginTop: SPACING.xxxl,
   },
   scrollContent: {
     paddingHorizontal: SPACING.l,

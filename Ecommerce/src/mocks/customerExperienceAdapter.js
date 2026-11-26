@@ -126,6 +126,11 @@ export const customerExperienceFixtureAdapter = async config => {
   if (config.url === '/health' && config.method === 'get') {
     return response(config, { data: { status: 'ok', checkedAt: new Date().toISOString() } });
   }
+  if (config.url === '/arise-ratings' && config.method === 'put') {
+    return response(config, {
+      data: { id: 'arise-rating-demo', rating: config.data.rating, ratedAt: new Date().toISOString() },
+    });
+  }
   if (config.url === '/coupons/available' && config.method === 'get') {
     return response(config, {
       data: {

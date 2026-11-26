@@ -2,7 +2,6 @@ import { Card, Col, Flex, Row, Segmented, Table, Typography } from 'antd';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@core/api/axiosInstance';
 import { qk } from '@core/api/queryClient';
-import { useCurrentUser } from '@core/auth/sessionStore';
 import { formatNumber, formatPercent } from '@core/utils/money';
 import ErrorState from '@ui/components/ErrorState';
 import MoneyText from '@ui/components/MoneyText';
@@ -29,7 +28,6 @@ const RANGES = [
  * Phase 8 decisions for why.
  */
 export default function DashboardPage() {
-  const user = useCurrentUser();
   const state = useUrlTableState({ defaultSort: '', defaultPageSize: 25 });
   const days = Number(state.filters.days ?? 7);
 
@@ -55,13 +53,11 @@ export default function DashboardPage() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.dashboard.alerts }),
   });
 
-  const firstName = user?.name?.split(' ')[0] ?? 'there';
-
   return (
-    <Flex vertical gap={16}>
+    <Flex vertical gap={24}>
       <PageHeader
-        title={`Good day, ${firstName}`}
-        subtitle="Here's what's happening across your store today."
+        title="Marketplace overview"
+        subtitle="Sales, fulfilment, finance and support at a glance"
         actions={
           <Segmented
             value={days}
@@ -150,10 +146,18 @@ export default function DashboardPage() {
 
       <Row gutter={[12, 12]}>
         {true && (
-          <Col xs={24} lg={12}>
-            <Card size="small" title="Payment mix" loading={summary.isLoading}>
+          <Col xs={24} lg={10}>
+            <Card
+              size="small"
+              title="Payment mix"
+              loading={summary.isLoading}
+              style={{ height: '100%' }}
+              styles={{ body: { padding: '0 16px 4px' } }}
+            >
               <Table
                 size="small"
+                tableLayout="fixed"
+                showHeader={false}
                 pagination={false}
                 rowKey="method"
                 dataSource={summary.data?.paymentMix ?? []}
@@ -163,7 +167,7 @@ export default function DashboardPage() {
                     title: 'Share',
                     dataIndex: 'sharePct',
                     align: 'right',
-                    render: (v) => <span className="tabular">{formatPercent(v)}</span>,
+                    render: (v) => <span className="tabular">{formatPercent(v)} share</span>,
                   },
                   {
                     title: 'Success rate',
@@ -171,7 +175,7 @@ export default function DashboardPage() {
                     align: 'right',
                     render: (v) => (
                       <Typography.Text type={v < 93 ? 'danger' : undefined} className="tabular">
-                        {formatPercent(v)}
+                        {formatPercent(v)} success
                       </Typography.Text>
                     ),
                   },
@@ -181,10 +185,18 @@ export default function DashboardPage() {
           </Col>
         )}
 
-        <Col xs={24} lg={12}>
-          <Card size="small" title="Top states by orders" loading={summary.isLoading}>
+        <Col xs={24} lg={14}>
+          <Card
+            size="small"
+            title="Top states by orders"
+            loading={summary.isLoading}
+            style={{ height: '100%' }}
+            styles={{ body: { padding: '0 16px 4px' } }}
+          >
             <Table
               size="small"
+              tableLayout="fixed"
+              showHeader={false}
               pagination={false}
               rowKey="state"
               dataSource={summary.data?.topStates ?? []}
@@ -194,7 +206,7 @@ export default function DashboardPage() {
                   title: 'Orders',
                   dataIndex: 'orders',
                   align: 'right',
-                  render: (v) => <span className="tabular">{formatNumber(v)}</span>,
+                  render: (v) => <span className="tabular">{formatNumber(v)} orders</span>,
                 },
                 {
                   title: 'GMV',
@@ -209,10 +221,10 @@ export default function DashboardPage() {
       </Row>
 
       <Row gutter={[12, 12]}>
-        <Col xs={24} lg={14}>
+        <Col xs={24} lg={16}>
           <TopListsCard data={summary.data} loading={summary.isLoading} />
         </Col>
-        <Col xs={24} lg={10}>
+        <Col xs={24} lg={8}>
           <AlertsFeed
             alerts={alerts.data?.data}
             unread={alerts.data?.meta?.unread}

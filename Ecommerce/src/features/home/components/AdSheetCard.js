@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, Image, StyleSheet, FlatList, Dimensions } from 'react-native';
+import { View, Text, Image, StyleSheet, FlatList, Dimensions, TouchableOpacity } from 'react-native';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
@@ -17,7 +17,7 @@ const AUTO_ADVANCE_MS = 3200;
  * animation) snap to the matching real index on the other side — the swap is
  * imperceptible since the clone looks identical to the real slide it stands in for.
  */
-const AdSheetCard = ({ banners }) => {
+const AdSheetCard = ({ banners, onPressBanner }) => {
   const realLength = banners?.length || 0;
   const isLoopable = realLength > 1;
   const paddedBanners = isLoopable
@@ -107,11 +107,13 @@ const AdSheetCard = ({ banners }) => {
             index,
           })}
           renderItem={({ item }) => (
-            <Image
-              source={typeof item.image === 'string' ? { uri: item.image } : item.image}
-              style={styles.image}
-              resizeMode="cover"
-            />
+            <TouchableOpacity activeOpacity={0.9} onPress={() => onPressBanner?.(item)}>
+              <Image
+                source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+                style={styles.image}
+                resizeMode="cover"
+              />
+            </TouchableOpacity>
           )}
         />
         <View style={styles.adTag}>

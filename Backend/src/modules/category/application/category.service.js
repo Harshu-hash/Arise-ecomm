@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
+import { onCatalogChange } from '../../../infrastructure/realtime/catalogEvents.js';
 import { deviceUrl } from '../../../shared/utils/mediaUrl.js';
 import { ConflictError, ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
+import { ttlMemo } from '../../../shared/utils/ttlMemo.js';
 import {
   attributeSetDetails,
   releaseAttributeSet,
@@ -99,11 +101,12 @@ export async function findRootCategoryByName(name) {
 }
 
 export async function findCategoryForCatalog(categoryId) {
-  const category = await Category.findById(categoryId, 'name rootId').lean();
+  const category = await Category.findById(categoryId, 'name rootId attributeSetId').lean();
   return category ? {
     id: String(category._id),
     name: category.name,
     rootId: String(category.rootId),
+    attributeSetId: id(category.attributeSetId),
   } : null;
 }
 
@@ -378,9 +381,12 @@ export async function deleteCategory(categoryId, { scope, actor }) {
 const DEFAULT_TAB_COLOR = '#FFCB9D';
 
 
-async function activeTree() {
-  return categoryTree(await Category.find({ status: 'ACTIVE' }).lean(), (row) => row);
-}
+const activeTree = ttlMemo(
+  async () => categoryTree(await Category.find({ status: 'ACTIVE' }).lean(), (row) => row),
+  15_000,
+  () => 'all',
+);
+onCatalogChange(activeTree.clear);
 
 function findNode(nodes, categoryId) {
   for (const node of nodes) {

@@ -44,29 +44,29 @@ export default function DashboardPage() {
       />}
 
       <Row gutter={[12, 12]}>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="GMV (30 days)" valuePaise={kpis.gmv30dPaise} format="money" loading={isLoading} />
         </Col>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="Orders (30 days)" value={kpis.orders30d} loading={isLoading} />
         </Col>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="Orders to process" value={kpis.ordersToProcess} to="/orders" loading={isLoading} />
         </Col>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="Live listings" value={kpis.liveListings} to="/listings" loading={isLoading} />
         </Col>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="Returns pending" value={kpis.returnsPending} to="/returns" loading={isLoading} />
         </Col>
-        <Col xs={12} md={8} lg={6}>
+        <Col xs={12} md={8} lg={4}>
           <StatCard label="Payout due" valuePaise={kpis.payoutDuePaise} format="money" to="/payments" loading={isLoading} />
         </Col>
       </Row>
 
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={10}>
-          <Card title="Account health" loading={isLoading} size="small">
+          <Card title="Account health" loading={isLoading} size="small" style={{ height: "100%" }}>
             <Flex align="center" gap={20}>
               <Progress
                 type="dashboard"
@@ -84,7 +84,7 @@ export default function DashboardPage() {
         </Col>
 
         <Col xs={24} lg={14}>
-          <Card title="Grow your business" size="small" loading={isLoading}>
+          <Card title="Grow your business" size="small" loading={isLoading} style={{ height: "100%" }}>
             <List
               dataSource={data?.tips ?? []}
               renderItem={(tip) => (

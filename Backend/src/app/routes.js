@@ -8,6 +8,7 @@ import {
   applyCategoryTabOverrides,
   arrangeHomeSections,
   getPublishedPage,
+  getSettingsSection,
   getPublishedSections,
   listLiveBanners,
 } from '../modules/admin/public/index.js';
@@ -24,6 +25,10 @@ import { createAdminUsersRouter } from '../modules/identity/presentation/adminUs
 import { createAuthRouter } from '../modules/identity/presentation/auth.routes.js';
 import { createCustomerAuthRouter } from '../modules/identity/presentation/customerAuth.routes.js';
 import { createCustomerAddressRouter } from '../modules/customer/presentation/address.routes.js';
+import { createAdminCashbackRouter, createAdminCustomerWalletRouter, createAdminGiftCardRouter } from '../modules/wallet/presentation/adminWallet.routes.js';
+import { createCustomerGiftCardRouter, createCustomerWalletRouter } from '../modules/wallet/presentation/customerWallet.routes.js';
+import { createReferralInviteRouter, STORE_URLS } from '../modules/referral/presentation/invite.routes.js';
+import { createAdminReferralRouter, createCustomerReferralRouter } from '../modules/referral/presentation/referral.routes.js';
 import { createCustomerPrivacyRouter } from '../modules/customer/presentation/privacy.routes.js';
 import { createCustomerWishlistRouter } from '../modules/wishlist/presentation/wishlist.routes.js';
 import { createCustomerCartRouter } from '../modules/cart/presentation/cart.routes.js';
@@ -46,6 +51,7 @@ import { createAdminPaymentRouter } from '../modules/order/presentation/adminPay
 import { createAdminAnalyticsRouter, createAdminDashboardRouter, createAdminMoneyRouter, createSellerAnalyticsRouter, createSellerDashboardRouter } from '../modules/analytics/presentation/analytics.routes.js';
 import { createAdminBroadcastRouter } from '../modules/notification/presentation/broadcast.routes.js';
 import { createAdminChatRouter, createCustomerChatRouter } from '../modules/support/presentation/chat.routes.js';
+import { createAdminAriseRatingRouter, createCustomerAriseRatingRouter } from '../modules/support/presentation/ariseRating.routes.js';
 import { createAdminApprovalRouter } from '../modules/approval/presentation/approval.routes.js';
 import { createCustomerHelpRouter, createSellerSupportRouter } from '../modules/support/presentation/help.routes.js';
 import { createAdminAbuseRouter } from '../modules/review/presentation/adminAbuse.routes.js';
@@ -59,6 +65,7 @@ import { createRoleRouter } from '../modules/identity/presentation/roles.routes.
 import { createRegistrationRouter } from '../modules/identity/presentation/registration.routes.js';
 import { createSellerApplicationsRouter } from '../modules/identity/presentation/sellerApplications.routes.js';
 import { createSellerSettingsRouter } from '../modules/identity/presentation/sellerSettings.routes.js';
+import { createAdminSellerInquiryRouter, createCustomerSellerInquiryRouter } from '../modules/identity/presentation/sellerInquiry.routes.js';
 import { createCategoryRouter } from '../modules/category/presentation/category.routes.js';
 import { createCustomerCategoryRouter } from '../modules/category/presentation/customerCategory.routes.js';
 import { listHomeCategoryTabs } from '../modules/category/public/index.js';
@@ -109,6 +116,10 @@ const INVITE_AUDIENCES = ['seller', 'admin'];
 const homeTabs = ttlMemo(async () => applyCategoryTabOverrides(await listHomeCategoryTabs()), 15_000);
 const homeBrandTabs = ttlMemo(() => applyBrandTabOverrides(BRAND_TABS), 15_000);
 const homeLayout = ttlMemo(() => getPublishedSections(), 15_000);
+const homeForYou = ttlMemo(async () => {
+  const { forYouColor, forYouImage, forYouImageOpacity } = await getSettingsSection('homeHeader');
+  return { ...HOME_TAB, gradient: [forYouColor, '#FFFFFF'], backgroundImageUrl: forYouImage || null, backgroundImageOpacity: forYouImageOpacity / 100 };
+}, 15_000);
 const homeCampaigns = ttlMemo(() => listHomeCampaignSections(), 15_000);
 const homePage = ttlMemo(async (categoryId) => {
   const [hero, feed, ads, tabs] = await Promise.all([
@@ -120,7 +131,7 @@ const homePage = ttlMemo(async (categoryId) => {
   ]);
   return { hero, feed, ads, tabs };
 }, 15_000);
-for (const memo of [homeTabs, homeBrandTabs, homeLayout, homePage, homeCampaigns]) onCatalogChange(memo.clear);
+for (const memo of [homeForYou, homeTabs, homeBrandTabs, homeLayout, homePage, homeCampaigns]) onCatalogChange(memo.clear);
 
 export function createRoutes() {
   const root = Router();
@@ -142,20 +153,24 @@ export function createRoutes() {
     req.url = '/health';
     system(req, res, next);
   });
-  root.get('/api/customer/v1/app-config', (_req, res) =>
-    res.json({
+  root.get('/api/customer/v1/app-config', async (_req, res, next) => {
+    try {
+      // app-config is what the app reads first: a settings problem must not take it down, so fall back to the defaults.
+      const { platformName, logoUrl } = await getSettingsSection('general').catch(() => ({ platformName: 'Arise', logoUrl: '' }));
+      return res.json({
       data: {
+        brand: { name: platformName, logoUrl: logoUrl || null },
         minimumSupportedVersion: '1.0.0',
         latestVersion: '1.0.0',
         maintenance: { enabled: false, message: null },
-        storeUrls: {
-          android: 'market://details?id=com.ariseecommerce',
-          ios: 'https://apps.apple.com/app/arise-marketplace/id0000000000',
-        },
+        storeUrls: STORE_URLS,
         featureFlags: { wallet: true, referrals: true, productQuestions: true },
       },
-    }),
-  );
+    });
+    } catch (error) {
+      return next(error);
+    }
+  });
   // ?categoryId=<id> is a header category tab's page; absent (or the reserved "foryou" tab) is the main home feed.
   root.get('/api/customer/v1/home', optionalAuthenticate, async (req, res, next) => {
     try {
@@ -187,10 +202,23 @@ export function createRoutes() {
         data: {
           version: '1',
           generatedAt: new Date().toISOString(),
-          header: { searchPlaceholders: ['Search products'], brandTabs, categoryTabs: [HOME_TAB, ...tabs] },
+          header: { searchPlaceholders: ['Search products'], brandTabs, categoryTabs: [await homeForYou(), ...tabs] },
           sections: arrangeHomeSections(built, layout),
         },
       });
+    } catch (error) {
+      next(error);
+    }
+  });
+  // Infinite scroll for the "You May Also Like" grid: /home carries the first page, this serves the following ones.
+  root.get('/api/customer/v1/home/feed', async (req, res, next) => {
+    try {
+      const categoryId = typeof req.query.categoryId === 'string' && req.query.categoryId !== HOME_TAB.id ? req.query.categoryId : null;
+      if (categoryId && !objectIdSchema.safeParse(categoryId).success) return res.json({ data: { items: [], nextCursor: null } });
+      const offset = Math.max(0, parseInt(req.query.cursor, 10) || 0);
+      const limit = Math.min(40, Math.max(1, parseInt(req.query.limit, 10) || 20));
+      const items = await listHomeProductFeed({ categoryId, limit: limit + 1, offset });
+      res.json({ data: { items: items.slice(0, limit), nextCursor: items.length > limit ? String(offset + limit) : null } });
     } catch (error) {
       next(error);
     }
@@ -214,6 +242,10 @@ export function createRoutes() {
   root.use('/api/customer/v1/media', createCustomerMediaRouter());
   root.use('/api/customer/v1/flash-sales', createCustomerFlashSaleRouter());
   root.use('/api/customer/v1/coupons', createCustomerCouponRouter());
+  root.use('/api/customer/v1/wallet', createCustomerWalletRouter());
+  root.use('/api/customer/v1/gift-cards', createCustomerGiftCardRouter());
+  root.use('/api/customer/v1/referrals', createCustomerReferralRouter());
+  root.use('/invite', createReferralInviteRouter());
   root.use('/api/customer/v1/promotions', createCustomerPromotionRouter({ brandTabs: BRAND_TABS }));
   root.use('/api/customer/v1', createCustomerAddressRouter());
   root.use('/api/customer/v1', createCustomerPrivacyRouter());
@@ -223,7 +255,9 @@ export function createRoutes() {
   root.use('/api/customer/v1', createCustomerNotificationRouter());
   root.use('/api/customer/v1', createCustomerReviewRouter());
   root.use('/api/customer/v1', createCustomerQuestionRouter());
+  root.use('/api/customer/v1', createCustomerSellerInquiryRouter());
   root.use('/api/customer/v1', createCustomerChatRouter());
+  root.use('/api/customer/v1', createCustomerAriseRatingRouter());
   root.use('/api/customer/v1/help', createCustomerHelpRouter());
 
   // Brute-force protection: stricter per-IP bucket on every audience's auth routes.
@@ -263,8 +297,13 @@ export function createRoutes() {
   root.use('/api/admin/v1/campaigns/reach', createAudienceReachRouter()); // before the campaign router: "reach" is not an id
   root.use('/api/admin/v1/campaigns', createCampaignRouter());
   root.use('/api/admin/v1/coupons', createCouponRouter());
+  root.use('/api/admin/v1/referrals', createAdminReferralRouter());
+  root.use('/api/admin/v1/customer-wallets', createAdminCustomerWalletRouter());
+  root.use('/api/admin/v1/gift-cards', createAdminGiftCardRouter());
+  root.use('/api/admin/v1/cashback-rules', createAdminCashbackRouter());
   root.use('/api/admin/v1/reviews', createAdminReviewRouter());
   root.use('/api/admin/v1/chats', createAdminChatRouter());
+  root.use('/api/admin/v1/arise-ratings', createAdminAriseRatingRouter());
   root.use('/api/admin/v1/approvals', createAdminApprovalRouter());
   root.use('/api/admin/v1/abuse-reports', createAdminAbuseRouter());
   root.use('/api/admin/v1/push-broadcasts', createAdminBroadcastRouter());
@@ -291,6 +330,7 @@ export function createRoutes() {
   root.use('/api/admin/v1/brands', createBrandRouter());
   root.use('/api/admin/v1/size-charts', createSizeChartRouter());
   root.use('/api/admin/v1/sellers', createAdminPayoutHoldRouter()); // before the seller applications router: it only answers POST /:id/payout-hold
+  root.use('/api/admin/v1/seller-inquiries', createAdminSellerInquiryRouter());
   root.use('/api/admin/v1/sellers', createSellerApplicationsRouter());
   root.use('/api/admin/v1/products', createProductReviewRouter());
   root.use('/api/admin/v1/offers', createOfferAdminRouter());

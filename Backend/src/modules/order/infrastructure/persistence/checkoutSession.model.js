@@ -13,6 +13,7 @@ const sessionSchema = new mongoose.Schema(
     items: { type: [{ _id: false, offerId: mongoose.Schema.Types.ObjectId, quantity: Number }], required: true },
     couponCode: { type: String, default: null },
     address: { type: mongoose.Schema.Types.Mixed, required: true },
+    useWallet: { type: Boolean, default: false }, // spend store credit on this checkout (online payment only)
     selectedPaymentMethod: { type: String, enum: ['upi', 'card', 'cod', null], default: null },
     quote: { type: mongoose.Schema.Types.Mixed, required: true },
     status: { type: String, enum: Object.values(SESSION_STATUS), default: SESSION_STATUS.OPEN },

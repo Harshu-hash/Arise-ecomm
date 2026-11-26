@@ -5,4 +5,5 @@ export {
   useRevalidateCheckoutSessionMutation,
   useUpdateCheckoutAddressMutation,
   useUpdateCheckoutPaymentMethodMutation,
+  useUpdateCheckoutWalletMutation,
 } from './checkout.api';

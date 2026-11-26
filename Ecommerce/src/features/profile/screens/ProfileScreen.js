@@ -19,6 +19,7 @@ import { useGetProfileQuery } from '../api/profile.api';
 const QUICK_ACTIONS = [
   { id: 'orders', label: 'Orders', icon: 'package', bg: '#E5EEFF', color: COLORS.primary },
   { id: 'wishlist', label: 'Wishlist', icon: 'heart', bg: '#FDE7EC', color: COLORS.offerRed },
+  { id: 'wallet', label: 'Wallet', icon: 'credit-card', bg: '#E3F6F8', color: '#0E8FA0' },
   {
     id: 'coupons',
     label: 'Coupons',
@@ -92,14 +93,6 @@ const ProfileScreen = ({ navigation }) => {
                 <Text style={styles.coinText}>0</Text>
               </View>
             </View>
-            <Text style={styles.userCardCopy}>
-              Enjoy FREE YouTube Premium, Early Access to sale and more with Black.
-            </Text>
-            <TouchableOpacity activeOpacity={0.85} style={styles.exploreBlackBtn}>
-              <Text style={styles.exploreBlackText}>
-                Explore <Text style={{ fontWeight: '900' }}>BLACK</Text>
-              </Text>
-            </TouchableOpacity>
           </View>
         )}
 
@@ -111,6 +104,7 @@ const ProfileScreen = ({ navigation }) => {
               onPress={() => {
                 if (!navigation) return;
                 if (action.id === 'orders') navigation.navigate('MyOrders');
+                if (action.id === 'wallet') navigation.navigate('Wallet');
                 if (action.id === 'coupons') navigation.navigate('Coupons');
                 if (action.id === 'wishlist') navigation.navigate('Wishlist');
                 if (action.id === 'notifications') navigation.navigate('Notifications');
@@ -226,25 +220,6 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginLeft: 3,
   },
-  userCardCopy: {
-    fontSize: 13,
-    color: COLORS.textSecondary,
-    marginTop: SPACING.m,
-    lineHeight: 18,
-  },
-  exploreBlackBtn: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.black,
-    borderRadius: RADIUS.round,
-    paddingHorizontal: SPACING.l,
-    paddingVertical: SPACING.s,
-    marginTop: SPACING.m,
-  },
-  exploreBlackText: {
-    color: COLORS.white,
-    fontSize: 13,
-    fontWeight: '600',
-  },
   quickGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -253,7 +228,8 @@ const styles = StyleSheet.create({
     gap: SPACING.s,
   },
   quickCard: {
-    width: '47.5%',
+    flexBasis: '47%', // two equal columns that fill the row
+    flexGrow: 1,
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,

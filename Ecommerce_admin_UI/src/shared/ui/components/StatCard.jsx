@@ -53,7 +53,7 @@ export default function StatCard({
           {glossify(label)}
         </Typography.Text>
 
-        <Typography.Text strong className="tabular" style={{ fontSize: 26, lineHeight: 1.15, fontWeight: 700, letterSpacing: '-0.02em' }}>
+        <Typography.Text strong className="tabular" style={{ fontSize: 24, lineHeight: 1.2, fontWeight: 500 }}>
           {display}
         </Typography.Text>
 
@@ -67,7 +67,7 @@ export default function StatCard({
                 {flat ? <MinusOutlined /> : up ? <ArrowUpOutlined /> : <ArrowDownOutlined />}{' '}
                 {formatPercent(Math.abs(deltaPct))}
               </Typography.Text>
-              <Typography.Text type="secondary" style={{ fontSize: 11 }}>
+              <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                 {comparisonLabel}
               </Typography.Text>
             </Space>

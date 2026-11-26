@@ -12,6 +12,7 @@ export function serializeBanner(row, now = new Date()) {
     name: row.name,
     kind: row.kind,
     images: row.images,
+    videoUrl: row.videoUrl ?? '',
     altText: row.altText,
     placements: row.placements,
     categoryIds: (row.categoryIds ?? []).map(String),
@@ -81,7 +82,17 @@ function assertCategoriesChosen({ placements, categoryIds }) {
   }
 }
 
+/** A banner shows an image or a video, exactly one; only a hero can be a video. */
+function assertMedia({ kind, images, videoUrl }) {
+  const hasImage = Boolean(images?.mobile_16_9);
+  const hasVideo = Boolean(videoUrl);
+  const fail = (message) => new ValidationError('Invalid banner.', { imageUrl: [message] });
+  if (hasImage === hasVideo) throw fail('Add either an image or a video, not both or neither.');
+  if (hasVideo && kind !== 'HERO') throw fail('Only a hero banner can be a video.');
+}
+
 export async function createBanner(input, actor) {
+  assertMedia(input);
   assertCategoriesChosen(input);
   if (!isValidWindow(input.startsAt, input.endsAt)) throw windowError();
   if (input.startsAt < new Date(Date.now() - DAY_MS)) throw startError();
@@ -97,6 +108,7 @@ export async function createBanner(input, actor) {
 export async function updateBanner(id, patch, actor) {
   const before = await Banner.findById(id).lean();
   if (!before) throw new NotFoundError('That banner no longer exists.');
+  assertMedia({ kind: patch.kind ?? before.kind, images: patch.images ?? before.images, videoUrl: patch.videoUrl ?? before.videoUrl });
   assertCategoriesChosen({
     placements: patch.placements ?? before.placements,
     categoryIds: patch.categoryIds ?? before.categoryIds ?? [],
@@ -129,5 +141,5 @@ export async function listLiveBanners(placement, { categoryId = null, now = new 
   })
     .sort({ priority: 1, _id: 1 })
     .lean();
-  return rows.map((row) => ({ id: String(row._id), imageUrl: deviceUrl(row.images.mobile_16_9), altText: row.altText }));
+  return rows.map((row) => ({ id: String(row._id), imageUrl: row.images.mobile_16_9 ? deviceUrl(row.images.mobile_16_9) : null, videoUrl: row.videoUrl ? deviceUrl(row.videoUrl) : null, altText: row.altText }));
 }

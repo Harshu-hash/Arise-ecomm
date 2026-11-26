@@ -11,8 +11,7 @@ const DAYS = 30;
 const first = async (promise) => (await promise)[0] ?? {};
 
 const TIPS = [
-  { id: 'tip-ads', title: 'Boost visibility with Sponsored Products', cta: 'Create a campaign', link: '/ads/new' },
-  { id: 'tip-stock', title: 'Keep best-sellers in stock to avoid lost sales', cta: 'Review inventory', link: '/inventory' },
+  { id: 'tip-stock', title: 'Keep best-sellers in stock to avoid lost sales', cta: 'Review inventory', link: '/stock' },
   { id: 'tip-listings', title: 'Add more listings to reach more buyers', cta: 'Add a product', link: '/listings/new' },
 ];
 

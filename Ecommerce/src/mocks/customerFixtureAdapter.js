@@ -26,7 +26,7 @@ export const customerFixtureAdapter = config => {
   if (config.url?.startsWith('/pages/')) {
     const slug = config.url.split('/pages/')[1];
     return Promise.resolve({
-      data: { data: { slug, title: slug, body: `Fixture content for "${slug}". The real text comes from admin CMS.`, publishedAt: new Date().toISOString() } },
+      data: { data: { slug, title: slug, body: `Fixture content for "${slug}". The real text comes from admin CMS.`, links: {}, publishedAt: new Date().toISOString() } },
       status: 200,
       statusText: 'OK',
       headers: { 'content-type': 'application/json' },
@@ -38,6 +38,7 @@ export const customerFixtureAdapter = config => {
   if (config.url?.startsWith('/payment-methods'))
     return customerPaymentMethodsFixtureAdapter(config);
   if (
+    config.url === '/arise-ratings' ||
     config.url?.startsWith('/promotions') ||
     config.url?.startsWith('/flash-sales') ||
     config.url === '/me/recently-viewed' ||

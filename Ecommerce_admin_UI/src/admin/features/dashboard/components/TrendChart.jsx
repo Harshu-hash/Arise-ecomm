@@ -10,6 +10,7 @@ import {
   YAxis,
 } from 'recharts';
 import { useThemeStore } from '@theme/themeStore';
+import { CHROME } from '@theme/tokens';
 import { formatDate } from '@core/utils/date';
 import { formatINRCompact, formatNumber } from '@core/utils/money';
 
@@ -103,7 +104,7 @@ export default function TrendChart({ series = [], previousSeries = [], loading }
             dot={false}
             connectNulls
           />
-          <Line type="monotone" dataKey="current" stroke="#2874F0" strokeWidth={2} dot={false} />
+          <Line type="monotone" dataKey="current" stroke={CHROME.accent} strokeWidth={2} dot={false} />
         </LineChart>
       </ResponsiveContainer>
     </Card>

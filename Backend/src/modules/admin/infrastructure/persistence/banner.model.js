@@ -7,10 +7,12 @@ const bannerSchema = new mongoose.Schema(
     kind: { type: String, enum: BANNER_KINDS, required: true },
     // URLs of files uploaded through the CMS_MEDIA upload purpose.
     images: {
-      mobile_16_9: { type: String, required: true },
-      tile_1_1: { type: String, required: true },
-      web: { type: String, required: true },
+      mobile_16_9: { type: String, default: '' },
+      tile_1_1: { type: String, default: '' },
+      web: { type: String, default: '' },
     },
+    // A hero banner is an image or a video, never both (the service checks); '' for the one not used.
+    videoUrl: { type: String, default: '' },
     altText: { type: String, required: true },
     placements: { type: [{ type: String, enum: BANNER_PLACEMENTS }], required: true },
     // Categories whose page shows this banner; only meaningful with the CATEGORY_HERO placement.

@@ -1,5 +1,4 @@
-import { BellOutlined } from '@ant-design/icons';
-import { Badge, Card, Empty, Flex, Skeleton, Typography } from 'antd';
+import { Badge, Card, Flex, Skeleton, Typography } from 'antd';
 import { useNavigate } from 'react-router-dom';
 import DateText from '@ui/components/DateText';
 
@@ -13,7 +12,7 @@ const SEVERITY_COLOR = {
 export default function AlertsFeed({ alerts, unread, loading, onRead }) {
   if (loading) {
     return (
-      <Card title="Alerts" size="small">
+      <Card title="Alerts" size="small" style={{ height: '100%' }}>
         <Skeleton active paragraph={{ rows: 3 }} />
       </Card>
     );
@@ -21,18 +20,14 @@ export default function AlertsFeed({ alerts, unread, loading, onRead }) {
 
   return (
     <Card
-      title={
-        <Flex align="center" gap={8}>
-          <BellOutlined />
-          Alerts
-          {Boolean(unread) && <Badge count={unread} size="small" />}
-        </Flex>
-      }
+      title="Alerts"
+      extra={Boolean(unread) && <Badge count={unread} size="small" />}
       size="small"
-      styles={{ body: { padding: alerts?.length ? 0 : 16 } }}
+      style={{ height: '100%' }}
+      styles={{ body: { padding: alerts?.length ? 0 : '16px 20px' } }}
     >
       {!alerts?.length ? (
-        <Empty description="No alerts" />
+        <Badge status="success" text="No active alerts" />
       ) : (
         <Flex vertical>
           {alerts.map((a) => (

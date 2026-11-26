@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
+import { env } from '../../../config/env.js';
+import { getUserAuthorization } from '../../identity/public/index.js';
 import { ROLES } from '../../../shared/constants/roles.js';
 import { sendCommand } from '../../../shared/http/respond.js';
 import { validate } from '../../../shared/http/validate.js';
@@ -20,9 +22,12 @@ import {
   updateCategoryTab,
   updateDraft,
 } from '../application/homeLayout.service.js';
+import { getSettingsSection, updateSettingsSection } from '../application/settings.service.js';
 import { getPage, listPages, publishPage } from '../application/staticPage.service.js';
 import { HOME_SECTION_TYPES, MAX_HOME_SECTIONS, MAX_PAGE_BODY } from '../domain/constants/cms.js';
 
+const cmsImageUrl = z.url().max(500).refine((url) => url.startsWith(`${env.PUBLIC_ORIGIN}/uploads/cms/`), 'Upload the image first.');
+const forYouBody = z.object({ forYouColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFCB9D.'), forYouImage: z.union([z.literal(''), cmsImageUrl]), forYouImageOpacity: z.number().int().min(0).max(100) }).strict();
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFE11B.');
 const section = z.object({
   type: z.enum(HOME_SECTION_TYPES),
@@ -53,11 +58,18 @@ const brandTabBody = z
   })
   .partial();
 const reorderBody = z.object({ orderedIds: z.array(objectIdSchema).min(1).max(100) }).strict();
-const pageBody = z
+const webUrl = z.url().max(500).refine((url) => /^https?:\/\//i.test(url), 'Use an http or https URL.');
+export const staticPageBody = z
   .object({
     body: z.string().trim().min(1, 'The page cannot be empty.').max(MAX_PAGE_BODY, 'The page is too long.'),
     materialChange: z.boolean().default(false),
     note: z.string().trim().max(200).optional(),
+    links: z.object({
+      website: webUrl.nullable(),
+      careers: webUrl.nullable(),
+      press: webUrl.nullable(),
+      social: webUrl.nullable(),
+    }).strict().optional(),
   })
   .strict();
 
@@ -94,6 +106,13 @@ export function createCmsRouter() {
   router.patch('/category-tabs/:id', requirePermission('cms.home.edit'), validate({ params: idParams, body: categoryTabBody }), async (req, res) =>
     sendCommand(res, await updateCategoryTab(req.params.id, req.body, req.auth)),
   );
+  // The "For You" tab is not a category, so its colour and background image live in the 'homeHeader' platform setting.
+  router.get('/for-you-tab', requirePermission('cms.home.view'), async (_req, res) => sendCommand(res, await getSettingsSection('homeHeader')));
+  router.put('/for-you-tab', requirePermission('cms.home.edit'), validate({ body: forYouBody }), async (req, res) => {
+    const actor = await getUserAuthorization(req.auth.userId);
+    const saved = await updateSettingsSection('homeHeader', { values: req.body }, { ...req.auth, name: actor?.name });
+    return sendCommand(res, saved.values);
+  });
   router.get('/brand-tabs', requirePermission('cms.home.view'), async (_req, res) => sendCommand(res, await listBrandTabs()));
   router.patch('/brand-tabs/:id', requirePermission('cms.home.edit'), validate({ params: idParams, body: brandTabBody }), async (req, res) =>
     sendCommand(res, await updateBrandTab(req.params.id, req.body, req.auth)),
@@ -109,7 +128,7 @@ export function createStaticPageRouter() {
   router.get('/', requirePermission('cms.page.view'), async (_req, res) => sendCommand(res, await listPages()));
   router.get('/:id', requirePermission('cms.page.view'), validate({ params: idParams }), async (req, res) => sendCommand(res, await getPage(req.params.id)));
   // Saving publishes immediately, so it needs the publish permission.
-  router.patch('/:id', requirePermission('cms.page.publish'), validate({ params: idParams, body: pageBody }), async (req, res) =>
+  router.patch('/:id', requirePermission('cms.page.publish'), validate({ params: idParams, body: staticPageBody }), async (req, res) =>
     sendCommand(res, await publishPage(req.params.id, req.body, req.auth)),
   );
   return router;

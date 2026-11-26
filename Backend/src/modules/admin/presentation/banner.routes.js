@@ -14,17 +14,19 @@ const SORTABLE = ['priority', 'startsAt', 'impressions'];
 
 // Images must be files this platform stored via the CMS_MEDIA upload purpose, not arbitrary external URLs.
 const cmsImage = z.url().max(500).refine((url) => url.startsWith(`${env.PUBLIC_ORIGIN}/uploads/cms/`), 'Upload the image first.');
+const cmsMedia = z.union([z.literal(''), cmsImage]); // '' for the one a banner does not use
 const fields = {
   name: z.string().trim().min(1, 'Give the banner a name.').max(100),
   kind: z.enum(BANNER_KINDS),
-  images: z.object({ mobile_16_9: cmsImage, tile_1_1: cmsImage, web: cmsImage }).strict(),
+  images: z.object({ mobile_16_9: cmsMedia, tile_1_1: cmsMedia, web: cmsMedia }).strict(),
+  videoUrl: cmsMedia,
   altText: z.string().trim().min(1, 'Required for accessibility.').max(200),
   placements: z.array(z.enum(BANNER_PLACEMENTS)).min(1, 'Choose a placement.').max(BANNER_PLACEMENTS.length),
   categoryIds: z.array(objectIdSchema).max(50),
   startsAt: z.coerce.date(),
   endsAt: z.coerce.date(),
 };
-const createSchema = z.object({ ...fields, categoryIds: fields.categoryIds.default([]) }).strict();
+const createSchema = z.object({ ...fields, categoryIds: fields.categoryIds.default([]), videoUrl: fields.videoUrl.default('') }).strict();
 const updateSchema = z.object(Object.fromEntries(Object.entries(fields).map(([key, schema]) => [key, schema.optional()]))).strict();
 const idParams = z.object({ id: objectIdSchema });
 const csv = (allowed) => z.string().optional().transform((value) => (value ? value.split(',').filter((item) => allowed.includes(item)) : []));

@@ -27,6 +27,9 @@ describe('customer API contract', () => {
       '/support/chat',
       '/support/channels',
       '/seller-leads',
+      '/seller-leads/me',
+      '/arise-ratings',
+      '/pages/{slug}',
     ].forEach(route => expect(contract.paths[route]).toBeDefined());
   });
 

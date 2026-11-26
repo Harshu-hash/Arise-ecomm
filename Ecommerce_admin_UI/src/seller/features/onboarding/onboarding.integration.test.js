@@ -95,6 +95,15 @@ describe('S10 seller onboarding and verified identity', () => {
     expect(renewed.previousVersions).toHaveLength(1);
   });
 
+  it('only recommends seller workflows backed by the API', async () => {
+    await signInSeller();
+    const summary = await sellerDashboardApi.summary();
+    expect(summary.tips.map(({ id, link }) => ({ id, link }))).toEqual([
+      { id: 'tip-stock', link: '/stock' },
+      { id: 'tip-listings', link: '/listings/new' },
+    ]);
+  });
+
   it('routes a verified legal-name change through admin review', async () => {
     const user = await signInSeller();
     const before = await settingsApi.profile();

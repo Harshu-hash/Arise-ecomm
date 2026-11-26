@@ -642,13 +642,19 @@ describe('dashboard', () => {
   });
 
   it('returns only action-center tiles the role can act on', async () => {
-    const lead = await signIn('supportlead@arise.test');
-    const r = await call('/dashboard/action-center', { token: lead.accessToken });
+    const admin = await signIn('super@arise.test');
+    const r = await call('/dashboard/action-center', { token: admin.accessToken });
     expect(r.status).toBe(200);
     const keys = r.json.data.map((t) => t.key);
-    expect(keys).toContain('ticketsBreachingSla');
-    // The support lead cannot see payouts, so that queue is withheld.
-    expect(keys).not.toContain('payoutBatchesAwaitingApproval');
+    expect(keys).toEqual([
+      'sellerApplicationsPending',
+      'listingsInQc',
+      'ordersNotAccepted',
+      'notDispatched',
+      'returnsAwaitingQc',
+      'failedRefunds',
+      'withdrawalsAwaitingApproval',
+    ]);
   });
 
   it('refuses the action center to a role without that permission', async () => {

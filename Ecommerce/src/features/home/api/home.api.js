@@ -1,6 +1,6 @@
 import { baseApi } from '@core/api/baseApi';
 import { HOME_ENDPOINTS } from './home.endpoints';
-import { mapAppConfigResponse, mapHomeResponse } from './home.mapper';
+import { mapAppConfigResponse, mapHomeFeedPage, mapHomeResponse } from './home.mapper';
 
 export const homeApi = baseApi.injectEndpoints({
   endpoints: builder => ({
@@ -10,6 +10,12 @@ export const homeApi = baseApi.injectEndpoints({
       transformResponse: mapHomeResponse,
       providesTags: [{ type: 'Home', id: 'FEED' }],
       keepUnusedDataFor: 120,
+    }),
+    // Following pages of the "You May Also Like" grid; the first page arrives with getHome.
+    getHomeFeedPage: builder.query({
+      query: ({ categoryId, cursor }) => ({ url: HOME_ENDPOINTS.feedPage, params: { categoryId, cursor } }),
+      transformResponse: mapHomeFeedPage,
+      keepUnusedDataFor: 0,
     }),
     getAppConfig: builder.query({
       query: () => ({ url: HOME_ENDPOINTS.appConfig }),
@@ -24,5 +30,6 @@ export const {
   useGetAppConfigQuery,
   useGetHomeQuery,
   useLazyGetAppConfigQuery,
+  useLazyGetHomeFeedPageQuery,
   useLazyGetHomeQuery,
 } = homeApi;

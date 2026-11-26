@@ -25,6 +25,8 @@ const headerSchema = z.object({
       label: z.string().min(1),
       icon: z.string().min(1),
       imageUrl: z.string().url().nullable().optional(),
+      backgroundImageUrl: z.string().url().nullable().optional(), // photo behind the header while this tab is selected
+      backgroundImageOpacity: z.number().min(0).max(1).default(1), // how strongly it covers the gradient
       gradient: gradientSchema,
     }),
   ),
@@ -57,6 +59,7 @@ export const appConfigResponseSchema = apiEnvelope(
       enabled: z.boolean(),
       message: z.string().nullable().optional(),
     }),
+    brand: z.object({ name: z.string(), logoUrl: z.string().url().nullable() }).optional(),
     storeUrls: z.object({ android: z.string().min(1), ios: z.string().min(1) }),
     featureFlags: z.record(z.boolean()),
   }),
@@ -64,7 +67,8 @@ export const appConfigResponseSchema = apiEnvelope(
 
 export const bannerItemSchema = z.object({
   id: z.string().min(1),
-  imageUrl: z.string().url(),
+  imageUrl: z.string().url().nullable().optional(), // absent on a video banner
+  videoUrl: z.string().url().nullable().optional(),
   target: z
     .object({ type: z.string().min(1), id: z.string().min(1).optional() })
     .nullable()

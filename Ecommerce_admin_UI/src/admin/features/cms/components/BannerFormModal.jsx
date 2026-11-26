@@ -1,5 +1,5 @@
 import { UploadOutlined } from '@ant-design/icons';
-import { App, Button, DatePicker, Flex, Form, Image, Input, Modal, Select, Upload } from 'antd';
+import { App, Button, DatePicker, Flex, Form, Image, Input, Modal, Radio, Select, Upload } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { dayjs } from '@core/utils/date';
@@ -68,10 +68,41 @@ export function ImageUpload({ value, onChange, kind, removable = false }) {
   );
 }
 
+const VIDEO_TYPES = ['video/mp4', 'video/webm'];
+const MAX_VIDEO_MB = 100; // matches the server's MAX_VIDEO_BYTES default
+
+/** Uploads a short MP4/WebM clip and stores its public URL. The app plays it muted and looping. */
+export function VideoUpload({ value, onChange }) {
+  const { message } = App.useApp();
+  const [uploading, setUploading] = useState(false);
+  const upload = async (file) => {
+    setUploading(true);
+    try {
+      if (!VIDEO_TYPES.includes(file.type)) throw new Error('Use an MP4 or WebM video.');
+      if (file.size > MAX_VIDEO_MB * 1024 * 1024) throw new Error(`The video must be under ${MAX_VIDEO_MB} MB.`);
+      onChange(await cmsApi.uploadImage(file));
+    } catch (e) {
+      message.error(e.message);
+    } finally {
+      setUploading(false);
+    }
+    return false;
+  };
+  return (
+    <Flex vertical gap={8} align="flex-start">
+      {value && <video src={value} controls muted style={{ maxWidth: '100%', maxHeight: 160, borderRadius: 8 }} />}
+      <Upload accept="video/mp4,video/webm" showUploadList={false} beforeUpload={upload} disabled={uploading}>
+        <Button icon={<UploadOutlined />} loading={uploading}>{value ? 'Replace video' : 'Upload video'}</Button>
+      </Upload>
+    </Flex>
+  );
+}
+
 export default function BannerFormModal({ banner, open, onClose, onSaved }) {
   const { message } = App.useApp();
   const [form] = Form.useForm();
   const kind = Form.useWatch('kind', form);
+  const mediaType = Form.useWatch('mediaType', form);
   const placements = Form.useWatch('placements', form);
   const showsOnCategoryPages = placements?.includes('CATEGORY_HERO');
   // Customer category pages are the top-level categories, so only those are offered.
@@ -89,14 +120,16 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
       form.setFieldsValue({
         name: banner.name,
         kind: banner.kind,
+        mediaType: banner.videoUrl ? 'VIDEO' : 'IMAGE',
         imageUrl: banner.images?.mobile_16_9 ?? '',
+        videoUrl: banner.videoUrl ?? '',
         altText: banner.altText,
         placements: banner.placements,
         categoryIds: banner.categoryIds ?? [],
         window: [dayjs(banner.startsAt), dayjs(banner.endsAt)],
       });
     } else {
-      form.setFieldsValue({ kind: 'HERO', placements: ['HOME_HERO'], window: [dayjs(), dayjs().add(14, 'day')] });
+      form.setFieldsValue({ mediaType: 'IMAGE', kind: 'HERO', placements: ['HOME_HERO'], window: [dayjs(), dayjs().add(14, 'day')] });
     }
   }, [open, banner, form]);
 
@@ -124,7 +157,8 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
     const payload = {
       name: v.name,
       kind: v.kind,
-      images: { mobile_16_9: v.imageUrl, tile_1_1: v.imageUrl, web: v.imageUrl },
+      images: (v.kind === 'HERO' && v.mediaType === 'VIDEO') ? { mobile_16_9: '', tile_1_1: '', web: '' } : { mobile_16_9: v.imageUrl, tile_1_1: v.imageUrl, web: v.imageUrl },
+      videoUrl: (v.kind === 'HERO' && v.mediaType === 'VIDEO') ? v.videoUrl : '',
       altText: v.altText,
       placements: v.placements,
       categoryIds: v.placements.includes('CATEGORY_HERO') ? v.categoryIds ?? [] : [],
@@ -152,9 +186,20 @@ export default function BannerFormModal({ banner, open, onClose, onSaved }) {
         <Form.Item name="kind" label="Kind">
           <Select options={[{ value: 'HERO', label: 'Hero (16:9)' }, { value: 'TILE', label: 'Tile (1:1)' }]} />
         </Form.Item>
-        <Form.Item name="imageUrl" label="Image" rules={[{ required: true, message: 'Upload an image.' }]}>
-          <ImageUpload kind={kind} />
-        </Form.Item>
+        {kind === 'HERO' && (
+          <Form.Item name="mediaType" label="Banner media" extra="Show either a picture or a video, not both.">
+            <Radio.Group optionType="button" options={[{ value: 'IMAGE', label: 'Image' }, { value: 'VIDEO', label: 'Video' }]} />
+          </Form.Item>
+        )}
+        {kind === 'HERO' && mediaType === 'VIDEO' ? (
+          <Form.Item name="videoUrl" label="Video" extra="MP4 or WebM, up to 100 MB. Plays muted and loops; keep it short and 16:9." rules={[{ required: true, message: 'Upload a video.' }]}>
+            <VideoUpload />
+          </Form.Item>
+        ) : (
+          <Form.Item name="imageUrl" label="Image" rules={[{ required: true, message: 'Upload an image.' }]}>
+            <ImageUpload kind={kind} />
+          </Form.Item>
+        )}
         <Form.Item name="altText" label="Alt text" rules={[{ required: true, whitespace: true, message: 'Required for accessibility.' }, { max: 200, message: 'Keep it under 200 characters.' }]}>
           <Input maxLength={200} />
         </Form.Item>

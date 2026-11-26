@@ -5,6 +5,7 @@ import { getCategoryTerms } from '../../category/public/index.js';
 import { evaluateCouponsForCart } from '../../coupon/public/index.js';
 import { getAddress, getDefaultAddress } from '../../customer/public/index.js';
 import { getSellerSummaries } from '../../identity/public/index.js';
+import { getSpendableBalance } from '../../wallet/public/index.js';
 import { createCodPayment, createPaymentIntent, findCommittedPayment, toPaymentDto } from '../../payment/public/index.js';
 import { findVariantIdByLabel, holdStock, pickOfferId } from '../../product/public/index.js';
 import { quoteShipping } from '../../shipping/public/index.js';
@@ -38,7 +39,7 @@ async function allowedMethods(quote) {
  * Prices a checkout from scratch for the chosen payment `method`. Cash on delivery costs a handling fee and is quoted with the courier's
  * cash-on-delivery rate, so the total depends on it. Returns the quote to store: priced lines, one parcel per seller, totals, blockers, warnings, codEligible.
  */
-async function priceSession({ customerId, items, couponCode, address, method = null }) {
+async function priceSession({ customerId, items, couponCode, address, method = null, useWallet = false }) {
   const resolved = await resolveLines(items.map((item) => ({ offerId: String(item.offerId), quantity: item.quantity })));
   const lines = resolved.filter((line) => line.sellable);
   const blockers = resolved.filter((line) => !line.sellable).map((line) => ISSUE_TEXT[line.issueCode](line));
@@ -80,6 +81,13 @@ async function priceSession({ customerId, items, couponCode, address, method = n
 
   const platformFeePaise = lines.length ? fees.platformFeePaise : 0;
   const priced = priceOrder({ lines, shipping, coupon, platformFeePaise, codFeePaise: cash ? fees.codConvenienceFeePaise : 0, terms });
+  // Store credit pays part of an online order: capped by the admin's share limit, and always leaves the minimum Razorpay can charge.
+  let walletCreditPaise = 0;
+  if (useWallet && !cash && lines.length && payments.enabledMethods.includes('WALLET')) {
+    const cap = Math.floor((priced.totals.payablePaise * payments.walletUsageCapPct) / 100);
+    walletCreditPaise = Math.max(0, Math.min(await getSpendableBalance(customerId), cap, priced.totals.payablePaise - MIN_PAYMENT_PAISE));
+  }
+  priced.totals = { ...priced.totals, walletCreditPaise, payablePaise: priced.totals.payablePaise - walletCreditPaise };
   const toPay = priced.totals.payablePaise - priced.totals.codFeePaise;
   if (!codProblem && (toPay < orders.codMinPaise || toPay > orders.codMaxPaise)) {
     codProblem = `Cash on delivery is available for orders between Rs ${orders.codMinPaise / 100} and Rs ${orders.codMaxPaise / 100}.`;
@@ -137,6 +145,8 @@ export async function toSessionDto(session) {
     couponCode: quote.couponCode,
     allowedPaymentMethods: await allowedMethods(quote),
     selectedPaymentMethod: session.selectedPaymentMethod,
+    useWallet: Boolean(session.useWallet),
+    walletBalancePaise: await getSpendableBalance(session.customerId),
     codEligible: Boolean(quote.codEligible),
     expiresAt: session.expiresAt.toISOString(),
     warnings: quote.warnings,
@@ -160,7 +170,7 @@ async function assertOpen(session) {
 const noLines = (quote) => failure(409, 'CHECKOUT_UNAVAILABLE', quote.blockers[0] ?? 'Nothing in this order can be bought right now.', { blockers: quote.blockers });
 
 async function reprice(session) {
-  session.quote = await priceSession({ customerId: session.customerId, items: session.items, couponCode: session.couponCode, address: session.address, method: session.selectedPaymentMethod });
+  session.quote = await priceSession({ customerId: session.customerId, items: session.items, couponCode: session.couponCode, address: session.address, method: session.selectedPaymentMethod, useWallet: session.useWallet });
   if (!session.quote.lines.length) throw noLines(session.quote);
   session.markModified('quote');
   await session.save();
@@ -254,6 +264,13 @@ export async function setPaymentMethod(customerId, id, method) {
   if (repricing) await reprice(session);
   else await session.save();
   return toSessionDto(session);
+}
+
+export async function setWallet(customerId, id, use) {
+  const session = await load(customerId, id);
+  await assertOpen(session);
+  session.useWallet = use;
+  return toSessionDto(await reprice(session));
 }
 
 export async function revalidate(customerId, id) {

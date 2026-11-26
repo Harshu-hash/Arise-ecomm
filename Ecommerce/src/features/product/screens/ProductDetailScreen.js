@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/Feather';
 import StarIcon from 'react-native-vector-icons/FontAwesome';
+import BadgeIcon from 'react-native-vector-icons/MaterialCommunityIcons';
 import Animated, {
   useSharedValue,
   useAnimatedScrollHandler,
@@ -25,6 +26,7 @@ import Animated, {
   Extrapolation,
   runOnJS,
 } from 'react-native-reanimated';
+import { optionCards } from '../utils/optionCards';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager, BottomSheetModal } from '../../../shared/components';
@@ -33,7 +35,7 @@ import { haptics } from '../../../utils/haptics';
 import { useToast } from '../../../contexts/ToastContext';
 import FullScreenLoader from '../../../shared/loaders/FullScreenLoader';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import { useGetProductQuery } from '../api/product.query';
+import { useGetProductQuery, useGetRelatedProductsQuery } from '../api/product.query';
 import {
   useAddWishlistItemMutation,
   useGetWishlistQuery,
@@ -64,77 +66,6 @@ const COLOUR_OPTIONS = [
   { name: 'Grey', image: FALLBACK_IMAGES[3] },
 ];
 
-const SIMILAR_PRODUCTS = [
-  {
-    id: 'sim1',
-    brand: 'Kuons',
-    name: 'Dark Indigo Denim Shacket',
-    image: IMG('photo-1576995853123-5a10305d93c0', 400),
-    price: 1995,
-    mrp: 3999,
-    discountPct: 50,
-    ad: true,
-  },
-  {
-    id: 'sim2',
-    brand: 'Beyoung',
-    name: 'Corduroy Shirt for Men',
-    image: IMG('photo-1602810318383-e386cc2a3ccf', 400),
-    price: 915,
-    mrp: 2499,
-    discountPct: 63,
-  },
-  {
-    id: 'sim3',
-    brand: 'Beyoung',
-    name: 'Corduroy Shirt for Men',
-    image: IMG('photo-1596755094514-f87e34085b2c', 400),
-    price: 915,
-    mrp: 2499,
-    discountPct: 63,
-  },
-];
-
-const SUGGESTIONS = [
-  {
-    id: 's1',
-    brand: 'Beyoung',
-    name: 'Men Corduroy Shirts',
-    image: IMG('photo-1603252109303-2751441dd157', 400),
-    price: 822,
-    mrp: 2499,
-    discountPct: 67,
-    rating: 3.9,
-  },
-  {
-    id: 's2',
-    brand: 'Basics',
-    name: 'Casual Shirt',
-    image: IMG('photo-1620012253295-c15cc3e65df4', 400),
-    price: 2499,
-  },
-  {
-    id: 's3',
-    brand: 'Roadster',
-    name: 'Men Slim Fit Shirt',
-    image: IMG('photo-1589310243389-96a5483213a8', 400),
-    price: 749,
-    mrp: 1799,
-    discountPct: 58,
-    rating: 4.1,
-  },
-  {
-    id: 's4',
-    brand: 'HRX',
-    name: 'Men Casual Shirt',
-    image: IMG('photo-1598033129183-c4f50c736f10', 400),
-    price: 899,
-    mrp: 1999,
-    discountPct: 55,
-    rating: 4.3,
-  },
-];
-
 const BANK_OFFERS = [
   {
     id: 'o1',
@@ -159,6 +90,8 @@ const BANK_OFFERS = [
 const CTA_HEIGHT = 46;
 const CTA_FADE = 24;
 const SUGGESTION_TABS = ['All', 'Similar', 'Your Next Favourites'];
+// Percent off for a card; 0 when it is not discounted.
+const pctOff = item => (item.mrp > item.price ? Math.round(((item.mrp - item.price) / item.mrp) * 100) : 0);
 const formatINR = n => `₹${Number(n).toLocaleString('en-IN')}`;
 
 const Section = ({ title, right, children, style }) => (
@@ -313,6 +246,10 @@ const ProductDetailContent = ({ product, navigation }) => {
   const wishlisted = wishlist?.items.some(item => item.id === product.id) ?? false;
   const heartScale = useSharedValue(1);
   const [suggestionTab, setSuggestionTab] = useState('All');
+  // Both rails come from the backend: the same shelf for "Similar", the wider category and the shopper's interests for the rest.
+  const { data: related } = useGetRelatedProductsQuery(product.id);
+  const similarProducts = related?.similar ?? [];
+  const suggestedProducts = related?.suggested ?? [];
   const [addedToBag, setAddedToBag] = useState(false);
   const [addCartItem, { isLoading: isAddingToCart }] = useAddCartItemMutation();
   const [priceAlertOn, setPriceAlertOn] = useState(false);
@@ -485,11 +422,6 @@ const ProductDetailContent = ({ product, navigation }) => {
       navigation.navigate('QuestionsAnswers', { productId: product.id, productName: product.name });
   };
 
-  const handleSimilarAdd = item => {
-    haptics.medium();
-    toast.show(`${item.brand} ${item.name} added to bag`, { icon: 'check', variant: 'success' });
-  };
-
   const toggleSuggestionLike = id => {
     haptics.light();
     setLikedSuggestions(prev => {
@@ -502,10 +434,10 @@ const ProductDetailContent = ({ product, navigation }) => {
 
   const visibleSuggestions =
     suggestionTab === 'Similar'
-      ? SUGGESTIONS.filter(s => s.discountPct)
+      ? similarProducts
       : suggestionTab === 'Your Next Favourites'
-        ? [...SUGGESTIONS].reverse()
-        : SUGGESTIONS;
+        ? suggestedProducts
+        : [...similarProducts, ...suggestedProducts];
 
   const ctaButtons = (
     <>
@@ -654,29 +586,6 @@ const ProductDetailContent = ({ product, navigation }) => {
             )}
           </View>
 
-          {/* Mega deal */}
-          <View style={[styles.megaCard, styles.padded2]}>
-            <View style={styles.megaTop}>
-              <View style={styles.megaLogo}>
-                <Text style={styles.megaLogoText}>MEGA{'\n'}DEAL</Text>
-              </View>
-              <View style={styles.megaPriceWrap}>
-                <Text style={styles.megaPrice}>Get at {formatINR(megaPrice)}</Text>
-                <View style={styles.megaUnderline} />
-              </View>
-              <View style={styles.extraOff}>
-                <Text style={styles.extraOffText}>Extra {formatINR(extraOff)} Off</Text>
-              </View>
-            </View>
-            <TouchableOpacity activeOpacity={0.8} style={styles.megaBottom} onPress={openOffers}>
-              <Text style={styles.megaBottomText}>
-                With Coupon + <Icon name="credit-card" size={14} color={COLORS.offerRed} /> Bank
-                Offer
-              </Text>
-              <Text style={styles.detailsLink}>Details ›</Text>
-            </TouchableOpacity>
-          </View>
-
           {colours.length > 0 && (
           <>
           {/* Colour */}
@@ -711,21 +620,37 @@ const ProductDetailContent = ({ product, navigation }) => {
           {options.map(option => (
             <View key={option.code}>
               <View style={[styles.padded, styles.sizeHeader]}>
-                <Text style={styles.sizeTitle}>{`Select ${option.name}`}</Text>
+                <Text style={styles.label}>
+                  <Text style={styles.labelBold}>{`${option.name}: `}</Text>
+                  {selectedOptions[option.code]}
+                </Text>
               </View>
               <View style={styles.sizeRow}>
-                {option.values.map(value => (
-                  <TouchableOpacity
-                    key={value}
-                    activeOpacity={0.8}
-                    onPress={() => setSelectedOptions(current => ({ ...current, [option.code]: value }))}
-                    style={[styles.sizeBox, selectedOptions[option.code] === value && styles.sizeBoxActive]}
-                  >
-                    <Text style={[styles.sizeText, selectedOptions[option.code] === value && styles.sizeTextActive]}>
-                      {value}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
+                {optionCards(product.variants, option, { selectedOptions, selectedColor, selectedSize, options }).map(card => {
+                  const active = selectedOptions[option.code] === card.value;
+                  return (
+                    <TouchableOpacity
+                      key={card.value}
+                      activeOpacity={0.8}
+                      onPress={() => setSelectedOptions(current => ({ ...current, [option.code]: card.value }))}
+                      style={[styles.optionCard, active && styles.optionCardActive, !card.inStock && styles.optionCardOut]}
+                    >
+                      <Text style={[styles.optionCardTitle, active && styles.optionCardTitleActive]}>{card.value}</Text>
+                      {card.price != null && (
+                        <View style={styles.optionCardPriceBox}>
+                          {card.discountPct > 0 ? (
+                            <Text style={styles.optionCardMrpRow}>
+                              <Text style={styles.optionCardDiscount}>{`↓${card.discountPct}% `}</Text>
+                              <Text style={styles.optionCardMrp}>{card.mrp.toLocaleString('en-IN')}</Text>
+                            </Text>
+                          ) : null}
+                          <Text style={styles.optionCardPrice}>{formatINR(card.price)}</Text>
+                          {!card.inStock ? <Text style={styles.optionCardOutText}>Out of stock</Text> : null}
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
               </View>
             </View>
           ))}
@@ -768,6 +693,29 @@ const ProductDetailContent = ({ product, navigation }) => {
 
           </>
           )}
+
+          {/* Mega deal */}
+          <View style={[styles.megaCard, styles.padded2]}>
+            <View style={styles.megaTop}>
+              <View style={styles.megaLogo}>
+                <Text style={styles.megaLogoText}>MEGA{'\n'}DEAL</Text>
+              </View>
+              <View style={styles.megaPriceWrap}>
+                <Text style={styles.megaPrice}>Get at {formatINR(megaPrice)}</Text>
+                <View style={styles.megaUnderline} />
+              </View>
+              <View style={styles.extraOff}>
+                <Text style={styles.extraOffText}>Extra {formatINR(extraOff)} Off</Text>
+              </View>
+            </View>
+            <TouchableOpacity activeOpacity={0.8} style={styles.megaBottom} onPress={openOffers}>
+              <Text style={styles.megaBottomText}>
+                With Coupon + <Icon name="credit-card" size={14} color={COLORS.offerRed} /> Bank
+                Offer
+              </Text>
+              <Text style={styles.detailsLink}>Details ›</Text>
+            </TouchableOpacity>
+          </View>
 
           {/* Invisible placeholder reserving the in-page spot; the real buttons are the overlay below */}
           <View
@@ -866,13 +814,13 @@ const ProductDetailContent = ({ product, navigation }) => {
           <View style={styles.badgeRow}>
             <View style={styles.badgeItem}>
               <View style={[styles.badgeCircle, { backgroundColor: COLORS.ratingGreenBg }]}>
-                <Icon name="shield" size={28} color={COLORS.primary} />
+                <BadgeIcon name="shield-star" size={34} color={COLORS.primary} />
               </View>
               <Text style={styles.badgeLabel}>Genuine{'\n'}Product</Text>
             </View>
             <View style={styles.badgeItem}>
               <View style={[styles.badgeCircle, { backgroundColor: COLORS.ratingGreenBg }]}>
-                <Icon name="check-circle" size={28} color={PINK} />
+                <BadgeIcon name="check-decagram" size={34} color={COLORS.ratingGreen} />
               </View>
               <Text style={styles.badgeLabel}>Quality{'\n'}Checked</Text>
             </View>
@@ -886,9 +834,10 @@ const ProductDetailContent = ({ product, navigation }) => {
           </View>
 
           {/* Similar products */}
+          {similarProducts.length > 0 && (
           <Section title="Similar Products" style={[styles.padded, { marginTop: SPACING.xxl }]}>
             <FlatList
-              data={SIMILAR_PRODUCTS}
+              data={similarProducts}
               horizontal
               keyExtractor={p => p.id}
               showsHorizontalScrollIndicator={false}
@@ -908,22 +857,23 @@ const ProductDetailContent = ({ product, navigation }) => {
                       {item.name}
                     </Text>
                     <Text style={styles.simPriceRow}>
-                      <Text style={styles.simMrp}>{formatINR(item.mrp)} </Text>
+                      {pctOff(item) > 0 ? <Text style={styles.simMrp}>{formatINR(item.mrp)} </Text> : null}
                       <Text style={styles.simPrice}>{formatINR(item.price)} </Text>
-                      <Text style={styles.simOff}>{item.discountPct}% OFF</Text>
+                      {pctOff(item) > 0 ? <Text style={styles.simOff}>{pctOff(item)}% OFF</Text> : null}
                     </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     activeOpacity={0.8}
-                    onPress={() => handleSimilarAdd(item)}
+                    onPress={() => openProduct(item)}
                     style={styles.simAddBtn}
                   >
-                    <Text style={styles.simAddText}>Add to Bag</Text>
+                    <Text style={styles.simAddText}>View</Text>
                   </TouchableOpacity>
                 </View>
               )}
             />
           </Section>
+          )}
 
           {/* Ratings and reviews: shown only once the product has published reviews. */}
           {product.reviewCount > 0 && (
@@ -1049,6 +999,7 @@ const ProductDetailContent = ({ product, navigation }) => {
           </Dropdown>
 
           {/* Products you may like */}
+          {similarProducts.length + suggestedProducts.length > 0 && (
           <Section
             title="Products you may like"
             style={[styles.padded, { marginTop: SPACING.xxl }]}
@@ -1111,16 +1062,15 @@ const ProductDetailContent = ({ product, navigation }) => {
                     </TouchableOpacity>
                   </View>
                   <Text>
-                    {item.mrp ? <Text style={styles.simMrp}>{formatINR(item.mrp)} </Text> : null}
+                    {pctOff(item) > 0 ? <Text style={styles.simMrp}>{formatINR(item.mrp)} </Text> : null}
                     <Text style={styles.gridPrice}>{formatINR(item.price)} </Text>
-                    {item.discountPct ? (
-                      <Text style={styles.simOff}>{item.discountPct}% OFF</Text>
-                    ) : null}
+                    {pctOff(item) > 0 ? <Text style={styles.simOff}>{pctOff(item)}% OFF</Text> : null}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </Section>
+          )}
         </Animated.ScrollView>
 
         {/* The single CTA pair: rides the bottom edge until it meets the in-page slot, then scrolls with the page */}
@@ -1410,6 +1360,30 @@ const styles = StyleSheet.create({
   sizeBoxError: { borderColor: COLORS.error },
   sizeText: { fontSize: 13, fontWeight: '600', color: COLORS.textPrimary },
   sizeTextActive: { color: PINK },
+  optionCard: {
+    minWidth: 110,
+    borderRadius: RADIUS.s,
+    borderWidth: 1.5,
+    borderColor: COLORS.border,
+    paddingVertical: SPACING.s,
+    paddingHorizontal: SPACING.m,
+    backgroundColor: COLORS.surface,
+  },
+  optionCardActive: { borderColor: COLORS.textPrimary, backgroundColor: COLORS.mutedBg },
+  optionCardOut: { opacity: 0.6 },
+  optionCardTitle: { fontSize: 12.5, color: COLORS.textPrimary },
+  optionCardTitleActive: { fontWeight: '700' },
+  optionCardPriceBox: {
+    marginTop: SPACING.xs,
+    paddingTop: SPACING.xs,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
+  },
+  optionCardMrpRow: { fontSize: 11 },
+  optionCardDiscount: { fontWeight: '700', color: GREEN },
+  optionCardMrp: { color: COLORS.textSecondary, textDecorationLine: 'line-through' },
+  optionCardPrice: { fontSize: 13.5, fontWeight: '700', color: COLORS.textPrimary },
+  optionCardOutText: { fontSize: 10, color: COLORS.error },
   sizeErrorText: { color: PINK, fontSize: 11.5, marginTop: SPACING.s },
 
   ctaRow: { flexDirection: 'row', gap: SPACING.m, marginTop: SPACING.xl, height: CTA_HEIGHT },

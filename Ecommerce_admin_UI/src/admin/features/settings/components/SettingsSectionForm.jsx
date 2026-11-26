@@ -1,7 +1,9 @@
-import { Flex, Input, InputNumber, Select, Switch, Typography } from 'antd';
+import { ImageUpload } from '@admin/features/cms/components/BannerFormModal';
+import { Col, ColorPicker, Flex, Input, InputNumber, Row, Select, Switch, Typography } from 'antd';
 
 /** `"platformFeePaise"` → `"Platform fee"`. Money fields are rendered and edited in rupees — paise never reaches the screen. */
 function humanize(key) {
+  if (key === 'logoUrl') return 'Brand logo';
   const words = key.replace(/Paise$/, '').replace(/([a-z])([A-Z])/g, '$1 $2').toLowerCase();
   return words.charAt(0).toUpperCase() + words.slice(1);
 }
@@ -11,6 +13,10 @@ function isMoneyKey(key) {
 }
 
 function Field({ fieldKey, value, onChange, disabled }) {
+  if (fieldKey === 'logoUrl') {
+    return <ImageUpload kind="FREE" removable value={value || null} onChange={(url) => onChange(url ?? '')} />;
+  }
+
   if (typeof value === 'boolean') {
     return <Switch checked={value} onChange={onChange} disabled={disabled} />;
   }
@@ -25,6 +31,10 @@ function Field({ fieldKey, value, onChange, disabled }) {
     ) : (
       <InputNumber style={{ width: 200 }} value={value} onChange={onChange} disabled={disabled} />
     );
+  }
+
+  if (fieldKey.endsWith('Color') && typeof value === 'string') {
+    return <ColorPicker showText disabled={disabled} value={value} onChange={(c) => onChange(c.toHexString().slice(0, 7).toUpperCase())} />;
   }
 
   if (typeof value === 'string') {
@@ -64,13 +74,26 @@ function Field({ fieldKey, value, onChange, disabled }) {
 
 /** Renders every field in a settings section's `values` object with the right control for its type. */
 export default function SettingsSectionForm({ values, onChange, disabled }) {
+  // One row per setting: its name on the left, its control on the right (stacked on narrow screens).
   return (
-    <Flex vertical gap={16}>
-      {Object.entries(values).map(([key, value]) => (
-        <Flex key={key} vertical gap={4} align="flex-start">
-          <Typography.Text style={{ fontSize: 13 }}>{humanize(key)}</Typography.Text>
-          <Field fieldKey={key} value={value} disabled={disabled} onChange={(v) => onChange({ ...values, [key]: v })} />
-        </Flex>
+    <Flex vertical>
+      {Object.entries(values).map(([key, value], index) => (
+        <Row
+          key={key}
+          gutter={[16, 8]}
+          align="middle"
+          style={{ padding: '16px 0', borderTop: index ? '1px solid var(--ant-color-border-secondary)' : undefined }}
+        >
+          <Col xs={24} md={9}>
+            <Typography.Text strong style={{ fontSize: 13 }}>{humanize(key)}</Typography.Text>
+            {typeof value === 'boolean' && (
+              <div><Typography.Text type="secondary" style={{ fontSize: 12 }}>{value ? 'On' : 'Off'}</Typography.Text></div>
+            )}
+          </Col>
+          <Col xs={24} md={15}>
+            <Field fieldKey={key} value={value} disabled={disabled} onChange={(v) => onChange({ ...values, [key]: v })} />
+          </Col>
+        </Row>
       ))}
     </Flex>
   );

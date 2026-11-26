@@ -1,4 +1,4 @@
-import { productDetailResponseSchema } from './product.schemas';
+import { productDetailResponseSchema, relatedProductsResponseSchema } from './product.schemas';
 
 const toRupees = paise => paise / 100;
 
@@ -16,6 +16,11 @@ export const mapProductCard = product => ({
   assured: product.assured,
   deliveryDate: product.deliveryLabel,
 });
+
+export const mapRelatedProducts = payload => {
+  const { similar, suggested } = relatedProductsResponseSchema.parse(payload).data;
+  return { similar: similar.map(mapProductCard), suggested: suggested.map(mapProductCard) };
+};
 
 export const mapProductDetail = payload => {
   const product = productDetailResponseSchema.parse(payload).data;

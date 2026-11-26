@@ -33,6 +33,7 @@ const startSchema = z
       ),
     purpose: z.enum(['LOGIN', 'SIGNUP', 'PASSWORD_RESET']),
     name: z.string().trim().min(1).max(80).optional(),
+    referralCode: z.string().trim().max(20).optional(),
   })
   .refine((body) => body.purpose !== 'SIGNUP' || body.name, { message: 'Name is required.', path: ['name'] });
 const otpSchema = z.object({ challengeId: objectIdSchema, otp: z.string().regex(/^\d{4}$/) });

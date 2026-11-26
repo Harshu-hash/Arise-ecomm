@@ -1,7 +1,29 @@
 import React, { useState, useRef } from 'react';
 import { View, Image, StyleSheet, Dimensions, FlatList } from 'react-native';
-import LottieView from 'lottie-react-native';
 import { COLORS } from '../../../constants/colors';
+
+// loaded when first needed, so a build without the native module still shows image banners
+let Video = null;
+try {
+  Video = require('react-native-video').default;
+} catch {
+  Video = null;
+}
+
+// An app build made before react-native-video was installed has the JS but not the native view, and rendering it throws.
+// Catch that here so the home screen keeps working (the video banner stays blank until the app is rebuilt).
+class VideoGuard extends React.Component {
+  state = { failed: false };
+
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+
+  render() {
+    // keep the banner's slot: with nothing in it the carousel row would collapse to zero height
+    return this.state.failed ? <View style={styles.image} /> : this.props.children;
+  }
+}
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
@@ -23,26 +45,34 @@ const HeroBannerCarousel = ({ banners }) => {
         keyExtractor={item => item.id}
         onScroll={onScroll}
         scrollEventThrottle={16}
-        renderItem={({ item }) => (
-          <Image
-            source={typeof item.image === 'string' ? { uri: item.image } : item.image}
-            style={styles.image}
-            resizeMode="cover"
-          />
-        )}
+        extraData={activeIndex}
+        renderItem={({ item, index }) =>
+          item.video ? (
+            <VideoGuard>
+              <Video
+                source={{ uri: item.video }}
+                style={styles.image}
+                resizeMode="cover"
+                repeat
+                muted
+                paused={index !== activeIndex} // only the banner in view plays
+                playInBackground={false}
+                disableFocus
+              />
+            </VideoGuard>
+          ) : item.image ? (
+            <Image
+              source={typeof item.image === 'string' ? { uri: item.image } : item.image}
+              style={styles.image}
+              resizeMode="cover"
+            />
+          ) : null
+        }
       />
       <View style={styles.dotsRow}>
         {banners.map((b, i) => (
           <View key={b.id} style={[styles.dot, i === activeIndex && styles.dotActive]} />
         ))}
-      </View>
-      <View style={styles.lottieContainer} pointerEvents="none">
-        <LottieView
-          source={require('../../../../assets/animations/delivery.json')}
-          autoPlay
-          loop
-          style={styles.lottieAnimation}
-        />
       </View>
     </View>
   );
@@ -75,19 +105,6 @@ const styles = StyleSheet.create({
   dotActive: {
     width: 16,
     backgroundColor: COLORS.white,
-  },
-  lottieContainer: {
-    position: 'absolute',
-    bottom: 10,
-    right: 15,
-    width: 80,
-    height: 80,
-    zIndex: 10,
-    elevation: 10,
-  },
-  lottieAnimation: {
-    width: '100%',
-    height: '100%',
   },
 });
 

@@ -5,6 +5,8 @@ import DateText from '@ui/components/DateText';
 import MaskedValue from '@ui/components/MaskedValue';
 import MoneyText from '@ui/components/MoneyText';
 import StatusTag from '@ui/components/StatusTag';
+import CustomerReferralsTab from './CustomerReferralsTab';
+import CustomerWalletTab from './CustomerWalletTab';
 
 /** Profile, addresses, orders, returns, risk and devices for one customer. */
 export default function CustomerTabs({ customer, meta }) {
@@ -63,6 +65,8 @@ export default function CustomerTabs({ customer, meta }) {
             </Flex>
           ) : <Empty description="No saved addresses" />,
         },
+        { key: 'wallet', label: 'Wallet', children: <CustomerWalletTab customerId={customer.id} /> },
+        { key: 'referrals', label: 'Referrals', children: <CustomerReferralsTab customerId={customer.id} /> },
         {
           key: 'orders',
           label: `Recent orders (${recentOrders.length})`,

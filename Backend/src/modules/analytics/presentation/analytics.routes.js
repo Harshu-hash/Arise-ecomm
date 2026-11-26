@@ -35,7 +35,7 @@ export function createAdminDashboardRouter() {
   }));
   router.get('/action-center', requirePermission('dashboard.action_center.view'), route(async (req, res) => {
     await assertPlatformWide(req);
-    const held = new Set((await Promise.all(['sellers.application.view', 'catalog.product.approve', 'orders.order.view', 'logistics.ndr.view', 'orders.return.view', 'finance.refund.view', 'finance.payout.view']
+    const held = new Set((await Promise.all(['sellers.application.view', 'catalog.product.approve', 'orders.order.view', 'orders.return.view', 'finance.refund.view', 'finance.payout.view']
       .map(async (key) => ((await userHasPermission(req.auth.userId, key)) ? key : null)))).filter(Boolean));
     return sendData(res, await getActionCenter((permission) => held.has(permission)));
   }));

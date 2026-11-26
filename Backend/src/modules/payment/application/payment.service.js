@@ -2,6 +2,7 @@ import { env } from '../../../config/env.js';
 import { paymentGateway } from '../../../infrastructure/external/payment/index.js';
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { PAYMENT_STATUS, Payment, REFUND_STATUS } from '../infrastructure/persistence/payment.model.js';
+import { creditWallet } from '../../wallet/public/index.js';
 
 // Payments for checkouts. Money moves only through Razorpay; this module records what happened and never trusts a client
 // that says "paid": a payment is SUCCEEDED only after a signed checkout result or a signed webhook for the exact amount.
@@ -108,14 +109,23 @@ export async function refundPayment(paymentId, { key = 'all', amountPaise = null
   if (!payment || payment.status !== PAYMENT_STATUS.SUCCEEDED) throw new ConflictError('PAYMENT_NOT_REFUNDABLE', 'There is no completed payment to refund.');
   const existing = payment.refunds.find((refund) => refund.key === key);
   if (existing && existing.status !== REFUND_STATUS.FAILED) return payment;
-  const amount = amountPaise ?? payment.amountPaise - refundedPaise(payment);
-  if (amount < 1 || refundedPaise(payment) + amount > payment.amountPaise) throw new ConflictError('REFUND_TOO_LARGE', 'That is more than is left to refund on this payment.');
-  const entry = existing ?? payment.refunds[payment.refunds.push({ key, status: REFUND_STATUS.PENDING, amountPaise: amount, reason, initiatedAt: new Date() }) - 1];
+  // An order part-paid with store credit refunds the card first, then the wallet for what the card never paid.
+  const cardRoom = payment.amountPaise - refundedPaise(payment);
+  const amount = amountPaise ?? cardRoom + walletRoom(payment);
+  if (amount < 1 || amount > cardRoom + walletRoom(payment)) throw new ConflictError('REFUND_TOO_LARGE', 'That is more than is left to refund on this payment.');
+  const toCard = Math.min(amount, cardRoom);
+  const toWallet = amount - toCard;
+  const entry = existing ?? payment.refunds[payment.refunds.push({ key, status: REFUND_STATUS.PENDING, amountPaise: toCard, walletPaise: toWallet, reason, initiatedAt: new Date() }) - 1];
   try {
-    const refund = await paymentGateway.refund({ providerPaymentId: payment.providerPaymentId, amountPaise: amount, notes: { reason }, idempotencyKey: `refund_${payment._id}_${key}`.replace(/[^A-Za-z0-9_-]/g, '_') }); // Razorpay allows only letters, digits, _ and -
+    // credited first and keyed, so a retry after a failed card refund never credits twice
+    if (toWallet > 0) await creditWallet({ userId: payment.customerId, type: 'REFUND', title: 'Refund to wallet', reference: reason ?? null, amountPaise: toWallet, key: `refund:${payment._id}:${key}` });
+    const refund = toCard > 0
+      ? await paymentGateway.refund({ providerPaymentId: payment.providerPaymentId, amountPaise: toCard, notes: { reason }, idempotencyKey: `refund_${payment._id}_${key}`.replace(/[^A-Za-z0-9_-]/g, '_') }) // Razorpay allows only letters, digits, _ and -
+      : { providerStatus: 'processed', providerRefundId: null };
     entry.status = refund.providerStatus === 'processed' ? REFUND_STATUS.SUCCEEDED : REFUND_STATUS.PENDING;
     entry.providerRefundId = refund.providerRefundId;
-    entry.amountPaise = amount;
+    entry.amountPaise = toCard;
+    entry.walletPaise = toWallet;
     entry.failureReason = null;
   } catch (error) {
     entry.status = REFUND_STATUS.FAILED;
@@ -126,7 +136,9 @@ export async function refundPayment(paymentId, { key = 'all', amountPaise = null
   return payment.save();
 }
 
-/** What is already given back or on its way (failed refunds do not count). */
+const walletRoom = (payment) => (payment.walletCreditPaise ?? 0) - payment.refunds.filter((refund) => refund.status !== REFUND_STATUS.FAILED).reduce((sum, refund) => sum + (refund.walletPaise ?? 0), 0);
+
+/** What is already given back to the card or on its way (failed refunds do not count). */
 export const refundedPaise = (payment) => payment.refunds.filter((refund) => refund.status !== REFUND_STATUS.FAILED).reduce((sum, refund) => sum + refund.amountPaise, 0);
 
 /** Razorpay's refund webhooks. */

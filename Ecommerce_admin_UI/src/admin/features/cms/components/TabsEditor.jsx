@@ -1,8 +1,49 @@
 import { ArrowDownOutlined, ArrowUpOutlined } from '@ant-design/icons';
-import { App, Button, Card, ColorPicker, Flex, Input, Skeleton, Switch, Typography } from 'antd';
+import { App, Button, Card, ColorPicker, Flex, Input, Skeleton, Slider, Switch, Typography } from 'antd';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import ErrorState from '@ui/components/ErrorState';
 import { cmsApi, cmsKeys } from '../api/cms.api';
+import { ImageUpload } from './BannerFormModal';
+
+/** The "For You" tab is not a category, so it has its own card: header colour, and an optional photo shown behind the header. */
+function ForYouCard() {
+  const { message } = App.useApp();
+  const query = useQuery({ queryKey: ['cms', 'forYouTab'], queryFn: cmsApi.forYouTab });
+  const save = useMutation({
+    mutationFn: cmsApi.updateForYouTab,
+    onSuccess: () => { query.refetch(); message.success('Saved. The app picks it up within seconds.'); },
+    onError: (e) => message.error(Object.values(e.fieldErrors ?? {}).flat()[0] ?? e.message),
+  });
+  if (query.isLoading) return <Skeleton active paragraph={{ rows: 2 }} />;
+  if (query.error) return <ErrorState error={query.error} onRetry={query.refetch} />;
+  const { forYouColor, forYouImage, forYouImageOpacity } = query.data.data;
+  const current = { forYouColor, forYouImage, forYouImageOpacity };
+  return (
+    <Card size="small" title="For You tab" style={{ maxWidth: 520 }}>
+      <Flex vertical gap={12}>
+        <Flex gap={8} align="center">
+          <Typography.Text style={{ fontSize: 12, width: 110 }}>Header colour</Typography.Text>
+          <ColorPicker showText value={forYouColor} onChangeComplete={(c) => save.mutate({ ...current, forYouColor: c.toHexString().slice(0, 7).toUpperCase() })} />
+        </Flex>
+        <Flex gap={8} align="flex-start">
+          <Typography.Text style={{ fontSize: 12, width: 110 }}>Background image</Typography.Text>
+          <ImageUpload kind="FREE" removable value={forYouImage || null} onChange={(url) => save.mutate({ ...current, forYouImage: url ?? '' })} />
+        </Flex>
+        {forYouImage ? (
+          <Flex gap={8} align="center">
+            <Typography.Text style={{ fontSize: 12, width: 110 }}>Image opacity</Typography.Text>
+            <Slider style={{ flex: 1 }} min={0} max={100} defaultValue={forYouImageOpacity} tooltip={{ formatter: (v) => `${v}%` }} onChangeComplete={(v) => save.mutate({ ...current, forYouImageOpacity: v })} />
+            {/* live preview of the blend: the colour with the picture on top at the chosen strength */}
+            <div aria-label="Preview" style={{ width: 64, height: 40, borderRadius: 6, background: `linear-gradient(${forYouColor}, #FFFFFF)`, position: 'relative', overflow: 'hidden', flexShrink: 0 }}>
+              <img src={forYouImage} alt="" style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: forYouImageOpacity / 100 }} />
+            </div>
+          </Flex>
+        ) : null}
+        <Typography.Text type="secondary" style={{ fontSize: 12 }}>Lower the opacity to let the colour show through. Use a light, uncluttered picture so the search bar and tabs stay readable. Remove it to go back to the colour.</Typography.Text>
+      </Flex>
+    </Card>
+  );
+}
 
 /**
  * Category tabs (app `CATEGORY_TABS`) and top brand tabs (`BRAND_TABS`).
@@ -42,6 +83,8 @@ export default function TabsEditor({ kind }) {
   };
 
   return (
+    <Flex vertical gap={12}>
+    {isCategory && <ForYouCard />}
     <Flex gap={10} wrap>
       {tabs.map((tab, index) => (
         <Card key={tab.id} size="small" style={{ width: 240 }}>
@@ -85,6 +128,7 @@ export default function TabsEditor({ kind }) {
           </Flex>
         </Card>
       ))}
+    </Flex>
     </Flex>
   );
 }

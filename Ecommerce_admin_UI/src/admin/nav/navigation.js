@@ -51,9 +51,29 @@ export const NAV_GROUPS = [
       { label: 'Push Notifications', path: '/marketing/push-notifications', resources: ['notifications.broadcast'] },
       { label: 'Coupons', path: '/marketing/coupons', resources: ['marketing.coupon'] },
       { label: 'Offers', path: '/marketing/deals', resources: ['marketing.deal'] },
+    ],
+  },
+  {
+    key: 'rewards',
+    section: 'Catalog & Growth',
+    label: 'Rewards',
+    icon: 'wallet',
+    items: [
+      { label: 'Refer & Earn', path: '/marketing/referrals', resources: ['marketing.referral'] },
+      { label: 'Gift Cards', path: '/marketing/gift-cards', resources: ['wallet.giftcard'] },
+      { label: 'Cashback Rules', path: '/marketing/cashback', resources: ['wallet.cashback'] },
+    ],
+  },
+  {
+    key: 'content',
+    section: 'Catalog & Growth',
+    label: 'Content',
+    icon: 'layout',
+    items: [
       { label: 'Banners', path: '/cms/banners', resources: ['cms.banner'] },
       { label: 'Home Layout', path: '/cms/home', resources: ['cms.home'] },
       { label: 'Pages', path: '/cms/pages', resources: ['cms.page'] },
+      { label: 'About Arise', path: '/cms/about-arise', resources: ['cms.page'] },
     ],
   },
   {
@@ -74,6 +94,7 @@ export const NAV_GROUPS = [
     icon: 'customerService',
     items: [
       { label: 'Live Chat', path: '/support/chat', resources: ['support.chat'] },
+      { label: 'Arise ratings', path: '/support/arise-ratings', resources: ['support.csat'] },
       { label: 'Reviews & Q&A', path: '/reviews', resources: ['reviews.review', 'reviews.qa', 'reviews.abuse'] },
     ],
   },
@@ -85,6 +106,7 @@ export const NAV_GROUPS = [
     items: [
       { label: 'Sellers', path: '/sellers', resources: ['sellers.seller', 'sellers.bank', 'sellers.penalty', 'sellers.claim'] },
       { label: 'Seller Applications', path: '/sellers/applications', resources: ['sellers.application', 'sellers.kyc'] },
+      { label: 'Seller inquiries', path: '/sellers/inquiries', resources: ['sellers.application'] },
     ],
   },
   {

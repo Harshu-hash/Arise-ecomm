@@ -39,5 +39,7 @@ export const mapReferral = payload => {
     ...data,
     rewardAmount: money(data.rewardAmountPaise),
     earnedAmount: money(data.earnedAmountPaise),
+    friendReward: money(data.friendRewardPaise),
+    minOrder: money(data.minOrderPaise),
   };
 };

@@ -33,5 +33,6 @@ export const mapCheckoutSession = payload => {
       deliveryPromise: line.deliveryPromise,
     })),
     totals: mapTotals(session.totals),
+    walletBalance: toRupees(session.walletBalancePaise),
   };
 };

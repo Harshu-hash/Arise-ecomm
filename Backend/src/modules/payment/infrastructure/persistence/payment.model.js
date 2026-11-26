@@ -24,6 +24,7 @@ const paymentSchema = new mongoose.Schema(
     providerPaymentId: { type: String, default: null },
     failureReason: { type: String, default: null },
     orderId: { type: mongoose.Schema.Types.ObjectId, default: null },
+    walletCreditPaise: { type: Number, default: 0 }, // part of the order paid with store credit; refunds beyond the card's share go back to the wallet
     // Money given back, possibly in parts (one per cancelled seller parcel). `key` makes each refund safe to retry.
     refunds: {
       type: [{
@@ -31,7 +32,8 @@ const paymentSchema = new mongoose.Schema(
         key: { type: String, required: true },
         status: { type: String, enum: Object.values(REFUND_STATUS), required: true },
         providerRefundId: { type: String, default: null },
-        amountPaise: { type: Number, required: true },
+        amountPaise: { type: Number, required: true }, // sent back to the card / UPI
+        walletPaise: { type: Number, default: 0 }, // sent back to the customer's wallet
         reason: { type: String, default: null },
         initiatedAt: { type: Date, default: null }, // when the refund was first asked for (older entries have none)
         failureReason: { type: String, default: null }, // why Razorpay refused it, when it did

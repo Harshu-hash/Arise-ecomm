@@ -247,6 +247,11 @@ export const customerSearchProductFixtureAdapter = async config => {
   if (config.url === '/search' && config.method === 'get') {
     return response(config, searchEnvelope(config.params));
   }
+  const relatedMatch = config.url?.match(/^\/products\/([^/]+)\/related$/);
+  if (relatedMatch && config.method === 'get') {
+    const others = cardDtos.filter(item => item.id !== decodeURIComponent(relatedMatch[1]));
+    return response(config, { data: { similar: others.slice(0, 4), suggested: others.slice(4, 10) } });
+  }
   if (config.url?.startsWith('/products/') && config.method === 'get') {
     const productId = decodeURIComponent(config.url.slice('/products/'.length));
     const envelope = productDetailEnvelope(productId);

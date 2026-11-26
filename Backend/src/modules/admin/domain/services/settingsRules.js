@@ -13,6 +13,7 @@ const ip = z.union([z.ipv4(), z.ipv6(), z.cidrv4(), z.cidrv6()]);
 export const SECTION_SCHEMAS = {
   general: z.object({
     platformName: text(100),
+    logoUrl: z.union([z.literal(''), z.url().max(500)]),
     supportEmail: z.email().max(254),
     supportPhone: text(32),
     businessAddress: z.string().trim().max(300),
@@ -51,6 +52,23 @@ export const SECTION_SCHEMAS = {
     codEnabled: z.boolean(),
     walletUsageCapPct: pct,
   }).strict(),
+
+  homeHeader: z.object({
+    forYouColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFCB9D.'),
+    forYouImage: z.union([z.literal(''), z.url().max(500)]),
+    forYouImageOpacity: z.number().int().min(0).max(100),
+  }).strict(),
+
+  referral: z.object({
+    enabled: z.boolean(),
+    referrerRewardPaise: int(0, 10_000_000),
+    refereeRewardPaise: int(0, 10_000_000),
+    minOrderPaise: paiseSchema,
+    rewardExpiryDays: int(0, 730), // 0 never expires
+    maxRewardsPerReferrer: int(0, 10_000), // 0 is unlimited
+    autoApprove: z.boolean(), // off: each qualified referral waits for an admin to approve its reward
+    terms: z.string().trim().max(500),
+  }).strict().refine((v) => !v.enabled || v.referrerRewardPaise > 0 || v.refereeRewardPaise > 0, { path: ['referrerRewardPaise'], message: 'Set a reward before turning the program on.' }),
 
   tax: z.object({
     invoiceSeriesPrefix: z.string().trim().regex(/^[A-Z0-9]{1,4}$/, 'Use 1 to 4 letters or digits: GST allows invoice numbers of at most 16 characters.'),

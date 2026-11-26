@@ -111,7 +111,8 @@ async function locateRefund(id) {
 
 /** What retrying this refund would send, so a route can compare it with the admin's refund limit first. */
 export async function refundAmountPaise(id) {
-  return (await locateRefund(id)).entry.amountPaise;
+  const { entry } = await locateRefund(id);
+  return entry.amountPaise + (entry.walletPaise ?? 0);
 }
 
 /** Asks the gateway again for a refund it refused. A returned item goes back through its return (which also settles the seller's side). */
@@ -121,7 +122,7 @@ export async function retryRefund(id, actor) {
 
   if (key.startsWith('return:')) await settleReturn(key.slice('return:'.length));
   else {
-    const updated = await refundPayment(payment._id, { key, amountPaise: entry.amountPaise, reason: entry.reason ?? 'Retried by admin' });
+    const updated = await refundPayment(payment._id, { key, amountPaise: entry.amountPaise + (entry.walletPaise ?? 0), reason: entry.reason ?? 'Retried by admin' });
     // a refund that never reached the gateway was never counted on the order; one the gateway took and later failed already was
     if (!entry.providerRefundId && payment.orderId) await Order.updateOne({ _id: payment.orderId }, { $inc: { refundedPaise: entry.amountPaise } });
     entry.status = updated.refunds.find((refund) => refund.key === key).status;

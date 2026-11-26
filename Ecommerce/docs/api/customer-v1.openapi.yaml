@@ -51,6 +51,10 @@
     "/app-config": {
       "get": { "operationId": "getAppConfig", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/AppConfig" } } }
     },
+    "/pages/{slug}": {
+      "parameters": [{ "name": "slug", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "operationId": "getStaticPage", "tags": ["Account"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
     "/home": {
       "get": { "operationId": "getHome", "tags": ["Discovery"], "security": [], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
@@ -330,6 +334,10 @@
     "/support/channels": {
       "get": { "operationId": "getSupportChannels", "tags": ["Support"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
+    "/products/{productId}/related": {
+      "parameters": [{ "name": "productId", "in": "path", "required": true, "schema": { "type": "string" } }],
+      "get": { "operationId": "getRelatedProducts", "tags": ["Discovery"], "security": [], "description": "Similar products (same shelf) and products you may like (wider category, the signed-in shopper's interests): { similar, suggested }.", "responses": { "200": { "$ref": "#/components/responses/Resource" }, "404": { "$ref": "#/components/responses/Error" } } }
+    },
     "/support/chat": {
       "get": { "operationId": "getSupportChat", "tags": ["Support"], "description": "The caller's open live chat with its messages, or null data when none is open.", "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
     },
@@ -362,6 +370,12 @@
     },
     "/seller-leads": {
       "post": { "operationId": "submitSellerLead", "tags": ["Seller onboarding"], "parameters": [{ "$ref": "#/components/parameters/IdempotencyKey" }], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "201": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
+    },
+    "/seller-leads/me": {
+      "get": { "operationId": "getSellerLead", "tags": ["Seller onboarding"], "responses": { "200": { "$ref": "#/components/responses/Resource" } } }
+    },
+    "/arise-ratings": {
+      "put": { "operationId": "submitAriseRating", "tags": ["Feedback"], "requestBody": { "$ref": "#/components/requestBodies/JsonCommand" }, "responses": { "200": { "$ref": "#/components/responses/Resource" }, "422": { "$ref": "#/components/responses/ValidationError" } } }
     }
   },
   "components": {

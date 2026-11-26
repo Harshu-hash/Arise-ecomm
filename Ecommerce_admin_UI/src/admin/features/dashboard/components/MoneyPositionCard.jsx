@@ -79,7 +79,7 @@ function Section({ title, rows }) {
     <Flex vertical gap={6}>
       <Typography.Text
         type="secondary"
-        style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}
+        style={{ fontSize: 12, fontWeight: 500 }}
       >
         {title}
       </Typography.Text>

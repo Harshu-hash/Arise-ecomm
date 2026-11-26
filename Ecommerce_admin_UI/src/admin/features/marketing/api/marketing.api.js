@@ -41,10 +41,9 @@ export const marketingApi = {
   updateSaleEvent: (id, payload) => api.patch(`/sale-events/${id}`, payload),
   deleteSaleEvent: (id) => api.delete(`/sale-events/${id}`),
 
-  referralConfig: () => api.get('/referral/config'),
-  updateReferralConfig: (payload) => api.patch('/referral/config', payload),
+  referralConfig: () => api.get('/referrals/config'),
   referrals: (params) => api.get('/referrals', params),
-  decideReferral: (id, decision, reason) => api.post(`/referrals/${id}/decide`, { decision, reason }),
+  decideReferral: (id, decision, reason) => api.post(`/referrals/${id}/decision`, { decision, ...(reason ? { reason } : {}) }),
 
   campaigns: (params) => api.get('/campaigns', params),
   campaign: (id) => api.get(`/campaigns/${id}`),

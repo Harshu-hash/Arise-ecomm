@@ -19,6 +19,10 @@ export const productCardDtoSchema = z.object({
   deliveryLabel: z.string().nullable().optional(),
 });
 
+export const relatedProductsResponseSchema = apiEnvelope(
+  z.object({ similar: z.array(productCardDtoSchema), suggested: z.array(productCardDtoSchema) }),
+);
+
 // A size chart's shape is generic: `columns` are the header labels in order,
 // each `rows` entry is the same length with the size value first — so the
 // screen can render any category's chart (shirts, footwear, …) the same way.

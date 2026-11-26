@@ -10,6 +10,8 @@ import { deriveOrderStatus, isCancellable, SUB } from '../domain/services/orderS
 import { Order } from '../infrastructure/persistence/order.model.js';
 import { issueCreditNotes } from './invoice.service.js';
 import { accrueDelivered } from '../../settlement/public/index.js';
+import { qualifyOnDelivered } from '../../referral/public/index.js';
+import { grantCashback } from '../../wallet/public/index.js';
 import { notifyCancelled, notifySubOrderMoved } from './orderNotifications.js';
 import { stockReference } from './checkout.service.js';
 
@@ -43,7 +45,11 @@ export async function moveSubOrder({ orderId, subOrderId, to, from = null, actor
   const order = await Order.findById(orderId);
   orderChanged(order);
   notifySubOrderMoved(order, subOrderId, to);
-  if (to === SUB.DELIVERED) await accrueDelivered(orderId, subOrderId); // credits the seller's wallet; never throws into the delivery
+  if (to === SUB.DELIVERED) {
+    await accrueDelivered(orderId, subOrderId); // credits the seller's wallet; never throws into the delivery
+    await qualifyOnDelivered(order); // an invited friend's first qualifying order earns the referral reward; never throws either
+    await grantCashback({ userId: order.customerId, orderNumber: order.number, subOrderId, valuePaise: itemsPaidPaise(order.subOrders.id(subOrderId) ?? { items: [] }) }); // the best cashback rule, once per parcel
+  }
   return order;
 }
 

@@ -31,6 +31,19 @@ describe('customerCheckoutPaymentFixtureAdapter', () => {
     expect(result.data.data.totals.payablePaise).toBe(30700);
   });
 
+  it('applies store credit to the total and takes it off again', async () => {
+    const created = await post('/checkout/sessions', { source: 'CART', addressId: 'addr-1', cartVersion: 1 }, 'wallet-key');
+    const { id, totals } = created.data.data;
+    const put = use =>
+      customerCheckoutPaymentFixtureAdapter({ url: `/checkout/sessions/${id}/wallet`, method: 'put', data: { use } });
+    const on = (await put(true)).data.data;
+    expect(on.useWallet).toBe(true);
+    expect(on.totals.walletCreditPaise).toBeGreaterThan(0);
+    expect(on.totals.payablePaise).toBe(totals.payablePaise - on.totals.walletCreditPaise);
+    const off = (await put(false)).data.data;
+    expect(off.totals).toMatchObject({ walletCreditPaise: 0, payablePaise: totals.payablePaise });
+  });
+
   it('deduplicates checkout, payment and order creation keys', async () => {
     const firstSession = await post(
       '/checkout/sessions',

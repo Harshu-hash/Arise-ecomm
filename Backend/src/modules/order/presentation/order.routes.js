@@ -9,7 +9,7 @@ import { authenticate, authorize } from '../../../shared/middleware/authenticate
 import { idempotent } from '../../../shared/middleware/idempotency.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { confirmFromClient, getPayment, toPaymentDto } from '../../payment/public/index.js';
-import { createIntent, createSession, getSession, previewCheckout, revalidate, setAddress, setPaymentMethod } from '../application/checkout.service.js';
+import { createIntent, createSession, getSession, previewCheckout, revalidate, setAddress, setPaymentMethod, setWallet } from '../application/checkout.service.js';
 import { getCustomerInvoice, listCustomerInvoices, sendPdf } from '../application/invoice.service.js';
 import { cancelReturn, createReturn, getReturn, getReturnableItems, listReturns } from '../application/return.service.js';
 import { cancelOrder, createOrder, getOrder, getOrderTimeline, getShipmentTracking, listOrders } from '../application/order.service.js';
@@ -77,6 +77,8 @@ export function createCustomerOrderRouter() {
   router.route('/checkout/sessions/:checkoutSessionId/payment-method')
     .put(...customerOnly, validate({ params: sessionParams, body: methodBody }), route(async (req, res) => sendCommand(res, await setPaymentMethod(me(req), req.params.checkoutSessionId, req.body.paymentMethod))))
     .patch(...customerOnly, validate({ params: sessionParams, body: methodBody }), route(async (req, res) => sendCommand(res, await setPaymentMethod(me(req), req.params.checkoutSessionId, req.body.paymentMethod))));
+  router.put('/checkout/sessions/:checkoutSessionId/wallet', ...customerOnly, validate({ params: sessionParams, body: z.object({ use: z.boolean() }).strict() }), route(async (req, res) =>
+    sendCommand(res, await setWallet(me(req), req.params.checkoutSessionId, req.body.use))));
   router.post('/checkout/sessions/:checkoutSessionId/revalidate', ...customerOnly, validate({ params: sessionParams }), route(async (req, res) =>
     sendCommand(res, await revalidate(me(req), req.params.checkoutSessionId))));
   router.post('/checkout/sessions/:checkoutSessionId/payment-intent', ...customerOnly, validate({ params: sessionParams, body: intentBody }), idempotent(), route(async (req, res) =>

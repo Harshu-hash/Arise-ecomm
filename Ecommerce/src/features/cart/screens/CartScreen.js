@@ -33,35 +33,9 @@ import {
   useUpdateCartItemMutation,
 } from '../api/cart.query';
 import CouponSection, { CouponSheet } from '../components/CouponSection';
+import { useGetRelatedProductsQuery } from '@features/product/api/product.query';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
-
-const SUGGESTED_PRODUCTS = [
-  {
-    id: 'e2',
-    name: 'Noise ColorFit Smartwatch',
-    image:
-      'https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=400&q=80',
-    price: 1799,
-    mrp: 4999,
-  },
-  {
-    id: 'f2',
-    name: 'Cotton A-Line Kurti',
-    image:
-      'https://images.unsplash.com/photo-1591369822096-ffd140ec948f?auto=format&fit=crop&w=400&q=80',
-    price: 349,
-    mrp: 999,
-  },
-  {
-    id: 'e1',
-    name: 'Wireless Earbuds',
-    image:
-      'https://images.unsplash.com/photo-1590658268037-6bf12165a8df?auto=format&fit=crop&w=400&q=80',
-    price: 1299,
-    mrp: 2490,
-  },
-];
 
 const CartScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
@@ -75,6 +49,11 @@ const CartScreen = ({ navigation }) => {
   const [saveCartItemForLater] = useSaveCartItemForLaterMutation();
   const [moveSavedItemToCart] = useMoveSavedItemToCartMutation();
   const items = cart?.items ?? [];
+  const { data: related } = useGetRelatedProductsQuery(items[0]?.productId, { skip: !items[0]?.productId });
+  const inCart = new Set(items.map(item => item.productId));
+  const suggested = [...(related?.suggested ?? []), ...(related?.similar ?? [])].filter(
+    (p, i, all) => !inCart.has(p.id) && all.findIndex(q => q.id === p.id) === i,
+  );
   const savedForLater = cart?.savedForLater ?? [];
   const appliedCoupon = cart?.appliedCoupon ?? null;
   const deliveryAddress =
@@ -150,18 +129,6 @@ const CartScreen = ({ navigation }) => {
               >
                 <Text style={styles.shopNowText}>Shop now</Text>
               </PressableScale>
-            </View>
-
-            <View style={styles.suggestedWrapper}>
-              <Text style={styles.suggestedTitle}>Suggested for You</Text>
-              <Text style={styles.suggestedSubtitle}>Based on Your Activity</Text>
-              <HorizontalProductRail
-                data={SUGGESTED_PRODUCTS}
-                style={{ marginTop: SPACING.m }}
-                onPressItem={product =>
-                  navigation && navigation.navigate('ProductDetail', { productId: product.id })
-                }
-              />
             </View>
           </>
         ) : (
@@ -382,16 +349,16 @@ const CartScreen = ({ navigation }) => {
               </View>
             </View>
 
-            <View style={styles.suggestedWrapper}>
+            {suggested.length > 0 && <View style={styles.suggestedWrapper}>
               <Text style={styles.suggestedTitle}>You Might Also Like</Text>
               <HorizontalProductRail
-                data={SUGGESTED_PRODUCTS}
+                data={suggested}
                 style={{ marginTop: SPACING.m }}
                 onPressItem={product =>
                   navigation && navigation.navigate('ProductDetail', { productId: product.id })
                 }
               />
-            </View>
+            </View>}
           </>
         )}
       </ScrollView>

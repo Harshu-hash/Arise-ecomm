@@ -268,12 +268,6 @@ export function seedDashboard() {
       (t) => !['RESOLVED', 'CLOSED'].includes(t.status) && new Date(t.resolutionDueAt).getTime() < mockNow(),
     ).length;
   }
-  const ticketsBreachingSla = filter(
-    'tickets',
-    (t) => !['RESOLVED', 'CLOSED'].includes(t.status) && new Date(t.resolutionDueAt).getTime() < mockNow(),
-  ).length;
-  const adCampaignsPendingReview = filter('adCampaigns', (c) => c.status === 'PENDING_REVIEW').length;
-
   return insert('settings', {
     id: 'dashboard',
     series: dailySeries(120),
@@ -282,18 +276,11 @@ export function seedDashboard() {
         ['APPLIED', 'DOCUMENTS_PENDING', 'UNDER_REVIEW', 'NEEDS_INFO'].includes(s.status),
       ).length,
       listingsInQc: 148,
-      brandApprovalsPending: 12,
       ordersNotAccepted: 37,
       notDispatched: 64,
-      ndrPending: 212,
       returnsAwaitingQc: 89,
       failedRefunds: 7,
-      payoutBatchesAwaitingApproval: 1,
-      ticketsBreachingSla,
-      adCampaignsPendingReview,
-      lowStockFbaSkus: 43,
-      weightDisputesOpen: 18,
-      privacyRequestsDue: 3,
+      withdrawalsAwaitingApproval: 1,
     },
     paymentMix: [
       { method: 'UPI', sharePct: 48.2, successPct: 96.4 },

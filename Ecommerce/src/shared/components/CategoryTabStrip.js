@@ -1,3 +1,4 @@
+import { shortLabel } from '../../utils/shortLabel';
 import React, { useRef, useEffect, useState } from 'react';
 import { Image, ScrollView, Text, StyleSheet, TouchableOpacity, Animated, Easing } from 'react-native';
 import CategoryIcon from './CategoryIcon';
@@ -126,18 +127,18 @@ const CategoryTabStrip = ({
                 isActive && styles.iconBoxActive,
                 isIconAnimated && { opacity: iconOpacity, transform: [{ scale: iconScale }] },
               ]}>
-              {tab.imageUrl ? (
-                <Image source={{ uri: tab.imageUrl }} style={styles.tabImage} resizeMode="cover" />
-              ) : tab.icon && (
+              {tab.icon ? (
                 <CategoryIcon
                   name={tab.icon}
                   size={22}
                   color={COLORS.textPrimary}
                 />
-              )}
+              ) : tab.imageUrl ? (
+                <Image source={{ uri: tab.imageUrl }} style={styles.tabImage} resizeMode="cover" />
+              ) : null}
             </Animated.View>
             <Animated.View style={isIconAnimated && { transform: [{ translateY: labelTranslateY }] }}>
-              <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
+              <Text numberOfLines={1} style={[styles.label, isActive && styles.labelActive]}>{tab.id === 'foryou' ? tab.label : shortLabel(tab.label)}</Text>
             </Animated.View>
           </TouchableOpacity>
         );

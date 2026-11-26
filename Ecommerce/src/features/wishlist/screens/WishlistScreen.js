@@ -22,39 +22,7 @@ import {
   useMoveWishlistItemToCartMutation,
   useRemoveWishlistItemMutation,
 } from '../api/wishlist.query';
-
-const SUGGESTED_PRODUCTS = [
-  {
-    id: 'h2',
-    name: 'LIFE FIT Diary Collection',
-    image:
-      'https://images.unsplash.com/photo-1544816155-12df9643f363?auto=format&fit=crop&w=400&q=80',
-    price: 298,
-    mrp: 795,
-    discountPct: 63,
-    rating: 5,
-  },
-  {
-    id: 'e3',
-    name: 'Portable Bluetooth Speaker',
-    image:
-      'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?auto=format&fit=crop&w=400&q=80',
-    price: 899,
-    mrp: 1999,
-    discountPct: 55,
-    rating: 4.1,
-  },
-  {
-    id: 'e4',
-    name: 'Wireless Charging Pad',
-    image:
-      'https://images.unsplash.com/photo-1622957461294-2ce6b6d33d20?auto=format&fit=crop&w=400&q=80',
-    price: 499,
-    mrp: 999,
-    discountPct: 50,
-    rating: 3.9,
-  },
-];
+import { useGetRelatedProductsQuery } from '@features/product/api/product.query';
 
 const WishlistCard = ({ item, onRemove, onMoveToCart, onPress }) => {
   const discountPct =
@@ -143,6 +111,11 @@ const WishlistScreen = ({ navigation }) => {
   const [removeWishlistItem] = useRemoveWishlistItemMutation();
   const [moveWishlistItemToCart] = useMoveWishlistItemToCartMutation();
   const wishlist = data?.items ?? [];
+  const { data: related } = useGetRelatedProductsQuery(wishlist[0]?.id, { skip: !wishlist[0]?.id });
+  const saved = new Set(wishlist.map(item => item.id));
+  const suggested = [...(related?.suggested ?? []), ...(related?.similar ?? [])].filter(
+    (p, i, all) => !saved.has(p.id) && all.findIndex(q => q.id === p.id) === i,
+  );
 
   const removeItem = async id => {
     try {
@@ -211,18 +184,6 @@ const WishlistScreen = ({ navigation }) => {
                   <Text style={styles.shopNowText}>Start Shopping</Text>
                 </PressableScale>
               </View>
-
-              <View style={styles.suggestedWrapper}>
-                <Text style={styles.suggestedTitle}>You Might Like</Text>
-                <HorizontalProductRail
-                  data={SUGGESTED_PRODUCTS}
-                  showRating
-                  style={{ marginTop: SPACING.m }}
-                  onPressItem={product =>
-                    navigation && navigation.navigate('ProductDetail', { productId: product.id })
-                  }
-                />
-              </View>
             </View>
           }
         />
@@ -248,10 +209,10 @@ const WishlistScreen = ({ navigation }) => {
             />
           )}
           ListFooterComponent={
-            <View style={styles.suggestedWrapper}>
+            suggested.length > 0 && <View style={styles.suggestedWrapper}>
               <Text style={styles.suggestedTitle}>You Might Also Like</Text>
               <HorizontalProductRail
-                data={SUGGESTED_PRODUCTS}
+                data={suggested}
                 showRating
                 style={{ marginTop: SPACING.m, paddingHorizontal: 0 }}
                 onPressItem={product =>

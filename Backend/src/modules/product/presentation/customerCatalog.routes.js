@@ -6,13 +6,14 @@ import { ROLES } from '../../../shared/constants/roles.js';
 import { authenticate, authorize, optionalAuthenticate } from '../../../shared/middleware/authenticate.js';
 import { objectIdSchema } from '../../../shared/validators/common.js';
 import { recordSearch } from '../../search/public/index.js';
-import { deleteCustomerProductHistory, SORT_OPTIONS, getCustomerProduct, listCustomerBrands, listRecentlyViewed, recordProductView, searchCustomerProducts } from '../application/customerCatalog.service.js';
+import { deleteCustomerProductHistory, SORT_OPTIONS, getCustomerProduct, listCustomerBrands, listRecentlyViewed, listRelatedProducts, recordProductView, searchCustomerProducts } from '../application/customerCatalog.service.js';
 
 const csv = z.string().optional().transform((value) => (value ? value.split(',').filter(Boolean) : []));
 const searchQuery = z.object({
   q: z.string().trim().max(100).optional(),
   categoryId: objectIdSchema.optional(),
   brandId: objectIdSchema.optional(),
+  sellerId: objectIdSchema.optional(), // a seller's shop: only products they have a live offer on
   categories: csv,
   brands: csv,
   priceRangeId: z.string().max(10).optional(),
@@ -82,6 +83,14 @@ export function createCustomerRecentlyViewedRouter() {
 // Mounted at /api/customer/v1/products.
 export function createCustomerProductRouter() {
   const router = Router();
+  // "Similar Products" and "Products you may like" under a product page.
+  router.get('/:id/related', optionalAuthenticate, validate({ params: z.object({ id: objectIdSchema }) }), async (req, res, next) => {
+    try {
+      return sendData(res, await listRelatedProducts(req.params.id, { userId: req.auth?.role === 'CUSTOMER' ? req.auth.userId : null }));
+    } catch (error) {
+      return next(error);
+    }
+  });
   router.get('/:id', optionalAuthenticate, validate({ params: z.object({ id: objectIdSchema }) }), async (req, res, next) => {
     try {
       const product = await getCustomerProduct(req.params.id);

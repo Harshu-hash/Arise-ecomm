@@ -109,6 +109,8 @@ test('dashboards and analytics: real numbers for the admin and for one seller', 
   assert.equal(tile('returnsAwaitingQc').count, 1);
   assert.equal(tile('ordersNotAccepted').count, 1);
   assert.equal(tile('ordersNotAccepted').urgent, true);
+  assert.equal(tile('listingsInQc').link, '/catalog/products?status=QC_PENDING');
+  assert.equal(tile('ndrPending'), undefined, 'queues without an admin backend are not displayed');
   assert.deepEqual((await asAdmin('/admin/v1/dashboard/alerts')).body, { data: [], meta: { unread: 0 } });
   const money = (await asAdmin('/admin/v1/finance/overview')).body.data;
   assert.deepEqual([money.payableNowPaise, money.heldPaise, money.commissionPaise], [56_000, 30_000, 10_000]);
@@ -138,6 +140,10 @@ test('dashboards and analytics: real numbers for the admin and for one seller', 
   assert.deepEqual([mine.kpis.gmv30dPaise, mine.kpis.orders30d, mine.kpis.liveListings, mine.kpis.ordersToProcess, mine.kpis.returnsPending, mine.kpis.payoutDuePaise], [120_000, 2, 1, 1, 1, 56_000]);
   assert.equal(mine.accountHealth.cancellationPct, 33.33);
   assert.equal(mine.accountHealth.lateDispatchPct, 0, 'dispatched inside two days');
+  assert.deepEqual(mine.tips.map(({ id, link }) => ({ id, link })), [
+    { id: 'tip-stock', link: '/stock' },
+    { id: 'tip-listings', link: '/listings/new' },
+  ]);
   const otherSeller = (await call(signAccessToken({ sub: String(oid()), role: 'SELLER', sellerId: String(shopB._id) }), '/seller/v1/dashboard/summary')).body.data;
   assert.deepEqual([otherSeller.kpis.gmv30dPaise, otherSeller.kpis.orders30d], [0, 0]);
   assert.equal((await call(signAccessToken({ sub: String(oid()), role: 'CUSTOMER' }), '/seller/v1/dashboard/summary')).status, 403);

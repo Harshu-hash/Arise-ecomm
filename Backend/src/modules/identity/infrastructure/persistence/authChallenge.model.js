@@ -9,6 +9,7 @@ const authChallengeSchema = new mongoose.Schema(
     stage: { type: String, required: true },
     target: { type: String, default: null }, // email/phone being verified, when userId is not yet known
     name: { type: String, default: null }, // customer signup only
+    referralCode: { type: String, default: null }, // customer signup only: the invite code they arrived with
     // Absent for TOTP-backed challenges (LOGIN_2FA): the proof there is the user's own
     // authenticator/backup code, not a server-issued shared secret.
     codeHash: { type: String, default: null },

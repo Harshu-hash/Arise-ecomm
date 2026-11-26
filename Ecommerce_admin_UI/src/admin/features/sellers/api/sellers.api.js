@@ -3,6 +3,7 @@ import { api } from '@core/api/axiosInstance';
 export const sellersApi = {
   list: (params) => api.get('/sellers', params),
   applications: (params) => api.get('/sellers/applications', params),
+  inviteInquiry: (id) => api.post(`/seller-inquiries/${id}/invite`, {}),
   performance: (params) => api.get('/sellers/performance', params),
   detail: (id) => api.get(`/sellers/${id}`),
   update: (id, payload) => api.patch(`/sellers/${id}`, payload),
@@ -35,6 +36,7 @@ export const sellerKeys = {
   all: ['sellers'],
   list: (p) => ['sellers', 'list', p],
   applications: (p) => ['sellers', 'applications', p],
+  inquiries: (p) => ['sellers', 'inquiries', p],
   performance: (p) => ['sellers', 'performance', p],
   detail: (id) => ['sellers', 'detail', id],
   brandRequests: (p) => ['brandRequests', p],

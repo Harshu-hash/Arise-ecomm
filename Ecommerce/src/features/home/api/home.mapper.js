@@ -25,7 +25,7 @@ export const HOME_SECTION_TYPES = Object.freeze({
 
 const parseItems = (section, schema) => z.array(schema).parse(section?.items ?? []);
 const moneyToRupees = paise => paise / 100;
-const mapBanner = item => ({ id: item.id, image: item.imageUrl, target: item.target });
+const mapBanner = item => ({ id: item.id, image: item.imageUrl, video: item.videoUrl ?? null, target: item.target });
 const mapProduct = item => ({
   id: item.id,
   brand: item.brand,
@@ -49,6 +49,13 @@ const ORDERED_SECTIONS = {
   [HOME_SECTION_TYPES.brandSpotlight]: { schema: brandSpotlightSchema, map: withImage },
   [HOME_SECTION_TYPES.topValueDeals]: { schema: dealCardSchema, map: withImage },
   [HOME_SECTION_TYPES.productFeed]: { schema: productCardSchema, map: mapProduct },
+};
+
+export const mapHomeFeedPage = payload => {
+  const { items, nextCursor } = z
+    .object({ data: z.object({ items: z.array(productCardSchema), nextCursor: z.string().nullable() }) })
+    .parse(payload).data;
+  return { items: items.map(mapProduct), nextCursor };
 };
 
 export const mapHomeResponse = payload => {

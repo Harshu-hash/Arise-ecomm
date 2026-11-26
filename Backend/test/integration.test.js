@@ -978,6 +978,8 @@ test('customer categories: show only ACTIVE categories in the tree, home tabs an
   const hidden = row('Cust Hidden', null, { status: 'HIDDEN' });
   const underHidden = row('Cust Under Hidden', hidden);
   await Category.create([root, men, shirts, bare, hidden, underHidden]);
+  const { CategoryTab } = await import('../src/modules/admin/infrastructure/persistence/homeLayout.models.js');
+  await CategoryTab.create({ categoryId: root._id, label: root.name, icon: 'grid', gradient: ['#FFCB9D', '#FFFFFF'], order: 0 });
 
   const { Banner } = await import('../src/modules/admin/infrastructure/persistence/banner.model.js');
   const img = (n) => ({ mobile_16_9: `https://cdn.example.com/uploads/cms/${n}.png`, tile_1_1: 'https://x/t.png', web: 'https://x/w.png' });
@@ -1014,6 +1016,13 @@ test('customer categories: show only ACTIVE categories in the tree, home tabs an
   assert.equal(home.header.categoryTabs[0].id, 'foryou');
   const tab = home.header.categoryTabs.find((c) => c.label === 'Cust Fashion');
   assert.deepEqual(tab.gradient, ['#7c3aed', '#FFFFFF']);
+  assert.equal(tab.icon, 'tag', 'the current category icon wins over the tab\'s stale copied icon');
+  await CategoryTab.updateOne(
+    { categoryId: root._id },
+    { $set: { gradient: ['#112233', '#FFFFFF'], gradientOverridden: true } },
+  );
+  const overriddenTab = (await get('/home')).body.data.header.categoryTabs.find((c) => c.label === 'Cust Fashion');
+  assert.deepEqual(overriddenTab.gradient, ['#112233', '#FFFFFF'], 'an explicit Home Layout gradient still wins');
 
   const detail = (await get(`/categories/${root._id}`)).body.data;
   assert.equal(detail.heroBanner.title, 'hero-cat'); // the category's own banner, not its image

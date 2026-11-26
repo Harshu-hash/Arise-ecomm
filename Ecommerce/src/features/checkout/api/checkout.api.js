@@ -44,6 +44,15 @@ export const checkoutApi = baseApi.injectEndpoints({
       transformResponse: mapCheckoutSession,
       invalidatesTags: (_, __, { sessionId }) => [{ type: 'Checkout', id: sessionId }],
     }),
+    updateCheckoutWallet: builder.mutation({
+      query: ({ sessionId, use }) => ({
+        url: CHECKOUT_ENDPOINTS.wallet(sessionId),
+        method: 'PUT',
+        data: { use },
+      }),
+      transformResponse: mapCheckoutSession,
+      invalidatesTags: (_, __, { sessionId }) => [{ type: 'Checkout', id: sessionId }],
+    }),
     revalidateCheckoutSession: builder.mutation({
       query: sessionId => ({ url: CHECKOUT_ENDPOINTS.revalidate(sessionId), method: 'POST' }),
       transformResponse: mapCheckoutSession,
@@ -59,4 +68,5 @@ export const {
   useRevalidateCheckoutSessionMutation,
   useUpdateCheckoutAddressMutation,
   useUpdateCheckoutPaymentMethodMutation,
+  useUpdateCheckoutWalletMutation,
 } = checkoutApi;

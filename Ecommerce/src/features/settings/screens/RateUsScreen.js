@@ -5,10 +5,24 @@ import Icon from 'react-native-vector-icons/Feather';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
+import { useToast } from '../../../contexts/ToastContext';
+import { useSubmitAriseRatingMutation } from '../api/ariseRating.api';
 
 const RateUsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets();
   const [rating, setRating] = useState(0);
+  const toast = useToast();
+  const [submitRating, { isLoading }] = useSubmitAriseRatingMutation();
+
+  const submit = async () => {
+    try {
+      await submitRating({ rating }).unwrap();
+      toast.show('Thanks for rating Arise.', { variant: 'success' });
+      navigation?.goBack();
+    } catch (error) {
+      toast.show(error.message || 'Could not submit your rating.', { variant: 'error' });
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -45,15 +59,16 @@ const RateUsScreen = ({ navigation }) => {
 
         {rating > 0 ? (
           <Text style={styles.ratingFeedback}>
-            {rating >= 4 ? 'Awesome! Thanks for the love ❤️' : 'Thanks! We will work on improving.'}
+            {rating >= 4 ? 'Awesome! Thanks for the love.' : 'Thanks! We will work on improving.'}
           </Text>
         ) : null}
 
         <TouchableOpacity
           activeOpacity={0.85}
-          disabled={rating === 0}
-          style={[styles.submitBtn, rating === 0 && styles.submitBtnDisabled]}>
-          <Text style={styles.submitBtnText}>Submit Rating</Text>
+          disabled={rating === 0 || isLoading}
+          style={[styles.submitBtn, (rating === 0 || isLoading) && styles.submitBtnDisabled]}
+          onPress={submit}>
+          <Text style={styles.submitBtnText}>{isLoading ? 'Submitting...' : 'Submit Rating'}</Text>
         </TouchableOpacity>
       </View>
     </View>

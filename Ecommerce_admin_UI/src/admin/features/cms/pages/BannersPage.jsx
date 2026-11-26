@@ -77,6 +77,7 @@ export default function BannersPage() {
       key: 'actions', title: '', align: 'right', priority: 1,
       render: (_v, row) => (
         <>
+          <Button size="small" type="text" onClick={(e) => { e.stopPropagation(); setEditing(row); }}>Edit</Button>
           <Button size="small" type="text" danger onClick={(e) => { e.stopPropagation(); setDeleting(row); }}>Remove</Button>
         </>
       ),

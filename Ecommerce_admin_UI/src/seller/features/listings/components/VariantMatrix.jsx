@@ -12,7 +12,7 @@ import {
   Tag,
   Typography,
 } from 'antd';
-import { useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import ImageUpload from '@ui/components/ImageUpload/ImageUpload';
 
 function cartesian(valueLists) {
@@ -126,17 +126,18 @@ function VariantCard({ row, onUpdate }) {
  * combination — the matrix the mock handler's `variants[]` payload expects.
  */
 export default function VariantMatrix({ variantAttrs, value = [], onChange, skuPrefix = 'SKU' }) {
-  const selections = useMemo(() => {
-    const out = {};
-    for (const attr of variantAttrs) {
-      const codes = new Set((value ?? []).map((r) => r.attributes?.[attr.code]).filter(Boolean));
-      out[attr.code] = Array.from(codes);
-    }
-    return out;
-  }, [variantAttrs, value]);
+  // What the seller has picked, kept here and not read back from the rows: rows only exist once every option has a value, so
+  // with two options (storage + colour) a first pick would otherwise vanish the moment it was made.
+  const fromRows = () => Object.fromEntries(variantAttrs.map((attr) => [attr.code, [...new Set((value ?? []).map((r) => r.attributes?.[attr.code]).filter(Boolean))]]));
+  const [picks, setPicks] = useState(fromRows);
+  // a different category brings different options: start over
+  const optionCodes = variantAttrs.map((attr) => attr.code).join();
+  useEffect(() => { setPicks(fromRows()); }, [optionCodes]); // eslint-disable-line react-hooks/exhaustive-deps
+  const selections = value?.length ? fromRows() : picks; // existing rows (e.g. a loaded listing) are the truth
 
   const setSelection = (attr, picked) => {
     const nextSelections = { ...selections, [attr.code]: picked };
+    setPicks(nextSelections);
     const lists = variantAttrs.map((a) =>
       (nextSelections[a.code] ?? []).map((v) => ({ code: a.code, value: v })),
     );

@@ -20,6 +20,9 @@ const GRADIENT_FADE_DURATION = 380;
 // (the labels/underline rise 18px, plus the strip's own bottom padding). The background is shortened by it.
 const COLLAPSED_BOTTOM_TRIM = 24;
 
+const getImageForCategory = (categoryTabs, categoryId) =>
+  categoryTabs.find(tab => tab.id === categoryId) || {};
+
 const getGradientForCategory = (categoryTabs, categoryId) =>
   categoryTabs.find(tab => tab.id === categoryId)?.gradient || DEFAULT_GRADIENT;
 
@@ -60,9 +63,15 @@ const LocationSearchHeader = ({
   );
   const [incomingGradient, setIncomingGradient] = useState(null);
   const gradientFade = useRef(new Animated.Value(0)).current;
+  const activeGradient = getGradientForCategory(categoryTabs, activeCategoryId);
+  const { backgroundImageUrl: backgroundImage, backgroundImageOpacity = 1 } = getImageForCategory(
+    categoryTabs,
+    activeCategoryId,
+  );
+  const [activeGradientStart, activeGradientEnd] = activeGradient;
 
   useEffect(() => {
-    const nextGradient = getGradientForCategory(categoryTabs, activeCategoryId);
+    const nextGradient = [activeGradientStart, activeGradientEnd];
     if (nextGradient[0] === baseGradient[0] && nextGradient[1] === baseGradient[1]) return;
 
     setIncomingGradient(nextGradient);
@@ -79,7 +88,7 @@ const LocationSearchHeader = ({
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeCategoryId]);
+  }, [activeCategoryId, activeGradientStart, activeGradientEnd]);
 
   // Derived (never independently measured) so it can never drift out of sync with the
   // translateY clamp below — that mismatch was what left a leftover strip of orange
@@ -143,6 +152,13 @@ const LocationSearchHeader = ({
             <GradientBackground colors={incomingGradient} />
           </Animated.View>
         )}
+        {backgroundImage ? (
+          <Image
+            source={{ uri: backgroundImage }}
+            style={[StyleSheet.absoluteFill, { opacity: backgroundImageOpacity }]}
+            resizeMode="cover"
+          />
+        ) : null}
       </Animated.View>
 
       <View style={{ paddingTop: topPaddingValue }}>

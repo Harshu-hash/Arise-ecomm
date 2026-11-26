@@ -141,14 +141,11 @@ export async function getActionCenter(allowed) {
     { $match: { 'subOrders.status': status, 'subOrders.events.0.at': { $lt: new Date(now - ms) } } },
     { $count: 'n' },
   ]).then(([row]) => row?.n ?? 0);
-  const parcels = (status) => Order.aggregate([{ $unwind: '$subOrders' }, { $match: { 'subOrders.status': status } }, { $count: 'n' }]).then(([row]) => row?.n ?? 0);
-
-  const [applications, qc, notAccepted, notDispatched, failedDelivery, awaitingQc, failedRefunds, withdrawals] = await Promise.all([
+  const [applications, qc, notAccepted, notDispatched, awaitingQc, failedRefunds, withdrawals] = await Promise.all([
     count(Seller, { status: 'UNDER_REVIEW' }),
     count(Product, { status: 'QC_PENDING' }),
     stale('CONFIRMED', ACCEPT_SLA_MS),
     stale('ACCEPTED', DISPATCH_SLA_MS),
-    parcels('DELIVERY_FAILED'),
     count(Return, { status: 'RECEIVED' }),
     count(Return, { 'refund.status': 'FAILED' }),
     count(Withdrawal, { status: 'REQUESTED' }),
@@ -156,10 +153,9 @@ export async function getActionCenter(allowed) {
   // [key, label, count, link, permission needed, urgent when above zero]
   const tiles = [
     ['sellerApplicationsPending', 'Seller applications pending', applications, '/sellers/applications', 'sellers.application.view', false],
-    ['listingsInQc', 'Listings in QC', qc, '/catalog/qc', 'catalog.product.approve', false],
-    ['ordersNotAccepted', 'Not accepted past SLA', notAccepted, '/orders?status=PLACED&slaBreached=true', 'orders.order.view', true],
-    ['notDispatched', 'Not dispatched past SLA', notDispatched, '/orders?status=PACKED&slaBreached=true', 'orders.order.view', true],
-    ['ndrPending', 'Deliveries that failed', failedDelivery, '/logistics/ndr', 'logistics.ndr.view', true],
+    ['listingsInQc', 'Listings in QC', qc, '/catalog/products?status=QC_PENDING', 'catalog.product.approve', false],
+    ['ordersNotAccepted', 'Not accepted past SLA', notAccepted, '/orders?status=CONFIRMED&slaBreached=true', 'orders.order.view', true],
+    ['notDispatched', 'Not dispatched past SLA', notDispatched, '/orders?status=PROCESSING&slaBreached=true', 'orders.order.view', true],
     ['returnsAwaitingQc', 'Returns awaiting QC', awaitingQc, '/returns?status=RECEIVED', 'orders.return.view', false],
     ['failedRefunds', 'Failed refunds', failedRefunds, '/finance/refunds?status=FAILED', 'finance.refund.view', true],
     ['withdrawalsAwaitingApproval', 'Withdrawals to approve', withdrawals, '/finance/withdrawals', 'finance.payout.view', false],

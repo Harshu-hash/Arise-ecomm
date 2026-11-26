@@ -1,1 +1,1 @@
-export { useGetProductQuery, useLazyGetProductQuery } from './product.api';
+export { useGetProductQuery, useGetRelatedProductsQuery, useLazyGetProductQuery } from './product.api';

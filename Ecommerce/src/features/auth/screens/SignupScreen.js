@@ -21,6 +21,7 @@ const SignupScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [identifier, setIdentifier] = useState('');
+  const [referralCode, setReferralCode] = useState(route?.params?.referralCode ?? ''); // arrives from an invite link (arise://signup?referralCode=...)
   const [startAuth, { isLoading, error }] = useStartAuthMutation();
   const returnTo = route?.params?.returnTo;
 
@@ -41,6 +42,7 @@ const SignupScreen = ({ navigation, route }) => {
         identifier: identifier.trim(),
         name: name.trim(),
         purpose: 'SIGNUP',
+        ...(referralCode.trim() ? { referralCode: referralCode.trim() } : {}),
       }).unwrap();
       navigation?.navigate('OtpVerification', {
         identifier: identifier.trim(),
@@ -98,6 +100,17 @@ const SignupScreen = ({ navigation, route }) => {
           style={styles.field}
         />
 
+        <TextField
+          label="Referral code (optional)"
+          value={referralCode}
+          onChangeText={setReferralCode}
+          placeholder="Have a friend's invite code?"
+          leftIcon="gift"
+          autoCapitalize="characters"
+          error={error?.fieldErrors?.referralCode}
+          style={styles.field}
+        />
+
         <AppButton
           title="Create Account"
           onPress={handleCreateAccount}
@@ -108,7 +121,7 @@ const SignupScreen = ({ navigation, route }) => {
           style={styles.cta}
         />
 
-        {error && !error.fieldErrors?.name && !error.fieldErrors?.identifier ? (
+        {error && !error.fieldErrors?.name && !error.fieldErrors?.identifier && !error.fieldErrors?.referralCode ? (
           <Text accessibilityRole="alert" style={styles.errorText}>
             {error.message}
           </Text>

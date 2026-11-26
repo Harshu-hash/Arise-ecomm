@@ -17,13 +17,15 @@ import TopValueDealsSection from '../components/TopValueDealsSection';
 import ProductFeedSection from '../components/ProductFeedSection';
 import AddressSelectSheet from '../components/AddressSelectSheet';
 import HomeScreenSkeleton from '../components/HomeScreenSkeleton';
-import { homeApi } from '../api/home.api';
 import { HOME_SECTION_TYPES } from '../api/home.mapper';
-import { useGetHomeQuery } from '../api/home.query';
+import { useGetHomeQuery, useLazyGetHomeFeedPageQuery } from '../api/home.query';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
+import { categoryApi } from '@features/category';
 
 const FOR_YOU_TAB_ID = 'foryou'; // reserved first tab served by the backend: the main home feed
+const FEED_PAGE_SIZE = 20; // the first page /home sends; a shorter first page means there is nothing more
+const LOAD_MORE_DISTANCE = 800; // px from the end of the scroll at which the next page is fetched
 const DEFAULT_HEADER_HEIGHT = 272;
 const AD_SHEET_PARALLAX_DISTANCE = 50;
 const AD_SHEET_PARALLAX_SCROLL_RANGE = 160;
@@ -51,15 +53,42 @@ const HomeScreen = ({ navigation }) => {
   const { data, currentData, error, isLoading, isFetching, refetch } = useGetHomeQuery(
     activeCategoryId && activeCategoryId !== FOR_YOU_TAB_ID ? activeCategoryId : undefined,
   );
-  // Warm every header tab's page once the header is known, so switching tabs shows cached content at once.
-  const prefetchHome = homeApi.usePrefetch('getHome');
-  const tabIds = (data?.header.categoryTabs ?? []).map(tab => tab.id).join(',');
+  // "You May Also Like" grows by pages as the shopper nears the bottom; `key` ties the extra pages to the feed they extend,
+  // so a tab switch or a refresh starts over from the first page /home sends.
+  const [fetchFeedPage] = useLazyGetHomeFeedPageQuery();
+  const [moreFeed, setMoreFeed] = useState({ key: null, items: [], cursor: null, done: false });
+  const [loadingMore, setLoadingMore] = useState(false);
+  const loadingMoreRef = useRef(false);
+  const feedKey = `${activeCategoryId}|${data?.generatedAt}`;
+  const extraFeed = moreFeed.key === feedKey ? moreFeed : { key: feedKey, items: [], cursor: null, done: false };
+  const loadMoreFeed = async () => {
+    const feed = currentData?.sections.find(section => section.type === HOME_SECTION_TYPES.productFeed);
+    if (!feed || loadingMoreRef.current || extraFeed.done) return;
+    if (feed.items.length < FEED_PAGE_SIZE) return setMoreFeed({ ...extraFeed, done: true });
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const page = await fetchFeedPage({
+        categoryId: activeCategoryId && activeCategoryId !== FOR_YOU_TAB_ID ? activeCategoryId : undefined,
+        cursor: extraFeed.cursor ?? String(feed.items.length),
+      }).unwrap();
+      setMoreFeed({ key: feedKey, items: [...extraFeed.items, ...page.items], cursor: page.nextCursor, done: !page.nextCursor });
+    } catch {
+      // Leave it retryable: the next scroll near the end tries again.
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  };
+  // Warm the Categories tab without issuing one expensive Home request per header tab.
+  const prefetchCategoryTree = categoryApi.usePrefetch('getCategoryTree');
+  const prefetchCategory = categoryApi.usePrefetch('getCategory');
+  const firstCategoryId = data?.header.categoryTabs?.find(tab => tab.id !== FOR_YOU_TAB_ID)?.id;
   useEffect(() => {
-    tabIds
-      .split(',')
-      .filter(tabId => tabId && tabId !== FOR_YOU_TAB_ID)
-      .forEach(tabId => prefetchHome(tabId, { ifOlderThan: 60 }));
-  }, [tabIds, prefetchHome]);
+    if (!firstCategoryId) return;
+    prefetchCategoryTree(undefined, { ifOlderThan: 60 });
+    prefetchCategory(firstCategoryId, { ifOlderThan: 60 });
+  }, [firstCategoryId, prefetchCategory, prefetchCategoryTree]);
   const isAuthenticated = useSelector(selectIsAuthenticated);
   // Home is personal once signed in ("Still looking for these?"): reload it when the user signs in or out.
   const authSeen = useRef(isAuthenticated);
@@ -110,8 +139,16 @@ const HomeScreen = ({ navigation }) => {
     EMPTY_DELIVERY_LOCATION;
   const resolvedCategoryId = activeCategoryId || data.header.categoryTabs[0]?.id;
   const activeBrandId = data.header.brandTabs[0]?.id;
+  // A shop banner opens that seller's products; a product banner opens the product.
+  const openBanner = banner => {
+    if (banner.target?.type === 'PRODUCT') navigation?.navigate('ProductDetail', { productId: banner.target.id });
+    else if (banner.target?.type === 'SHOP') navigation?.navigate('SearchResults', { sellerId: banner.target.id, title: 'Shop' });
+  };
   const handleScroll = Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
     useNativeDriver: true,
+    listener: ({ nativeEvent: { contentOffset, contentSize, layoutMeasurement } }) => {
+      if (contentOffset.y + layoutMeasurement.height > contentSize.height - LOAD_MORE_DISTANCE) loadMoreFeed();
+    },
   });
   // Below the pinned hero and ad banners, sections appear in the order the admin's published layout set.
   const renderSection = section => {
@@ -164,7 +201,7 @@ const HomeScreen = ({ navigation }) => {
         return (
           <ProductFeedSection
             key={section.id}
-            products={section.items}
+            products={[...section.items, ...extraFeed.items]}
             onPressProduct={product => navigation?.navigate('ProductDetail', { product })}
           />
         );
@@ -202,12 +239,13 @@ const HomeScreen = ({ navigation }) => {
           {data.failedSections.length > 0 ? (
             <SectionLoadWarning count={data.failedSections.length} onRetry={refetch} />
           ) : null}
-          {data.adBanners.length > 0 ? <AdSheetCard banners={data.adBanners} /> : null}
+          {data.adBanners.length > 0 ? <AdSheetCard banners={data.adBanners} onPressBanner={openBanner} /> : null}
           {data.sections.map(renderSection)}
           {!hasSections && !isFetching ? (
             <Text style={styles.emptyNote}>Nothing to show in this category yet.</Text>
           ) : null}
         </Animated.View>}
+        {loadingMore ? <ActivityIndicator style={styles.moreLoader} color={COLORS.primary} /> : null}
       </Animated.ScrollView>
 
       <LocationSearchHeader
@@ -260,6 +298,7 @@ const styles = StyleSheet.create({
   },
   sectionWarningText: { flex: 1, color: COLORS.textPrimary, fontSize: 13 },
   tabLoader: { marginTop: 120 },
+  moreLoader: { marginVertical: SPACING.l },
   emptyNote: { textAlign: 'center', color: COLORS.textSecondary, fontSize: 14, marginTop: 80 },
   retryText: { color: COLORS.primary, fontWeight: '700', marginLeft: SPACING.m },
 });

@@ -84,6 +84,7 @@ const ProtectedReturnReplace = withAuthGuard(ReturnReplaceScreen);
 const ProtectedReturnDetail = withAuthGuard(ReturnDetailScreen);
 const ProtectedChat = withAuthGuard(ChatScreen);
 const ProtectedChatHistory = withAuthGuard(ChatHistoryScreen);
+const ProtectedRateUs = withAuthGuard(RateUsScreen);
 
 const CustomerNavigator = () => (
   <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -123,7 +124,7 @@ const CustomerNavigator = () => (
     <Stack.Screen name="QuestionDetail" component={QuestionDetailScreen} />
     <Stack.Screen name="SellOnArise" component={SellOnAriseScreen} />
     <Stack.Screen name="SellerRegistration" component={SellerRegistrationScreen} />
-    <Stack.Screen name="RateUs" component={RateUsScreen} />
+    <Stack.Screen name="RateUs" component={ProtectedRateUs} />
     <Stack.Screen name="About" component={AboutScreen} />
     <Stack.Screen name="TermsConditions" component={TermsConditionsScreen} />
     <Stack.Screen name="Offers" component={OffersScreen} options={{ animation: 'none' }} />

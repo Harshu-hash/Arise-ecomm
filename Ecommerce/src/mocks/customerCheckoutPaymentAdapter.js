@@ -47,6 +47,7 @@ const checkoutLine = item => ({
   sellerName: item.sellerName || 'Arise Select',
   deliveryPromise: item.deliveryLabel || '3-5 days',
 });
+const MOCK_WALLET_BALANCE_PAISE = 20000; // matches the server rule: half the total at most, always leaving ₹1 to pay
 const totalsFromLines = (lines, cartTotals) => {
   if (cartTotals) return { ...cartTotals, taxPaise: 0, walletCreditPaise: 0 };
   const subtotalPaise = lines.reduce((sum, line) => sum + line.lineTotalPaise, 0);
@@ -106,6 +107,8 @@ const createSession = (config, input) => {
     couponCode,
     allowedPaymentMethods: ['upi', 'card', 'cod', 'wallet'],
     selectedPaymentMethod: null,
+    useWallet: false,
+    walletBalancePaise: MOCK_WALLET_BALANCE_PAISE,
     codEligible: true,
     expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
     warnings: [],
@@ -147,6 +150,20 @@ export const customerCheckoutPaymentFixtureAdapter = async config => {
     const session = sessions.get(decodeURIComponent(sessionMatch[1]));
     if (!session)
       return reject(config, 404, 'CHECKOUT_NOT_FOUND', 'This checkout session expired.');
+    return response(config, { data: session });
+  }
+  const walletMatch = config.url?.match(/^\/checkout\/sessions\/([^/]+)\/wallet$/);
+  if (walletMatch && config.method === 'put') {
+    const session = sessions.get(decodeURIComponent(walletMatch[1]));
+    if (!session)
+      return reject(config, 404, 'CHECKOUT_NOT_FOUND', 'This checkout session expired.');
+    const before = session.totals.payablePaise + session.totals.walletCreditPaise;
+    const use = Boolean(config.data?.use);
+    const credit = use && session.selectedPaymentMethod !== 'cod'
+      ? Math.max(0, Math.min(MOCK_WALLET_BALANCE_PAISE, Math.floor(before / 2), before - 100))
+      : 0;
+    session.useWallet = use;
+    session.totals = { ...session.totals, walletCreditPaise: credit, payablePaise: before - credit };
     return response(config, { data: session });
   }
   const paymentMethodMatch = config.url?.match(/^\/checkout\/sessions\/([^/]+)\/payment-method$/);

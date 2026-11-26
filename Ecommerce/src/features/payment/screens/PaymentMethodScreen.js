@@ -19,6 +19,7 @@ import { haptics } from '../../../utils/haptics';
 import {
   useGetCheckoutSessionQuery,
   useUpdateCheckoutPaymentMethodMutation,
+  useUpdateCheckoutWalletMutation,
 } from '@features/checkout';
 import {
   useConfirmPaymentMutation,
@@ -45,6 +46,7 @@ const PaymentMethodScreen = ({ navigation, route }) => {
   const [placing, setPlacing] = useState(false);
   const [placementError, setPlacementError] = useState('');
   const [updateCheckoutPaymentMethod] = useUpdateCheckoutPaymentMethodMutation();
+  const [updateCheckoutWallet] = useUpdateCheckoutWalletMutation();
   const [createPaymentIntent] = useCreatePaymentIntentMutation();
   const [getPayment] = useLazyGetPaymentQuery();
   const [confirmPayment] = useConfirmPaymentMutation();
@@ -161,6 +163,34 @@ const PaymentMethodScreen = ({ navigation, route }) => {
           <Text style={styles.amountLabel}>Amount Payable</Text>
           <Text style={styles.amountValue}>₹{grandTotal}</Text>
         </View>
+
+        {checkoutSession.walletBalance > 0 && selected !== 'cod' ? (
+          <TouchableOpacity
+            activeOpacity={0.8}
+            style={[styles.methodCard, checkoutSession.useWallet && styles.methodCardActive]}
+            onPress={() => {
+              haptics.selection();
+              updateCheckoutWallet({ sessionId: checkoutSession.id, use: !checkoutSession.useWallet })
+                .unwrap()
+                .catch(() => {});
+            }}
+          >
+            <View style={styles.methodIconCircle}>
+              <Icon name="credit-card" size={18} color={COLORS.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.methodTitle}>{`Use wallet balance (₹${checkoutSession.walletBalance})`}</Text>
+              <Text style={styles.methodSubtitle}>
+                {checkoutSession.useWallet
+                  ? `₹${checkoutSession.totals.walletCredit} applied to this order`
+                  : 'Pay part of this order with your store credit'}
+              </Text>
+            </View>
+            <View style={[styles.radio, checkoutSession.useWallet && styles.radioActive]}>
+              {checkoutSession.useWallet ? <View style={styles.radioDot} /> : null}
+            </View>
+          </TouchableOpacity>
+        ) : null}
 
         <Text style={styles.sectionTitle}>Select a payment method</Text>
 

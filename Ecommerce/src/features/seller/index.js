@@ -1,1 +1,1 @@
-export { useSubmitSellerLeadMutation } from './api/seller.api';
+export { useGetSellerLeadQuery, useSubmitSellerLeadMutation } from './api/seller.api';

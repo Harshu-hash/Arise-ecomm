@@ -1,6 +1,5 @@
 import { http as mswHttp } from 'msw';
 import { db, findById } from '../db/store';
-import { pendingForApprover } from '../engine/approvals';
 import { guard } from '../engine/guard';
 import { ok } from '../engine/respond';
 import { mockNow } from '../engine/settings';
@@ -154,25 +153,15 @@ export const dashboardHandlers = [
 
     const seed = findById('settings', 'dashboard');
     const c = seed?.actionCenter ?? {};
-    const approvalsPending = pendingForApprover(g.user, g.permissions).length;
-
     /** Each tile declares the permission needed, so the UI can filter. */
     const tiles = [
       ['sellerApplicationsPending', 'Seller applications pending', c.sellerApplicationsPending, '/sellers/applications', 'sellers.application.view', false],
-      ['listingsInQc', 'Listings in QC', c.listingsInQc, '/catalog/qc', 'catalog.product.approve', false],
-      ['brandApprovalsPending', 'Brand approvals pending', c.brandApprovalsPending, '/sellers/brand-approvals', 'sellers.brandapproval.view', false],
-      ['ordersNotAccepted', 'Not accepted past SLA', c.ordersNotAccepted, '/orders?status=PLACED&slaBreached=true', 'orders.order.view', true],
-      ['notDispatched', 'Not dispatched past SLA', c.notDispatched, '/orders?status=PACKED&slaBreached=true', 'orders.order.view', true],
-      ['ndrPending', 'NDRs awaiting action', c.ndrPending, '/logistics/ndr', 'logistics.ndr.view', true],
+      ['listingsInQc', 'Listings in QC', c.listingsInQc, '/catalog/products?status=QC_PENDING', 'catalog.product.approve', false],
+      ['ordersNotAccepted', 'Not accepted past SLA', c.ordersNotAccepted, '/orders?status=CONFIRMED&slaBreached=true', 'orders.order.view', true],
+      ['notDispatched', 'Not dispatched past SLA', c.notDispatched, '/orders?status=PROCESSING&slaBreached=true', 'orders.order.view', true],
       ['returnsAwaitingQc', 'Returns awaiting QC', c.returnsAwaitingQc, '/returns?status=RECEIVED', 'orders.return.view', false],
       ['failedRefunds', 'Failed refunds', c.failedRefunds, '/finance/refunds?status=FAILED', 'finance.refund.view', true],
-      ['payoutBatchesAwaitingApproval', 'Payout batches to approve', c.payoutBatchesAwaitingApproval, '/finance/payouts', 'finance.payout.view', false],
-      ['approvalsPendingMe', 'Approvals pending me', approvalsPending, '/admin/approvals', 'admin.approval.view', false],
-      ['ticketsBreachingSla', 'Tickets breaching SLA', c.ticketsBreachingSla, '/support/tickets?view=breaching', 'support.ticket.view', true],
-      ['adCampaignsPendingReview', 'Ad campaigns to review', c.adCampaignsPendingReview, '/ads/review', 'ads.review.view', false],
-      ['lowStockFbaSkus', 'Low-stock FBA SKUs', c.lowStockFbaSkus, '/warehouses/inventory?stock=LOW', 'warehouse.inventory.view', false],
-      ['weightDisputesOpen', 'Weight disputes open', c.weightDisputesOpen, '/logistics/weight-disputes', 'logistics.weight.view', false],
-      ['privacyRequestsDue', 'Privacy requests due', c.privacyRequestsDue, '/customers/privacy', 'customers.privacy.view', true],
+      ['withdrawalsAwaitingApproval', 'Withdrawals to approve', c.withdrawalsAwaitingApproval, '/finance/withdrawals', 'finance.payout.view', false],
     ];
 
     const visible = tiles

@@ -1,9 +1,15 @@
 import { baseApi } from '@core/api/baseApi';
 import { PRODUCT_ENDPOINTS } from './product.endpoints';
-import { mapProductDetail } from './product.mapper';
+import { mapProductDetail, mapRelatedProducts } from './product.mapper';
 
 export const productApi = baseApi.injectEndpoints({
   endpoints: builder => ({
+    getRelatedProducts: builder.query({
+      query: productId => ({ url: PRODUCT_ENDPOINTS.related(productId) }),
+      transformResponse: mapRelatedProducts,
+      providesTags: (_, __, productId) => [{ type: 'Product', id: `RELATED-${productId}` }],
+      keepUnusedDataFor: 300,
+    }),
     getProduct: builder.query({
       query: productId => ({ url: PRODUCT_ENDPOINTS.detail(productId) }),
       transformResponse: mapProductDetail,
@@ -22,4 +28,4 @@ export const productApi = baseApi.injectEndpoints({
   }),
 });
 
-export const { useGetProductQuery, useLazyGetProductQuery } = productApi;
+export const { useGetProductQuery, useGetRelatedProductsQuery, useLazyGetProductQuery } = productApi;

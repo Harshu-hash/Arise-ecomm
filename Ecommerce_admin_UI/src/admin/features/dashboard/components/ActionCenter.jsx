@@ -1,4 +1,4 @@
-import { ArrowRightOutlined, WarningFilled } from '@ant-design/icons';
+import { ArrowRightOutlined } from '@ant-design/icons';
 import { Card, Empty, Flex, Skeleton, Typography } from 'antd';
 import { Link } from 'react-router-dom';
 import { formatNumber } from '@core/utils/money';
@@ -49,7 +49,7 @@ export default function ActionCenter({ tiles, loading }) {
                 padding: '10px 12px',
                 borderRadius: 8,
                 border: '1px solid var(--ant-color-border-secondary)',
-                background: tile.urgent ? 'var(--ant-color-error-bg)' : 'var(--ant-color-fill-quaternary)',
+                background: tile.urgent ? 'var(--ant-color-error-bg)' : 'transparent',
               }}
             >
               <div style={{ minWidth: 0 }}>
@@ -65,7 +65,6 @@ export default function ActionCenter({ tiles, loading }) {
                   >
                     {formatNumber(tile.count)}
                   </Typography.Text>
-                  {tile.urgent && <WarningFilled style={{ color: 'var(--ant-color-error)', fontSize: 12 }} />}
                 </Flex>
                 <Typography.Text type="secondary" style={{ fontSize: 12 }}>
                   {tile.label}

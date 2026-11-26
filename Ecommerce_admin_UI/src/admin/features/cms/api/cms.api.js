@@ -16,6 +16,8 @@ export const cmsApi = {
   updateBrandTab: (id, payload) => api.patch(`/cms/brand-tabs/${id}`, payload),
 
   // Stores an image through the CMS_MEDIA upload purpose and resolves to its public URL.
+  forYouTab: () => api.get('/cms/for-you-tab'),
+  updateForYouTab: (payload) => api.put('/cms/for-you-tab', payload),
   uploadImage: (file) => {
     const body = new FormData();
     body.append('purpose', 'CMS_MEDIA');

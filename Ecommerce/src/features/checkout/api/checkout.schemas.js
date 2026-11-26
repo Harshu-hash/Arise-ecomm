@@ -39,6 +39,8 @@ export const checkoutSessionSchema = z.object({
   couponCode: z.string().nullable(),
   allowedPaymentMethods: z.array(z.enum(['upi', 'card', 'cod', 'wallet'])).min(1),
   selectedPaymentMethod: z.enum(['upi', 'card', 'cod', 'wallet']).nullable(),
+  useWallet: z.boolean().default(false),
+  walletBalancePaise: z.number().int().nonnegative().default(0),
   codEligible: z.boolean(),
   expiresAt: z.string().datetime(),
   warnings: z.array(z.string()),

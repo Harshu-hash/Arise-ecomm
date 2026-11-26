@@ -1,5 +1,5 @@
 // The only surface other modules may import from admin.
-export { getSettingsSection } from '../application/settings.service.js';
+export { getSettingsSection, updateSettingsSection } from '../application/settings.service.js';
 export { getPublishedPage } from '../application/staticPage.service.js';
 export { listLiveBanners } from '../application/banner.service.js';
 export { applyBrandTabOverrides, applyCategoryTabOverrides, getPublishedSections } from '../application/homeLayout.service.js';

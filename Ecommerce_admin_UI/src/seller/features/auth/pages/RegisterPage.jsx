@@ -1,7 +1,7 @@
 import { BankOutlined, CheckCircleFilled, EnvironmentOutlined, FileProtectOutlined, LockOutlined, MailOutlined, PhoneOutlined, ShopOutlined, UploadOutlined, UserOutlined } from '@ant-design/icons';
 import { Alert, Button, Col, Form, Input, Row, Space, Steps, Typography, Upload } from 'antd';
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { IS_MOCK } from '@core/config/env';
 import { sellerAuthApi } from '../api/auth.api';
@@ -16,6 +16,7 @@ const uploadValue = (event) => (Array.isArray(event) ? event : event?.fileList);
 /** Public three-step application from the reference quick-commerce project. */
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [form] = Form.useForm();
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
@@ -106,7 +107,7 @@ export default function RegisterPage() {
       <Steps size="small" current={step} style={{ margin: '20px 0 24px' }} items={[{ title: 'Account' }, { title: 'Shop location' }, { title: 'Business & documents' }]} />
       {formError && <Alert type="error" showIcon message={formError} closable onClose={() => setFormError(null)} style={{ marginBottom: 16 }} />}
 
-      <Form form={form} layout="vertical" requiredMark={false} disabled={loading} onValuesChange={onValuesChange}>
+      <Form form={form} layout="vertical" requiredMark={false} disabled={loading} initialValues={{ email: searchParams.get('email') ?? undefined }} onValuesChange={onValuesChange}>
         <div hidden={step !== 0}>
           <Row gutter={12}>
             <Col xs={24} md={12}><Form.Item name="name" label="Owner name" rules={[{ required: true, message: 'Enter the owner name.' }, { pattern: /^[A-Za-z ]+$/, message: 'Use letters and spaces only.' }, { max: 50 }]}><Input autoFocus prefix={<UserOutlined />} placeholder="Full name" /></Form.Item></Col>

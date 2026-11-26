@@ -5,6 +5,7 @@ import { sendMail } from '../../../infrastructure/external/notification/mailer.j
 import { ROLES } from '../../../shared/constants/roles.js';
 import { AppError, ConflictError, ForbiddenError, RateLimitError, UnauthorizedError } from '../../../shared/errors/AppError.js';
 import { hashPassword, sha256 } from '../../../shared/utils/crypto.js';
+import { attachReferral, checkSignupCode } from '../../referral/public/index.js';
 import { AuthChallenge } from '../infrastructure/persistence/authChallenge.model.js';
 import { User } from '../infrastructure/persistence/user.model.js';
 import { createSession, revokeAllSessions } from './session.service.js';
@@ -67,7 +68,7 @@ function challengeBody(challenge, code) {
   };
 }
 
-async function createChallenge({ target, purpose, name = null, userId = null }) {
+async function createChallenge({ target, purpose, name = null, userId = null, referralCode = null }) {
   const code = makeOtp();
   const challenge = await AuthChallenge.create({
     userId: userId ? String(userId) : null,
@@ -75,6 +76,7 @@ async function createChallenge({ target, purpose, name = null, userId = null }) 
     stage: STAGES[purpose],
     target: target.value,
     name,
+    referralCode,
     codeHash: sha256(code),
     expiresAt: new Date(Date.now() + OTP_TTL_MS),
   });
@@ -82,11 +84,12 @@ async function createChallenge({ target, purpose, name = null, userId = null }) 
   return challengeBody(challenge, code);
 }
 
-export async function startCustomerAuth({ identifier, purpose, name }) {
+export async function startCustomerAuth({ identifier, purpose, name, referralCode }) {
   const target = normaliseIdentifier(identifier);
   const user = await User.findOne(userFilter(target));
   if (purpose === 'SIGNUP' && user) throw accountExists(target);
-  return createChallenge({ target, purpose, name, userId: user?._id });
+  const code = purpose === 'SIGNUP' ? await checkSignupCode(referralCode) : null; // a wrong code is fixed now, not after the OTP
+  return createChallenge({ target, purpose, name, userId: user?._id, referralCode: code });
 }
 
 export async function resendCustomerOtp({ challengeId }) {
@@ -102,6 +105,7 @@ export async function resendCustomerOtp({ challengeId }) {
     purpose: purposeOf(previous.stage),
     name: previous.name,
     userId: previous.userId,
+    referralCode: previous.referralCode,
   });
 }
 
@@ -139,6 +143,7 @@ export async function verifyCustomerOtp({ challengeId, otp, device, requiredStag
     if (await User.exists(userFilter(target))) throw accountExists(target);
     try {
       user = await User.create({ role: ROLES.CUSTOMER, [target.kind]: target.value, name: challenge.name, status: 'ACTIVE' });
+      if (challenge.referralCode) await attachReferral({ code: challenge.referralCode, refereeId: user._id });
     } catch (error) {
       if (error?.code === 11000) throw accountExists(target);
       throw error;

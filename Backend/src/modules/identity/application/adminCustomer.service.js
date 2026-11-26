@@ -1,3 +1,4 @@
+import { getBalance } from '../../wallet/public/index.js';
 import mongoose from 'mongoose';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { ROLES } from '../../../shared/constants/roles.js';
@@ -62,7 +63,7 @@ export async function listCustomers(query, { customerIds = null } = {}) {
   };
 }
 
-// Orders, returns, wallet and risk live in modules that do not exist yet, so the detail view serves
+// Orders, returns and risk live in modules that do not exist yet, so the detail view serves
 // honest zeros / empty lists for them rather than invented numbers.
 // shortcut: replace these placeholders with real reads when the order/wallet modules land.
 export async function getCustomer(id, permissions) {
@@ -72,7 +73,7 @@ export async function getCustomer(id, permissions) {
   return {
     data: {
       ...serializeCustomer(user),
-      riskLevel: 'LOW', riskScore: 0, openFlags: 0, codDisabled: false, walletBalancePaise: 0,
+      riskLevel: 'LOW', riskScore: 0, openFlags: 0, codDisabled: false, walletBalancePaise: await getBalance(id),
       rtoPct: 0, returnPct: 0, segments: [], platform: null, languagePreference: 'en',
     },
     meta: {

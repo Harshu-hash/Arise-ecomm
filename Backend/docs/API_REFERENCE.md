@@ -10,6 +10,13 @@ Rules for this file (see `DEVELOPMENT_RULES.md`):
 
 Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1`.
 
+## Arise ratings
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| `PUT` | `/api/customer/v1/arise-ratings` | Bearer JWT (customer) | Creates or updates the customer's 1–5 star rating from Account > Rate Us. |
+| `GET` | `/api/admin/v1/arise-ratings` | Bearer JWT + `support.csat.view` | Paginated customer ratings for the Arise ratings admin page; supports star filtering and sorting. |
+
 ---
 
 ## Format
@@ -28,6 +35,10 @@ Base paths: `/api/customer/v1`, `/api/seller/v1`, `/api/admin/v1`, `/webhooks/v1
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `POST` | `/api/customer/v1/seller-leads` | Bearer JWT (customer) + `Idempotency-Key` | Saves the Sell on Arise inquiry (`businessName`, `email`, `gstin`, `mobile`, `pickupPincode`, `consentVersion`). |
+| `GET` | `/api/customer/v1/seller-leads/me` | Bearer JWT (customer) | Returns the customer's existing inquiry receipt, or `null`; used to prevent the form being shown or submitted twice. |
+| `GET` | `/api/admin/v1/seller-inquiries` | Bearer JWT + `sellers.application.view` | Paginated seller inquiries, newest first; supports `q`, `sort`, `page`, and `pageSize`. |
+| `POST` | `/api/admin/v1/seller-inquiries/:id/invite` | Bearer JWT + `sellers.application.request_info` | Emails the inquiry address an SMTP-backed link to the seller registration flow; a previously sent invite is not sent twice. |
 | `POST` | `/api/customer/v1/auth/start` | none | Starts a customer login, signup, or password-reset OTP challenge for an email or Indian mobile number. |
 | `POST` | `/api/customer/v1/auth/resend-otp` | none | Replaces a live customer OTP challenge after the resend delay. |
 | `POST` | `/api/customer/v1/auth/verify-otp` | none | Verifies a login/signup OTP, creates the customer when needed, and returns access and rotating refresh tokens. |
@@ -151,6 +162,20 @@ Status is never stored: coupons derive it from state, schedule and usage; deals 
 | `POST` | `/api/admin/v1/coupons/:id/end` | Bearer JWT + `marketing.coupon.pause` | Ends an open coupon now; cannot be undone (clone it to run again). |
 | `POST` | `/api/admin/v1/coupons/:id/clone` | Bearer JWT + `marketing.coupon.create` | Copies a coupon as a DRAFT with a fresh code and dates starting now. |
 | `POST` | `/api/admin/v1/coupons/:id/test` | Bearer JWT + `marketing.coupon.view` | Runs the shared evaluator for a customer and live products at today's shelf prices: `{ applicable, reasons, discountPaise, ... }`. |
+| `GET` | `/api/admin/v1/referrals/config` | Bearer JWT + `marketing.referral.view` | The Refer & Earn program settings (`enabled`, `referrerRewardPaise`, `refereeRewardPaise`, `minOrderPaise`, `rewardExpiryDays`, `maxRewardsPerReferrer`, `autoApprove`, `terms`). They are the `referral` section of platform settings, edited on the Settings page (`admin.settings.edit`). |
+| `GET` | `/api/admin/v1/referrals` | Bearer JWT + `marketing.referral.view` | Paginated invited friends (`status`, `page`, `limit`) with referrer, qualifying order, frozen reward amounts, and `summary { counts, rewardedPaise }`. |
+| `POST` | `/api/admin/v1/referrals/:id/decision` | Bearer JWT + `marketing.referral.decide` | `{ decision: APPROVE \| REJECT, reason? }` for a QUALIFIED referral (reason required to reject). Approve credits both wallets. Audited. |
+| `GET` | `/api/admin/v1/referrals/customer/:id` | Bearer JWT + `marketing.referral.view` | One customer's code, who invited them (`referredBy`) and everyone they invited, each with `flags` (`SAME_DEVICE`, `SAME_ADDRESS`). A flagged referral is never paid automatically, even with auto-approve on. |
+| `POST` | `/api/admin/v1/customer-wallets/:id/freeze` | Bearer JWT + `wallet.account.freeze` | `{ frozen, reason }`. A frozen wallet cannot be spent at checkout (refunds and rewards still arrive; admin adjustments still work). Audited. |
+| `GET` | `/api/admin/v1/cashback-rules` | Bearer JWT + `wallet.cashback.view` | Cashback rules with `status`, `usedPaise`, `grants`. |
+| `POST` | `/api/admin/v1/cashback-rules` | Bearer JWT + `wallet.cashback.create` | `{ name, pct, maxCashbackPaise, minOrderPaise, creditExpiryDays, budgetPaise, startsAt, endsAt }`. When a parcel is delivered the best fitting live rule pays wallet credit, once per parcel, within its budget. |
+| `PATCH` | `/api/admin/v1/cashback-rules/:id` | Bearer JWT + `wallet.cashback.edit` | Edits any of the rule's fields. |
+| `POST` | `/api/admin/v1/cashback-rules/:id/pause` | Bearer JWT + `wallet.cashback.pause` | Toggles pause/resume. |
+| `GET` | `/api/admin/v1/customer-wallets/:id` | Bearer JWT + `wallet.account.view` | A customer's `balancePaise` and a page of their ledger (`?cursor&limit`). |
+| `POST` | `/api/admin/v1/customer-wallets/:id/adjustments` | Bearer JWT + `wallet.adjust.create` | `{ amountPaise (+credit / -debit), reason }`. A debit cannot take the balance below zero. Over the admin's `walletAdjustLimit` it answers 202 `{ approvalRequired }` and waits for a second admin. Audited. |
+| `GET` | `/api/admin/v1/gift-cards` | Bearer JWT + `wallet.giftcard.view` | Paginated gift cards (`status`, `page`, `limit`); PINs are never returned. |
+| `POST` | `/api/admin/v1/gift-cards` | Bearer JWT + `wallet.giftcard.generate` | `{ count (<= 500), amountPaise, expiresAt, note? }`. Returns every new `{ code, pin }` once; only a hash of the PIN is stored. Audited. |
+| `POST` | `/api/admin/v1/gift-cards/:id/block` | Bearer JWT + `wallet.giftcard.block` | Blocks an unused card. |
 | `POST` | `/api/admin/v1/campaigns/reach` | Bearer JWT + `marketing.coupon.view` or `marketing.campaign.view` | `{ reach }` customers an audience (`ALL`, `NEW`, `CUSTOM`) would reach. Segments are not built yet. |
 | `GET` | `/api/seller/v1/coupons` | Bearer JWT (seller or staff) | The seller's own coupons only (`q`, `status`, `sort`, paging) with status facets; pushes `coupon:changed` to the seller room on any change. |
 | `POST` | `/api/seller/v1/coupons` | Bearer JWT (seller owner) | Creates a seller-funded coupon (percent, flat or free delivery; no audience/budget/stacking). Applies to that seller's items only. Code is unique across the platform. Audited. |
@@ -239,7 +264,8 @@ Writes push `cms:changed` to the `admin` socket room. Once a home layout is publ
 | `PATCH` | `/api/admin/v1/cms/brand-tabs/:id` | Bearer JWT + `cms.home.edit` | Label, logo URL, target, visibility. Audited. |
 | `GET` | `/api/admin/v1/static-pages` | Bearer JWT + `cms.page.view` | About, Privacy, Terms, Return, Shipping and Seller policy pages (version history without bodies). |
 | `GET` | `/api/admin/v1/static-pages/:id` | Bearer JWT + `cms.page.view` | One page with its body. |
-| `PATCH` | `/api/admin/v1/static-pages/:id` | Bearer JWT + `cms.page.publish` | Publishes a new body (1–100,000 chars) as a new version; `materialChange` flags it for customer re-acceptance. Audited. |
+| `PATCH` | `/api/admin/v1/static-pages/:id` | Bearer JWT + `cms.page.publish` | Publishes a new body (1–100,000 chars) and optional HTTP(S) website/careers/press/social links as a new version; `materialChange` flags it for customer re-acceptance. Audited. |
+| `GET` | `/api/customer/v1/pages/:slug` | Public | Returns the latest published static page, including the customer-facing `about` page. |
 
 ## bannerAd
 
@@ -336,6 +362,12 @@ Applying a coupon (`/cart/coupon`) is not served yet: it needs the cart backend,
 | `POST` / `PUT` | `/api/customer/v1/cart/coupon` | Bearer JWT (customer) | `{ code }` (any case; unlisted codes work). One coupon at a time. `422 COUPON_INVALID`, `409 COUPON_MINIMUM_NOT_MET` (`details.minimumSubtotalPaise`) or `COUPON_NOT_APPLICABLE`. A refused coupon is not kept. |
 | `DELETE` | `/api/customer/v1/cart/coupon` | Bearer JWT (customer) | Removes the coupon. |
 | `GET` | `/api/customer/v1/coupons/eligible` | Bearer JWT (customer) | `{ items: [{ code, description, discountPaise, minimumSubtotalPaise }] }`: coupons that would save something on this cart now, best first (`?cartId` is accepted and ignored). |
+| `GET` | `/api/customer/v1/wallet` | Bearer JWT (customer) | Store-credit summary: `availableBalancePaise`, `expiryBuckets`. Credit comes from referral rewards and from the wallet share of refunds; it is spendable at checkout, never withdrawable. |
+| `GET` | `/api/customer/v1/wallet/transactions` | Bearer JWT (customer) | `?cursor&limit` ledger, newest first: `{ items, total, nextCursor }`. |
+| `POST` | `/api/customer/v1/gift-cards/redeem` | Bearer JWT (customer) | `{ code, pin }` -> `{ transaction, wallet }`. Claims the card first, then credits the wallet once. 422 `GIFT_CARD_INVALID` (code or PIN, never says which), 422 `GIFT_CARD_EXPIRED`, 409 `GIFT_CARD_REDEEMED`. Rate limited (20 per 15 min per IP). |
+| `PUT` | `/api/customer/v1/checkout/sessions/:id/wallet` | Bearer JWT (customer) | `{ use: boolean }`. Pays part of the order with store credit (online payment only): `min(balance, walletUsageCapPct of the total, total - ₹1)`. The session shows `useWallet`, `walletBalancePaise`, `totals.walletCreditPaise`; the card is charged `totals.payablePaise`. Credit is taken when the order is placed; a cancel or return refunds the card first, then the wallet. |
+| `GET` | `/api/customer/v1/referrals/me` | Bearer JWT (customer) | The invite code and share link, what the program pays (`rewardAmountPaise`, `friendRewardPaise`, `minOrderPaise`), counts, earnings and the latest invites. Sign-up accepts an optional `referralCode` on `/auth/start` (a wrong code is a 422 before the OTP). The reward is paid when the friend's first qualifying order is delivered. |
+| `GET` | `/invite/:code` | none | The page a shared invite link opens (HTML, no script): the code, the friend's reward, an "Open in the Arise app" link (`arise://signup?referralCode=<code>`, which pre-fills the signup field) and a store link. 404 for an unknown code. |
 
 ### Checkout, payment and orders (customer)
 
@@ -441,7 +473,7 @@ Product search (`GET /search`, listed under catalog) matches **every word** of `
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | `GET` | `/api/admin/v1/dashboard/summary` | admin `dashboard.dashboard.view` | `?days=` (1-120) → `kpis` (GMV, orders, units, AOV, new customers, cancellation and return rate, active sellers, live listings; net revenue only with `dashboard.finance_widgets.view`), each with `deltaPct` against the previous `days`; daily `series` and `previousSeries`; `paymentMix`, `topStates`, `topCategories/Sellers/Products`, order `funnel`. GMV counts parcels that were not cancelled or sent back. Days are IST. |
-| `GET` | `/api/admin/v1/dashboard/action-center` | admin `dashboard.action_center.view` | What is waiting on someone: seller applications, listings in QC, orders not accepted (24h) / not dispatched (48h), failed deliveries, returns awaiting QC, failed refunds, withdrawals to approve. Tiles the caller cannot open are left out. |
+| `GET` | `/api/admin/v1/dashboard/action-center` | admin `dashboard.action_center.view` | What is waiting on someone: seller applications, listings in QC, orders not accepted (24h) / not dispatched (48h), returns awaiting QC, failed refunds, withdrawals to approve. Tiles the caller cannot open are left out. |
 | `GET` | `/api/admin/v1/dashboard/alerts` | admin | Always empty for now (nothing generates admin alerts); `POST .../alerts/:id/read` is a no-op. |
 | `GET` | `/api/admin/v1/finance/overview` | admin `dashboard.finance_widgets.view` | Money position: payable now, held, wallet liability, COD outstanding, commission, TCS/TDS, refunds pending / failed. |
 | `GET` | `/api/admin/v1/reports/analytics/:domain` | admin `reports.*.view` | `?days=` (1-90). Domains: sales, customers, catalog, sellers, fulfilment, returns, finance, marketing, support. Support is `notBuilt`; ads, referrals, flash sales and campaign open rates are zero/empty (not tracked). |
