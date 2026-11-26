@@ -1,0 +1,95 @@
+# Production stack. Nothing is published to the internet: only the API on 127.0.0.1:4000 (host nginx proxies to it).
+# Usage:  docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+# .env must hold the production secrets (see .env.example); MONGODB_URI/REDIS_URL are overridden below.
+# shortcut: single-node Mongo replica set on one VPS, no auth inside the private network; move to Atlas/3 nodes when you need HA.
+
+x-backend: &backend
+  build: .
+  env_file: .env
+  environment:
+    NODE_ENV: production
+    MONGODB_URI: mongodb://mongo:27017/arise?replicaSet=rs0
+    REDIS_URL: redis://redis:6379
+    UPLOAD_DIR: /var/www/uploads
+  restart: unless-stopped
+  depends_on:
+    mongo-init:
+      condition: service_completed_successfully
+    redis:
+      condition: service_healthy
+  logging: &logging
+    driver: json-file
+    options: { max-size: "10m", max-file: "5" }
+
+services:
+  mongo:
+    image: mongo:8.0
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all", "--wiredTigerCacheSizeGB", "1"]
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 30
+    logging: *logging
+
+  mongo-init:
+    image: mongo:8.0
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: "no"
+    command:
+      - mongosh
+      - --host
+      - mongo:27017
+      - --eval
+      - "try { rs.status() } catch (error) { rs.initiate({_id:'rs0',members:[{_id:0,host:'mongo:27017'}]}) }"
+
+  redis:
+    image: redis:7.4-alpine
+    command: ["redis-server", "--appendonly", "yes", "--maxmemory-policy", "noeviction"]
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 20
+    logging: *logging
+
+  api:
+    <<: *backend
+    command: ["node", "src/app/server.js"]
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - /var/www/uploads:/var/www/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/health/live').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+
+  worker:
+    <<: *backend
+    command: ["node", "src/processes/worker.js"]
+    volumes:
+      - /var/www/uploads:/var/www/uploads
+
+  outbox:
+    <<: *backend
+    command: ["node", "src/processes/outbox.js"]
+
+  # Keep exactly one scheduler replica.
+  scheduler:
+    <<: *backend
+    command: ["node", "src/processes/scheduler.js"]
+
+volumes:
+  mongo-data:
+  redis-data:
