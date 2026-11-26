@@ -78,6 +78,9 @@ const schema = z.object({
   MAX_UPLOAD_BYTES: z.coerce.number().int().positive().default(10 * 1024 * 1024), // images & PDFs
   MAX_VIDEO_BYTES: z.coerce.number().int().positive().default(100 * 1024 * 1024),
 
+  // Built admin+seller UI (Ecommerce_admin_UI/dist). When set, this process serves it, so one proxy target covers everything.
+  ADMIN_DIST_DIR: optionalString,
+
   // Admin hardening & operations
   ADMIN_IP_ALLOWLIST: z.string().default(''), // comma-separated IPs/CIDRs; empty = no restriction
   METRICS_TOKEN: secret.optional(), // bearer token required to scrape /metrics

@@ -4,6 +4,7 @@ import express from 'express';
 import helmet from 'helmet';
 import pinoHttp from 'pino-http';
 import { randomUUID } from 'node:crypto';
+import path from 'node:path';
 import { env } from '../config/env.js';
 import { logger } from '../config/logger.js';
 import { PUBLIC_DIR } from '../infrastructure/storage/local.storage.js';
@@ -76,6 +77,17 @@ export function createApp() {
   app.use(sanitizeInput);
 
   app.use(createRoutes());
+
+  if (env.ADMIN_DIST_DIR) {
+    const dist = path.resolve(env.ADMIN_DIST_DIR);
+    app.use(express.static(dist, { maxAge: '1y', setHeaders: (res, file) => file.endsWith('.html') && res.setHeader('Cache-Control', 'no-cache') }));
+    // SPA fallback: extensionless GET navigations (assets with an extension still 404 properly).
+    app.use((req, res, next) =>
+      req.method === 'GET' && !path.extname(req.path) && !/^\/(api|webhooks|socket\.io|health|metrics|uploads)(\/|$)/.test(req.path)
+        ? res.sendFile(path.join(dist, req.path.startsWith('/seller') ? 'seller.html' : 'index.html'))
+        : next(),
+    );
+  }
   app.use(notFoundHandler);
   app.use(errorHandler);
   return app;
