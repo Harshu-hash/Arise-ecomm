@@ -58,6 +58,9 @@ const schema = z.object({
   // Provider-neutral SMS gateway: POST { to, message } with an optional bearer token.
   SMS_OTP_URL: z.url().optional(),
   SMS_OTP_TOKEN: optionalString,
+  // INSECURE: phone OTPs are never sent and the code is always SMS_OTP_MOCK_CODE, so anyone who knows a number can log in as it.
+  SMS_OTP_MOCK: booleanFromString(),
+  SMS_OTP_MOCK_CODE: z.string().regex(/^\d{4}$/, 'must be 4 digits').default('1234'),
 
   // Razorpay
   RAZORPAY_KEY_ID: optionalString,
@@ -121,7 +124,7 @@ if (isProduction || raw.NODE_ENV === 'staging') {
     'METRICS_TOKEN',
     'UPLOAD_DIR',
   ];
-  const missing = required.filter((key) => !raw[key]);
+  const missing = required.filter((key) => !raw[key] && !(key === 'SMS_OTP_URL' && raw.SMS_OTP_MOCK));
   if (missing.length) throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
   if (raw.JWT_ACCESS_SECRET === raw.JWT_REFRESH_SECRET) {
     throw new Error('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must differ');

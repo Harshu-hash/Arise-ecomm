@@ -115,7 +115,7 @@ function WithdrawalsTable({ onCancel, cancelling }) {
     const [label, color] = WITHDRAWAL_STATUS[row.status] ?? [row.status];
     return (
       <Flex vertical gap={6}>
-        <Flex justify="space-between" gap={8}>
+        <Flex wrap justify="space-between" gap={8}>
           <Typography.Text className="mono" strong style={{ fontSize: 12 }}>{row.number}</Typography.Text>
           <MoneyText paise={row.amountPaise} strong />
         </Flex>

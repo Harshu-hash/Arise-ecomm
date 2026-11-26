@@ -112,7 +112,7 @@ function CreateBannerModal({ open, onClose }) {
         {price && <PriceCard price={price} />}
         {IS_MOCK && <Form.Item name="paymentMethod" label="Mock payment method" rules={[{ required: true }]}><Radio.Group options={[{ value: 'UPI', label: 'UPI' }, { value: 'CARD', label: 'Credit/debit card' }]} /></Form.Item>}
       </div>
-      <Flex justify="space-between" style={{ marginTop: 20 }}><Button onClick={step === 0 ? close : () => setStep((value) => value - 1)}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 2 ? <Button type="primary" onClick={next}>Continue</Button> : <Button type="primary" htmlType="submit" loading={create.isPending}>Pay {price ? formatINR(price.totalPaise) : ''} and submit</Button>}</Flex>
+      <Flex wrap justify="space-between" style={{ marginTop: 20 }}><Button onClick={step === 0 ? close : () => setStep((value) => value - 1)}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 2 ? <Button type="primary" onClick={next}>Continue</Button> : <Button type="primary" htmlType="submit" loading={create.isPending}>Pay {price ? formatINR(price.totalPaise) : ''} and submit</Button>}</Flex>
     </Form>
   </Modal>;
 }
@@ -129,7 +129,7 @@ function SlotPicker({ value, onChange, slots, loading, onPick }) {
         onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onChange?.(slot.id); onPick?.(); } }}
         style={{ borderColor: selected ? 'var(--ant-color-primary)' : undefined, borderWidth: selected ? 2 : 1 }}
       >
-        <Flex justify="space-between" align="start" gap={8}>
+        <Flex wrap justify="space-between" align="start" gap={8}>
           <Typography.Text strong>{slot.name}</Typography.Text>
           <Typography.Text strong>{formatINR(slot.dailyRatePaise)}<Typography.Text type="secondary">/day</Typography.Text></Typography.Text>
         </Flex>
@@ -141,8 +141,8 @@ function SlotPicker({ value, onChange, slots, loading, onPick }) {
   })}</Row>;
 }
 
-function PriceCard({ price }) { return <Card size="small" title="Price summary"><Space direction="vertical" style={{ width: '100%' }}><Line label={`${price.days} day${price.days === 1 ? '' : 's'} × ${formatINR(price.dailyRatePaise)}/day`} value={price.subtotalPaise} /><Line label={`GST (${price.gstPct}%)`} value={price.gstPaise} /><Flex justify="space-between" style={{ borderTop: '1px solid var(--ant-color-border-secondary)', paddingTop: 8 }}><Typography.Text strong>Total payable</Typography.Text><MoneyText paise={price.totalPaise} strong /></Flex></Space></Card>; }
-function Line({ label, value }) { return <Flex justify="space-between"><Typography.Text type="secondary">{label}</Typography.Text><MoneyText paise={value} /></Flex>; }
+function PriceCard({ price }) { return <Card size="small" title="Price summary"><Space direction="vertical" style={{ width: '100%' }}><Line label={`${price.days} day${price.days === 1 ? '' : 's'} × ${formatINR(price.dailyRatePaise)}/day`} value={price.subtotalPaise} /><Line label={`GST (${price.gstPct}%)`} value={price.gstPaise} /><Flex wrap justify="space-between" style={{ borderTop: '1px solid var(--ant-color-border-secondary)', paddingTop: 8 }}><Typography.Text strong>Total payable</Typography.Text><MoneyText paise={price.totalPaise} strong /></Flex></Space></Card>; }
+function Line({ label, value }) { return <Flex wrap justify="space-between"><Typography.Text type="secondary">{label}</Typography.Text><MoneyText paise={value} /></Flex>; }
 
 function PayNow({ booking, onPaid }) {
   const { message } = App.useApp();
@@ -155,12 +155,12 @@ function PayNow({ booking, onPaid }) {
     action={<Button type="primary" loading={pay.isPending} onClick={() => pay.mutate()}>Pay {formatINR(booking.totalPaise)}</Button>} />;
 }
 
-function BannerDetail({ booking, onClose }) { return <Drawer title={booking?.campaignName} open={Boolean(booking)} onClose={onClose} width={680}>{booking && <Flex vertical gap={16}>
+function BannerDetail({ booking, onClose }) { return <Drawer title={booking?.campaignName} open={Boolean(booking)} onClose={onClose} width="min(680px, 100vw)">{booking && <Flex vertical gap={16}>
   {booking.status === 'PENDING_PAYMENT' && <PayNow booking={booking} onPaid={onClose} />}
-  <Flex justify="space-between"><Typography.Text type="secondary">Status</Typography.Text><StatusTag domain="bannerAd" code={booking.status} /></Flex>
+  <Flex wrap justify="space-between"><Typography.Text type="secondary">Status</Typography.Text><StatusTag domain="bannerAd" code={booking.status} /></Flex>
   {booking.rejectionReason && <Alert type="error" showIcon message="Banner rejected" description={booking.rejectionReason} />}
   <Image src={booking.mobileCreative?.previewUrl} alt="Mobile banner creative" style={{ maxHeight: 360, objectFit: 'contain' }} />
   <Card size="small" title="Booking"><LineText label="Placement" value={`${booking.placementName} (${booking.categoryName ? `${booking.categoryName} page` : 'For You page'})`} /><LineText label="Schedule" value={`${booking.startsOn} – ${booking.endsOn}`} /><LineText label="Booked days" value={booking.days} /><LineText label="Paid incl. GST" value={<MoneyText paise={booking.totalPaise} strong />} /><LineText label="Payment status" value={booking.paymentStatus} /><LineText label="Payment reference" value={booking.paymentReference} />{booking.refundReference && <LineText label="Refund reference" value={booking.refundReference} />}</Card>
-  {['LIVE', 'COMPLETED'].includes(booking.status) && <Card size="small" title="Performance"><Row><Col span={12}><Typography.Text type="secondary">Impressions</Typography.Text><Typography.Title level={4}>{booking.impressions.toLocaleString('en-IN')}</Typography.Title></Col><Col span={12}><Typography.Text type="secondary">Clicks</Typography.Text><Typography.Title level={4}>{booking.clicks.toLocaleString('en-IN')}</Typography.Title></Col></Row></Card>}
+  {['LIVE', 'COMPLETED'].includes(booking.status) && <Card size="small" title="Performance"><Row><Col xs={24} sm={12}><Typography.Text type="secondary">Impressions</Typography.Text><Typography.Title level={4}>{booking.impressions.toLocaleString('en-IN')}</Typography.Title></Col><Col xs={24} sm={12}><Typography.Text type="secondary">Clicks</Typography.Text><Typography.Title level={4}>{booking.clicks.toLocaleString('en-IN')}</Typography.Title></Col></Row></Card>}
 </Flex>}</Drawer>; }
-function LineText({ label, value }) { return <Flex justify="space-between" gap={16} style={{ marginBottom: 8 }}><Typography.Text type="secondary">{label}</Typography.Text><Typography.Text>{value}</Typography.Text></Flex>; }
+function LineText({ label, value }) { return <Flex wrap justify="space-between" gap={16} style={{ marginBottom: 8 }}><Typography.Text type="secondary">{label}</Typography.Text><Typography.Text>{value}</Typography.Text></Flex>; }

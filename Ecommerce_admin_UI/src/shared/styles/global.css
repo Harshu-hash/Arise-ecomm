@@ -466,3 +466,21 @@ html[data-theme='dark'] .ant-tooltip .ant-tooltip-arrow::before {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Phones: shared fixes so antd widgets never push the page wider than the screen. */
+@media (max-width: 767px) {
+  .ant-modal { max-width: calc(100vw - 24px); }
+  .ant-modal .ant-modal-body { max-height: calc(100vh - 190px); overflow-y: auto; }
+  .ant-modal-footer { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+  .ant-modal-footer .ant-btn + .ant-btn { margin-inline-start: 0; }
+  .ant-segmented { max-width: 100%; overflow-x: auto; }
+  .ant-card-head-wrapper { flex-wrap: wrap; gap: 8px; padding-block: 8px; }
+  .ant-card-head { padding-inline: 12px; }
+  .ant-card-body { padding: 12px; }
+  .ant-pagination { flex-wrap: wrap; justify-content: center; row-gap: 8px; }
+  .ant-picker-panels { flex-direction: column; }
+  .ant-picker-range-wrapper { max-width: calc(100vw - 24px); }
+  .ant-descriptions-item-label { white-space: normal; }
+  .ant-table-cell { padding: 10px 8px !important; }
+  .ant-tabs-nav { margin-bottom: 12px; }
+}

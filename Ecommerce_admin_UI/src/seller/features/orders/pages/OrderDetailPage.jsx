@@ -174,7 +174,7 @@ export default function OrderDetailPage() {
         breadcrumbs={[{ label: 'Orders', to: '/orders' }, { label: data.orderId }]}
         onBack={() => navigate('/orders')}
         tags={
-          <Space>
+          <Space wrap>
             <StatusTag domain="orderItem" code={data.status} />
             <Tag color={data.prepaid ? 'green' : 'orange'}>{data.prepaid ? 'Prepaid' : 'COD'}</Tag>
             {isArise && <Tag color="geekblue">Fulfilled by Arise</Tag>}
@@ -182,7 +182,7 @@ export default function OrderDetailPage() {
         }
         actions={
           !isArise && !isCancelled && data.stage !== 'SHIPPED' && data.stage !== 'DELIVERED' ? (
-            <Space>
+            <Space wrap>
               <>
                 <Button danger onClick={() => setCancelOpen(true)}>
                   Cancel order
@@ -450,7 +450,7 @@ export default function OrderDetailPage() {
         <Col xs={24} lg={8}>
           <Card
             title={
-              <Space>
+              <Space wrap>
                 <EnvironmentOutlined /> Ship to
               </Space>
             }
@@ -490,11 +490,11 @@ export default function OrderDetailPage() {
           </Card>
 
           <Card title="Payment" size="small">
-            <Flex justify="space-between" align="center">
+            <Flex wrap justify="space-between" align="center">
               <Typography.Text type="secondary">Your payout value</Typography.Text>
               <MoneyText paise={data.totalPaise} strong />
             </Flex>
-            <Flex justify="space-between" align="center" style={{ marginTop: 6 }}>
+            <Flex wrap justify="space-between" align="center" style={{ marginTop: 6 }}>
               <Typography.Text type="secondary">Method</Typography.Text>
               <Tag color={data.prepaid ? 'green' : 'orange'} style={{ margin: 0 }}>
                 {data.paymentMethod}
@@ -538,17 +538,17 @@ export default function OrderDetailPage() {
             <InputNumber min={1} style={{ width: '100%' }} />
           </Form.Item>
           <Row gutter={12}>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="l" label="Length (cm)" rules={[{ required: true }]}>
                 <InputNumber min={1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="w" label="Width (cm)" rules={[{ required: true }]}>
                 <InputNumber min={1} style={{ width: '100%' }} />
               </Form.Item>
             </Col>
-            <Col span={8}>
+            <Col xs={24} sm={8}>
               <Form.Item name="h" label="Height (cm)" rules={[{ required: true }]}>
                 <InputNumber min={1} style={{ width: '100%' }} />
               </Form.Item>

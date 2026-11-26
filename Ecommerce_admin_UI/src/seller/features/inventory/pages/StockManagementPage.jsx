@@ -58,10 +58,10 @@ function StockStatus({ row }) {
 
 function StockDrawer({ row, recommendation, onClose, onEdit }) {
   const ledger = useQuery({ queryKey: inventoryKeys.ledger(row?.id), queryFn: () => inventoryApi.ledger(row.id), enabled: Boolean(row) });
-  return <Drawer title={row?.productTitle} open={Boolean(row)} onClose={onClose} width={760} extra={row?.fulfillmentType === 'SELLER' ? <Button type="primary" icon={<EditOutlined />} onClick={onEdit}>Update stock</Button> : null}>
+  return <Drawer title={row?.productTitle} open={Boolean(row)} onClose={onClose} width="min(760px, 100vw)" extra={row?.fulfillmentType === 'SELLER' ? <Button type="primary" icon={<EditOutlined />} onClick={onEdit}>Update stock</Button> : null}>
     {row && <Flex vertical gap={16}>
       {recommendation && <Alert type="warning" showIcon message={`Restock ${recommendation.recommendedQty} units`} description={`This targets ${recommendation.targetDaysCover} days of cover based on current sales velocity.`} />}
-      <Row gutter={[12, 12]}><Col span={6}><Bucket label="Sellable" value={row.sellable} /></Col><Col span={6}><Bucket label="Reserved" value={row.reserved} /></Col><Col span={6}><Bucket label="Available" value={row.available} /></Col><Col span={6}><Bucket label="Unsellable" value={row.unsellable ?? row.damaged ?? 0} /></Col></Row>
+      <Row gutter={[12, 12]}><Col xs={12} md={6}><Bucket label="Sellable" value={row.sellable} /></Col><Col xs={12} md={6}><Bucket label="Reserved" value={row.reserved} /></Col><Col xs={12} md={6}><Bucket label="Available" value={row.available} /></Col><Col xs={12} md={6}><Bucket label="Unsellable" value={row.unsellable ?? row.damaged ?? 0} /></Col></Row>
       <Card size="small" title="Stock details"><Line label="SKU" value={row.sku} /><Line label="Location" value={row.warehouseCode} /><Line label="Fulfilment" value={row.fulfillmentType === 'SELLER' ? 'Self-ship' : 'Fulfilled by Arise'} /><Line label="Days of cover" value={row.daysOfCover ?? '—'} /><Line label="Oldest unit age" value={`${row.oldestUnitDays ?? 0} days`} /></Card>
       <Card size="small" title="Movement history" styles={{ body: { padding: 0 } }}><Table size="small" loading={ledger.isLoading} rowKey="id" dataSource={ledger.data?.entries ?? []} pagination={{ pageSize: 8, hideOnSinglePage: true }} columns={[
         { title: 'When', dataIndex: 'at', render: (value) => <DateText value={value} /> },
@@ -84,4 +84,4 @@ function EditStockModal({ row, onClose }) {
 }
 
 function Bucket({ label, value }) { return <Card size="small"><Typography.Text type="secondary">{label}</Typography.Text><Typography.Title level={4} style={{ margin: 0 }}>{Number(value ?? 0).toLocaleString('en-IN')}</Typography.Title></Card>; }
-function Line({ label, value }) { return <Flex justify="space-between" gap={16} style={{ marginBottom: 8 }}><Typography.Text type="secondary">{label}</Typography.Text><Typography.Text>{value}</Typography.Text></Flex>; }
+function Line({ label, value }) { return <Flex wrap justify="space-between" gap={16} style={{ marginBottom: 8 }}><Typography.Text type="secondary">{label}</Typography.Text><Typography.Text>{value}</Typography.Text></Flex>; }

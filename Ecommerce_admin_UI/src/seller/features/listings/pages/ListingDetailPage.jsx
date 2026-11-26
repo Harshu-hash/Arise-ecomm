@@ -114,7 +114,7 @@ export default function ListingDetailPage() {
         onBack={() => navigate('/listings')}
         tags={<StatusTag domain="listing" code={data.status} />}
         actions={
-          <Space>
+          <Space wrap>
             {data.status === 'DRAFT' && (
               <>
                 <Button
@@ -280,7 +280,7 @@ export default function ListingDetailPage() {
                 size="small"
                 rowKey="offerId"
                 pagination={false}
-                scroll={{ x: true }}
+                scroll={{ x: 'max-content' }}
                 dataSource={data.variants}
                 onRow={(v) => ({ onClick: () => v.offerId !== id && navigate(`/listings/${v.offerId}`) })}
                 rowClassName={(v) => (v.offerId === id ? 'ant-table-row-selected' : '')}
@@ -420,17 +420,17 @@ export default function ListingDetailPage() {
         <Col xs={24} lg={8}>
           <Card title="On this listing" size="small">
             <Space direction="vertical" size={8} style={{ width: '100%' }}>
-              <Flex justify="space-between">
+              <Flex wrap justify="space-between">
                 <Typography.Text type="secondary">Buy box</Typography.Text>
                 <Typography.Text strong>
                   {data.buyBoxWinner ? 'Winning' : 'Not winning'}
                 </Typography.Text>
               </Flex>
-              <Flex justify="space-between">
+              <Flex wrap justify="space-between">
                 <Typography.Text type="secondary">Other sellers on this variant</Typography.Text>
                 <Typography.Text strong>{data.competingOffers}</Typography.Text>
               </Flex>
-              <Flex justify="space-between">
+              <Flex wrap justify="space-between">
                 <Typography.Text type="secondary">Fulfilment</Typography.Text>
                 <Tag
                   color={data.fulfillmentType === 'ARISE' ? 'geekblue' : 'default'}

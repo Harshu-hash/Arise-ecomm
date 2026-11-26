@@ -1,10 +1,11 @@
-import { LockOutlined, UserOutlined } from '@ant-design/icons';
-import { Alert, Button, Divider, Form, Input, Space, Typography } from 'antd';
+import { ArrowRightOutlined, LockOutlined, ShopOutlined, UserOutlined } from '@ant-design/icons';
+import { Alert, Button, Form, Input, Typography } from 'antd';
 import { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ApiError } from '@core/api/errors';
 import { useSessionStore } from '@core/auth/sessionStore';
 import { IS_MOCK } from '@core/config/env';
+import { SELLER_ACCENT } from '@seller/theme';
 import { sellerAuthApi } from '../api/auth.api';
 import BackupCodesStep from '../components/BackupCodesStep';
 import EnrolTwoFactorStep from '../components/EnrolTwoFactorStep';
@@ -107,12 +108,8 @@ export default function LoginPage() {
 
   return (
     <div>
-      <Space direction="vertical" size={2} style={{ marginBottom: 20 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Seller sign in
-        </Typography.Title>
-        <Typography.Text type="secondary">Manage your Arise store.</Typography.Text>
-      </Space>
+      <h2 className="sl-title">Seller Sign In</h2>
+      <div className="sl-sub">Manage your Arise store.</div>
 
       {formError && (
         <Alert type="error" showIcon message={formError} style={{ marginBottom: 16 }} closable onClose={() => setFormError(null)} />
@@ -124,27 +121,23 @@ export default function LoginPage() {
           label="Email or phone"
           rules={[{ required: true, message: 'Enter your email or phone.' }]}
         >
-          <Input autoFocus size="large" prefix={<UserOutlined style={{ opacity: 0.45 }} />} placeholder="you@store.test or 10-digit phone" autoComplete="username" />
+          <Input autoFocus size="large" prefix={<UserOutlined />} placeholder="you@store.test or 10-digit phone" autoComplete="username" />
         </Form.Item>
 
         <Form.Item name="password" label="Password" rules={[{ required: true, message: 'Enter your password.' }]}>
-          <Input.Password size="large" prefix={<LockOutlined style={{ opacity: 0.45 }} />} placeholder="••••••••••••" autoComplete="current-password" />
+          <Input.Password size="large" prefix={<LockOutlined />} placeholder="••••••••••••" autoComplete="current-password" />
         </Form.Item>
 
-        <Button type="primary" size="large" htmlType="submit" block loading={loading}>
-          Sign in
+        <Button className="sl-primary ar-primary-btn" type="primary" size="large" htmlType="submit" block loading={loading} style={{ background: SELLER_ACCENT, borderColor: SELLER_ACCENT, color: '#fff' }}>
+          Sign In <ArrowRightOutlined />
         </Button>
       </Form>
 
-      <div style={{ textAlign: 'center', marginTop: 14 }}>
-        <Link to="/forgot-password">Forgot your password?</Link>
-      </div>
+      <Link className="sl-forgot" to="/forgot-password">Forgot your password?</Link>
 
-      <Divider plain style={{ fontSize: 12 }}>
-        New to Arise?
-      </Divider>
+      <div className="sl-or">New to Arise?</div>
       <Link to="/register">
-        <Button block size="large">
+        <Button className="sl-secondary" block size="large" icon={<ShopOutlined />}>
           Create a seller account
         </Button>
       </Link>

@@ -42,7 +42,7 @@ export default function ListingsPage() {
         breadcrumbs={[{ label: 'Listings' }, { label: 'My Listings' }]}
         subtitle="Everything you sell on Arise, with its QC and buy-box status."
         actions={
-          <Space>
+          <Space wrap>
             <>
               <Button icon={<UploadOutlined />} onClick={() => navigate('/listings/bulk')}>
                 Bulk upload
@@ -105,7 +105,7 @@ export default function ListingsPage() {
         }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
-            <Flex justify="space-between" align="flex-start" gap={8}>
+            <Flex wrap justify="space-between" align="flex-start" gap={8}>
               <div style={{ minWidth: 0 }}>
                 <Typography.Text strong>{row.productTitle}</Typography.Text>
                 <div>

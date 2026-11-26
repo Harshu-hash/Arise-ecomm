@@ -125,7 +125,7 @@ function BreakdownModal({ row, onClose }) {
 
 function Line({ k, v, danger, success, strong }) {
   return (
-    <Flex justify="space-between">
+    <Flex wrap justify="space-between">
       <Typography.Text type="secondary">{k}</Typography.Text>
       <Typography.Text strong={strong} type={danger ? 'danger' : success ? 'success' : undefined} className="tabular">{v}</Typography.Text>
     </Flex>

@@ -16,6 +16,7 @@ const server = createServer(app);
 createSocketServer(server);
 
 async function start() {
+  if (env.SMS_OTP_MOCK) logger.warn('SMS_OTP_MOCK is ON: phone OTPs are not sent and always accept the fixed mock code. Never leave this on for real users.');
   if (!env.DISABLE_INFRASTRUCTURE) {
     await Promise.all([connectDatabase(), connectRedis()]);
     await seedRoles();

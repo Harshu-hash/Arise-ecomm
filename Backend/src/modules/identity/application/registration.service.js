@@ -21,7 +21,7 @@ const normalisePhone = (value) => String(value ?? '').replace(/\D/g, '').slice(-
 const normalise = (kind, value) => (kind === 'phone' ? normalisePhone(value) : normaliseEmail(value));
 // 4 digits: the registration OTP field in RegisterPage.jsx is hard-coded to 4 (maxLength,
 // slice(0, 4)) — a longer code here would never fit what the user can type.
-const makeOtp = () => String(Math.floor(1000 + Math.random() * 9000));
+const makeOtp = (kind) => (kind === 'phone' && env.SMS_OTP_MOCK ? env.SMS_OTP_MOCK_CODE : String(Math.floor(1000 + Math.random() * 9000)));
 
 async function findExisting(kind, value) {
   const filter = kind === 'phone' ? { phone: value } : { email: value };
@@ -55,7 +55,7 @@ export async function sendRegistrationOtp({ kind, value }) {
     throw new ConflictError(`${kind.toUpperCase()}_TAKEN`, `This ${kind} is already registered.`);
   }
 
-  const code = makeOtp();
+  const code = makeOtp(kind);
   const challenge = await AuthChallenge.create({
     audience: 'SELLER_REGISTRATION',
     stage: `verify_${kind}`,

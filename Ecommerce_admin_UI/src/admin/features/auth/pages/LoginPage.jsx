@@ -40,11 +40,11 @@ export default function LoginPage() {
 
   return (
     <div>
-      <Space direction="vertical" size={2} style={{ marginBottom: 20 }}>
-        <Typography.Title level={4} style={{ margin: 0 }}>
-          Sign in
+      <Space direction="vertical" size={4} style={{ marginBottom: 24 }}>
+        <Typography.Title level={3} style={{ margin: 0 }}>
+          Welcome back
         </Typography.Title>
-        <Typography.Text type="secondary">Use your Arise admin account.</Typography.Text>
+        <Typography.Text type="secondary">Sign in to your Arise admin account.</Typography.Text>
       </Space>
 
       {formError && (
@@ -78,12 +78,12 @@ export default function LoginPage() {
           />
         </Form.Item>
 
-        <Button type="primary" size="large" htmlType="submit" block loading={loading}>
-          Continue
+        <Button type="primary" size="large" htmlType="submit" block loading={loading} className="ar-primary-btn" style={{ height: 46, fontWeight: 600, background: '#F59E0B', borderColor: '#F59E0B', color: '#000' }}>
+          Sign in
         </Button>
       </Form>
 
-      <div style={{ textAlign: 'center', marginTop: 14 }}>
+      <div style={{ textAlign: 'center', marginTop: 16 }}>
         <Link to="/forgot-password">Forgot your password?</Link>
       </div>
 

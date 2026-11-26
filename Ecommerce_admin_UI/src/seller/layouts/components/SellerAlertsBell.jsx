@@ -38,8 +38,8 @@ export default function SellerAlertsBell() {
   const unread = data?.meta?.unread ?? 0;
 
   const panel = (
-    <div style={{ width: 360, maxHeight: 420, overflowY: 'auto', background: 'var(--ant-color-bg-elevated)', border: '1px solid var(--ant-color-border-secondary)', borderRadius: 'var(--ant-border-radius-lg)', boxShadow: 'var(--ant-box-shadow-secondary)' }}>
-      <Flex justify="space-between" align="center" style={{ padding: '10px 14px' }}>
+    <div style={{ width: 'min(360px, calc(100vw - 24px))', maxHeight: 420, overflowY: 'auto', background: 'var(--ant-color-bg-elevated)', border: '1px solid var(--ant-color-border-secondary)', borderRadius: 'var(--ant-border-radius-lg)', boxShadow: 'var(--ant-box-shadow-secondary)' }}>
+      <Flex wrap justify="space-between" align="center" style={{ padding: '10px 14px' }}>
         <Typography.Text strong style={{ fontSize: 13 }}>Alerts</Typography.Text>
         {unread > 0 && <Typography.Text type="secondary" style={{ fontSize: 12 }}>{unread} unread</Typography.Text>}
       </Flex>

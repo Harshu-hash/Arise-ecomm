@@ -173,7 +173,7 @@ export default function CampaignDetailPage() {
                 <DateText value={campaign.startsAt} variant="date" /> – <DateText value={campaign.endsAt} variant="date" />
               </Descriptions.Item>
               <Descriptions.Item label="Entry deadline">
-                <Space>
+                <Space wrap>
                   <DateText value={campaign.submissionDeadline} variant="datetime" />
                   <Tag color={deadlinePassed ? 'red' : 'gold'} style={{ marginInlineEnd: 0 }}>
                     {deadlinePassed ? 'Closed' : fromNow(campaign.submissionDeadline)}
@@ -220,11 +220,11 @@ export default function CampaignDetailPage() {
           }}
           mobileCard={(row) => (
             <Flex vertical gap={6}>
-              <Flex justify="space-between" gap={8}>
+              <Flex wrap justify="space-between" gap={8}>
                 <Typography.Text strong>{row.productTitle}</Typography.Text>
                 <StatusTag domain="campaignSubmission" code={row.status} />
               </Flex>
-              <Space size={8}>
+              <Space wrap size={8}>
                 <MoneyText paise={row.dealPricePaise} strong />
                 <Tag>{row.discountPct}% off</Tag>
               </Space>

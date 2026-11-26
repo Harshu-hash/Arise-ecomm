@@ -67,7 +67,7 @@ async function startContactChange(user, field, value) {
   }
   // One pending change at a time: a new request replaces the old one.
   await AuthChallenge.updateMany(liveChallengeFilter(user._id), { $set: { consumedAt: new Date() } });
-  const code = makeOtp();
+  const code = makeOtp(kind);
   const challenge = await AuthChallenge.create({
     userId: String(user._id), audience: AUDIENCE, stage: field, target: value, codeHash: sha256(code), expiresAt: new Date(Date.now() + CODE_TTL_MS),
   });

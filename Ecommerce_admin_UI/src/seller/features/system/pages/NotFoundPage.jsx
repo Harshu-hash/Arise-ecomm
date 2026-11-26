@@ -9,7 +9,7 @@ export default function NotFoundPage() {
       title="Page not found"
       subTitle="The link may be out of date, or the page may have moved."
       extra={
-        <Space>
+        <Space wrap>
           <Button type="primary" onClick={() => navigate('/')}>
             Back to dashboard
           </Button>

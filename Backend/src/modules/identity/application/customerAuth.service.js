@@ -29,7 +29,7 @@ const accountExists = ({ kind }) =>
     'CUSTOMER_EXISTS',
     `An account already exists for this ${kind === 'phone' ? 'mobile number' : 'email address'}.`,
   );
-export const makeOtp = () => String(randomInt(1000, 10_000));
+export const makeOtp = (kind) => (kind === 'phone' && env.SMS_OTP_MOCK ? env.SMS_OTP_MOCK_CODE : String(randomInt(1000, 10_000)));
 const purposeOf = (stage) => Object.entries(STAGES).find(([, value]) => value === stage)?.[0];
 const mask = ({ kind, value }) =>
   kind === 'email' ? value.replace(/(^.).*(@.*$)/, '$1***$2') : `******${value.slice(-4)}`;
@@ -40,6 +40,7 @@ export async function deliverOtp(target, code) {
     await sendMail({ to: target.value, subject: 'Your Arise verification code', text: message });
     return;
   }
+  if (env.SMS_OTP_MOCK) return; // mock mode: no SMS is sent, makeOtp issued the fixed code
   if (!env.SMS_OTP_URL) {
     logger.warn('SMS provider not configured; customer OTP was not delivered');
     return;
@@ -69,7 +70,7 @@ function challengeBody(challenge, code) {
 }
 
 async function createChallenge({ target, purpose, name = null, userId = null, referralCode = null }) {
-  const code = makeOtp();
+  const code = makeOtp(target.kind);
   const challenge = await AuthChallenge.create({
     userId: userId ? String(userId) : null,
     audience: AUDIENCE,

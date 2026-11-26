@@ -108,7 +108,7 @@ function CouponActions({ coupon }) {
   const end = useMutation(run(() => sellerCouponsApi.end(coupon.id), 'Coupon ended'));
   if (!OPEN_STATUSES.includes(coupon.status)) return null;
   return (
-    <Space size={4} onClick={(e) => e.stopPropagation()}>
+    <Space wrap size={4} onClick={(e) => e.stopPropagation()}>
       <Button size="small" loading={pause.isPending} onClick={() => pause.mutate()}>{paused ? 'Resume' : 'Pause'}</Button>
       <Popconfirm title="End this coupon now?" description="Customers can no longer use it. This cannot be undone." okText="End coupon" okButtonProps={{ danger: true }} onConfirm={() => end.mutate()}>
         <Button size="small" type="text" danger loading={end.isPending}>End</Button>

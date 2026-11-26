@@ -50,9 +50,9 @@ export default function ReturnDetailPage() {
         title={`Return ${data.id}`}
         breadcrumbs={[{ label: 'Returns', to: '/returns' }, { label: data.id }]}
         onBack={() => navigate('/returns')}
-        tags={<Space><StatusTag domain="returnRequest" code={data.status} />{isArise && <Tag color="geekblue">By Arise</Tag>}</Space>}
+        tags={<Space wrap><StatusTag domain="returnRequest" code={data.status} />{isArise && <Tag color="geekblue">By Arise</Tag>}</Space>}
         actions={
-          <Space>
+          <Space wrap>
             {actions.includes('reject') && <><Button danger onClick={() => setRejectOpen(true)}>Reject</Button></>}
             {actions.includes('approve') && <><Button type="primary" loading={approveMut.isPending} onClick={() => approveMut.mutate()}>Approve & schedule pickup</Button></>}
             {actions.includes('receive') && <><Button type="primary" loading={receiveMut.isPending} onClick={() => receiveMut.mutate()}>Mark received</Button></>}

@@ -18,7 +18,7 @@ export default function SupportPage() {
       {availabilityLabel && <Typography.Text type="secondary">{availabilityLabel}</Typography.Text>}
       <Flex gap={12} wrap>
         {channels.map((channel) => (
-          <Card key={channel.id} size="small" loading={query.isLoading} style={{ minWidth: 260 }} title={channel.label}>
+          <Card key={channel.id} size="small" loading={query.isLoading} style={{ minWidth: 260, flex: '1 1 260px' }} title={channel.label}>
             <Flex vertical gap={8} align="start">
               <Typography.Text>{channel.description}</Typography.Text>
               <Button type="primary" icon={ICONS[channel.type]} href={channel.href}>{channel.label}</Button>

@@ -86,7 +86,7 @@ function CampaignCard({ campaign, onOpen }) {
       style={{ height: '100%' }}
       styles={{ body: { display: 'flex', flexDirection: 'column', gap: 12, height: '100%' } }}
     >
-      <Flex justify="space-between" align="flex-start" gap={8}>
+      <Flex wrap justify="space-between" align="flex-start" gap={8}>
         <div style={{ minWidth: 0 }}>
           <Typography.Text strong style={{ fontSize: 16 }}>{campaign.name}</Typography.Text>
           <div>
@@ -109,19 +109,19 @@ function CampaignCard({ campaign, onOpen }) {
       </Space>
 
       <Flex vertical gap={4} style={{ fontSize: 12 }}>
-        <Flex justify="space-between">
+        <Flex wrap justify="space-between">
           <Typography.Text type="secondary">Runs</Typography.Text>
           <Typography.Text>
             <DateText value={campaign.startsAt} variant="date" /> – <DateText value={campaign.endsAt} variant="date" />
           </Typography.Text>
         </Flex>
-        <Flex justify="space-between">
+        <Flex wrap justify="space-between">
           <Typography.Text type="secondary"><ClockCircleOutlined /> Entry deadline</Typography.Text>
           <Typography.Text type={deadlinePassed ? 'danger' : 'warning'}>
             {deadlinePassed ? 'Closed' : fromNow(campaign.submissionDeadline)}
           </Typography.Text>
         </Flex>
-        <Flex justify="space-between">
+        <Flex wrap justify="space-between">
           <Typography.Text type="secondary">Shows in</Typography.Text>
           <Typography.Text>{CUSTOMER_SECTION_LABELS[campaign.customerSection]}</Typography.Text>
         </Flex>

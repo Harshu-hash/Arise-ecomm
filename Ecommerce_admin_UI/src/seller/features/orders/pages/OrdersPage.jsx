@@ -161,7 +161,7 @@ export default function OrdersPage() {
         }}
         mobileCard={(row) => (
           <Flex vertical gap={6}>
-            <Flex justify="space-between" align="flex-start" gap={8}>
+            <Flex wrap justify="space-between" align="flex-start" gap={8}>
               <div style={{ minWidth: 0 }}>
                 <Typography.Text strong>{row.orderId}</Typography.Text>
                 <div>

@@ -67,7 +67,7 @@ export default function DashboardPage() {
       <Row gutter={[12, 12]}>
         <Col xs={24} lg={10}>
           <Card title="Account health" loading={isLoading} size="small" style={{ height: "100%" }}>
-            <Flex align="center" gap={20}>
+            <Flex align="center" gap={20} wrap>
               <Progress
                 type="dashboard"
                 percent={health.score ?? 0}
@@ -112,7 +112,7 @@ export default function DashboardPage() {
 
 function HealthRow({ label, value }) {
   return (
-    <Flex justify="space-between" style={{ width: '100%' }}>
+    <Flex wrap justify="space-between" style={{ width: '100%' }}>
       <Typography.Text type="secondary">{label}</Typography.Text>
       <Typography.Text strong>{(value ?? 0).toFixed(1)}%</Typography.Text>
     </Flex>

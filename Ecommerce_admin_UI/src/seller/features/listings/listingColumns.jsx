@@ -32,7 +32,7 @@ function VariantsCell({ count, row }) {
             size="small"
             rowKey="offerId"
             pagination={false}
-            scroll={{ x: true }}
+            scroll={{ x: 'max-content' }}
             dataSource={row.variants}
             columns={[
               {
