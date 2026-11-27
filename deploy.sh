@@ -7,7 +7,7 @@ command -v node >/dev/null || export PATH="$HOME/.nvm/versions/node/v22.23.5/bin
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 cd "$ROOT"
 
-if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+if [ -n "$(git -c core.fileMode=false status --porcelain --untracked-files=no)" ]; then
   echo "Tracked files have local changes; commit or discard them first." >&2
   exit 1
 fi
