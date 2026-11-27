@@ -32,6 +32,7 @@ export const mapOrder = order => {
     mrp: toRupees(item.mrpPaise),
     canCancel: item.canCancel,
     canReturn: item.canReturn,
+    shipmentId: item.shipmentId ?? null,
     returnId: item.returnId ?? null,
     returnStatus: item.returnStatus ?? null,
   }));
@@ -46,6 +47,7 @@ export const mapOrder = order => {
     date: new Date(order.placedAt).toLocaleDateString('en-IN'),
     address: mapAddress(order.address),
     items,
+    shipmentId: items.find(item => item.shipmentId)?.shipmentId ?? null,
     priceDetails: {
       itemTotal: totals.subtotal,
       deliveryFee: totals.deliveryFee,

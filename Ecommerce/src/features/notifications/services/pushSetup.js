@@ -1,6 +1,7 @@
 import { PermissionsAndroid, Platform } from 'react-native';
 import { pushTokenStorage } from '../storage/pushTokenStorage';
 import { registerPushToken } from './pushRegistration';
+import { listenForPushes } from './pushHandlers';
 
 // Firebase push setup. @react-native-firebase is required lazily so the app (and its tests) load without the native module.
 const newDeviceId = () => `${Platform.OS}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
@@ -15,13 +16,21 @@ async function permissionGranted(firebase, messaging) {
 }
 
 /** Asks for permission, registers this phone's Firebase token with the backend, and keeps it current. Returns a stop function. */
-export async function startPushRegistration() {
+export async function startPushRegistration(dispatch) {
   // The modular API: the namespaced `messaging()` call is deprecated and logs a warning on every use.
   const firebase = require('@react-native-firebase/messaging');
   const messaging = firebase.getMessaging(require('@react-native-firebase/app').getApp());
-  if (!(await permissionGranted(firebase, messaging))) return () => {};
+  if (!(await permissionGranted(firebase, messaging))) {
+    if (__DEV__) console.warn('Push registration skipped: notification permission was not granted');
+    return () => {};
+  }
   const deviceId = pushTokenStorage.get()?.deviceId ?? newDeviceId();
   const register = token => registerPushToken({ deviceId, token, platform: Platform.OS });
   await register(await firebase.getToken(messaging));
-  return firebase.onTokenRefresh(messaging, token => register(token).catch(() => {}));
+  const stopTokens = firebase.onTokenRefresh(messaging, token => register(token).catch(() => {}));
+  const stopPushes = listenForPushes(firebase, messaging, dispatch);
+  return () => {
+    stopTokens();
+    stopPushes();
+  };
 }

@@ -21,6 +21,8 @@ export const trackingResponseSchema = apiEnvelope(
       'DELAYED',
       'DELIVERY_FAILED',
       'CANCELLED',
+      'RTO',
+      'RTO_DELIVERED',
     ]),
     statusLabel: z.string().min(1),
     updatedAt: z.string().datetime(),

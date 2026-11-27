@@ -3,6 +3,7 @@ import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { emitTo, rooms } from '../../../infrastructure/realtime/socket.js';
 import { ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { countCustomers, getCustomer } from '../../identity/public/index.js';
+import { CATEGORY, notify } from '../../notification/public/index.js';
 import { getShelfPrices } from '../../product/public/index.js';
 import { COUPON_STATE, COUPON_STATUS, MAX_COUPON_DAYS } from '../domain/constants/coupon.js';
 import { burnExpr, couponErrors, evaluateCoupon, statusExpr } from '../domain/services/couponRules.js';
@@ -60,6 +61,29 @@ async function findCoupon(id, sellerId = null) {
   const [row] = await Coupon.aggregate([{ $match: match }, ...withDerived(new Date())]);
   if (!row) throw new NotFoundError('That coupon no longer exists.');
   return row;
+}
+
+// A coupon aimed at named customers is announced to them; a public one is announced with a broadcast (admin Notifications) instead.
+const tellTargetedCustomers = (coupon) => coupon.audience?.type === 'CUSTOM'
+  ? Promise.all(coupon.audience.customerIds.map((id) => notify({
+    to: { type: 'CUSTOMER', id: String(id) }, category: CATEGORY.OFFER, key: `coupon-for-you:${coupon._id}:${id}`,
+    title: 'A coupon just for you', body: `Use ${coupon.code}: ${coupon.name}. Valid until ${coupon.endsAt.toLocaleDateString('en-IN')}.`,
+  })))
+  : null;
+
+/** One push the day before a targeted coupon expires, to each customer it was made for. Keyed per coupon and customer. Returns how many were sent. */
+export async function sendCouponExpiryReminders(now = new Date()) {
+  let sent = 0;
+  for (const coupon of await Coupon.find({ state: COUPON_STATE.LIVE, 'audience.type': 'CUSTOM', endsAt: { $gt: now, $lte: new Date(now.getTime() + 86_400_000) } }).limit(200).lean()) {
+    for (const id of coupon.audience.customerIds) {
+      const told = await notify({
+        to: { type: 'CUSTOMER', id: String(id) }, category: CATEGORY.OFFER, key: `coupon-expiring:${coupon._id}:${id}`,
+        title: 'Your coupon expires soon', body: `${coupon.code} (${coupon.name}) ends ${coupon.endsAt.toLocaleDateString('en-IN')}. Use it before it goes.`,
+      });
+      if (told) sent += 1;
+    }
+  }
+  return sent;
 }
 
 // A seller's console refetches when their coupon changes, including when an admin pauses it.
@@ -137,6 +161,7 @@ export async function createCoupon(input, actor) {
   const result = await findCoupon(row._id).then(serializeCoupon);
   await recordAudit({ action: 'marketing.coupon.create', subjectType: 'coupon', subjectId: row._id, after: result, actor });
   announce(row);
+  await tellTargetedCustomers(row);
   return result;
 }
 

@@ -158,6 +158,7 @@ const HomeScreen = ({ navigation }) => {
           <RecentlyViewedRail
             key={section.id}
             items={section.items}
+            gradient={section.gradient}
             onPressItem={item => navigation?.navigate('ProductDetail', { productId: item.id })}
             onSeeAll={() => navigation?.navigate('RecentlyViewed')}
           />

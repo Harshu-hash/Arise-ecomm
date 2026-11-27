@@ -2,6 +2,7 @@ import { withTransaction } from '../../../config/database.js';
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { NotFoundError } from '../../../shared/errors/AppError.js';
 import { getCustomer } from '../../identity/public/index.js';
+import { CATEGORY, notify } from '../../notification/public/index.js';
 import { creditWallet, debitWallet, getBalance, getWalletAccount, listWalletTransactions, setWalletFrozen } from './wallet.service.js';
 
 async function assertCustomer(userId) {
@@ -23,6 +24,11 @@ export async function adjustCustomerWallet(userId, { amountPaise, reason }, acto
   const base = { userId, type: 'ADJUSTMENT', title: amountPaise > 0 ? 'Credit from Arise' : 'Adjustment by Arise', reference: reason, amountPaise: Math.abs(amountPaise) };
   if (amountPaise > 0) await creditWallet(base);
   else await withTransaction((session) => debitWallet({ ...base, allowFrozen: true }, session)); // an admin can still correct a frozen wallet
+  await notify({
+    to: { type: 'CUSTOMER', id: userId }, category: CATEGORY.ACCOUNT, key: `wallet-adjust:${userId}:${Date.now()}`,
+    title: amountPaise > 0 ? 'Wallet credited' : 'Wallet adjusted',
+    body: `${amountPaise > 0 ? `₹${(amountPaise / 100).toLocaleString('en-IN')} was added to` : `₹${(-amountPaise / 100).toLocaleString('en-IN')} was deducted from`} your wallet by Arise: ${reason}`,
+  });
   await recordAudit({ action: 'wallet.adjust', subjectType: 'customerWallet', subjectId: String(userId), after: { amountPaise }, reason, actor });
   return adminWalletView(userId);
 }

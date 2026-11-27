@@ -19,11 +19,9 @@ import Animated, {
   useAnimatedScrollHandler,
   useAnimatedStyle,
   useAnimatedReaction,
-  interpolate,
   withTiming,
   withSpring,
   Easing,
-  Extrapolation,
   runOnJS,
 } from 'react-native-reanimated';
 import { optionCards } from '../utils/optionCards';
@@ -43,6 +41,10 @@ import {
 } from '@features/wishlist';
 import { useAddCartItemMutation } from '@features/cart';
 import { useGetProductReviewsQuery } from '@features/reviews';
+import { useGetAddressesQuery, useGetServiceabilityQuery } from '@features/address';
+import { selectIsAuthenticated } from '@features/auth';
+import { useSelector } from 'react-redux';
+import { skipToken } from '@reduxjs/toolkit/query';
 
 // Aliases onto the app theme.
 const PINK = COLORS.primary;
@@ -88,7 +90,6 @@ const BANK_OFFERS = [
 ];
 
 const CTA_HEIGHT = 46;
-const CTA_FADE = 24;
 const SUGGESTION_TABS = ['All', 'Similar', 'Your Next Favourites'];
 // Percent off for a card; 0 when it is not discounted.
 const pctOff = item => (item.mrp > item.price ? Math.round(((item.mrp - item.price) / item.mrp) * 100) : 0);
@@ -200,8 +201,24 @@ const SpecTable = ({ title, rows }) =>
     </View>
   ) : null;
 
-const ProductDetailContent = ({ product, navigation }) => {
+const ProductDetailContent = ({ product, navigation, route }) => {
   const insets = useSafeAreaInsets();
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const { data: addressBook } = useGetAddressesQuery(undefined, { skip: !isAuthenticated });
+  const deliveryAddress =
+    addressBook?.items.find(item => item.id === route?.params?.selectedAddressId) ??
+    addressBook?.items.find(item => item.isDefault) ??
+    addressBook?.items[0];
+  // Shiprocket's transit estimate to this address (counted from today, with no seller dispatch time)
+  const { data: serviceability } = useGetServiceabilityQuery(deliveryAddress?.pincode ?? skipToken);
+  const etaDays = serviceability?.serviceable ? serviceability.estimatedDeliveryDays : null;
+  const deliveryDate = etaDays
+    ? new Date(Date.now() + etaDays * 86400000).toLocaleDateString('en-IN', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+      })
+    : product.deliveryDate;
   const { width, height: windowHeight } = useWindowDimensions();
 
   // The newest few published reviews, only once the product has any.
@@ -268,17 +285,12 @@ const ProductDetailContent = ({ product, navigation }) => {
     scrollY.value = e.contentOffset.y;
   });
 
+  // The bar never moves: it is shown at the bottom edge while the in-page slot is below the screen and hidden once the
+  // slot's own copy of the buttons is on screen. (Translating it from scroll events made it jitter, as it lags the native scroll.)
   const ctaStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: Math.min(viewH.value - CTA_HEIGHT - pinOffset, slotTop.value - scrollY.value) },
-    ],
+    transform: [{ translateY: viewH.value - CTA_HEIGHT - pinOffset }],
+    display: slotTop.value - scrollY.value >= viewH.value - CTA_HEIGHT - pinOffset ? 'flex' : 'none',
   }));
-
-  // Fade the bar's backdrop (white + top border) out as the buttons settle into the page.
-  const backdropStyle = useAnimatedStyle(() => {
-    const gap = slotTop.value - scrollY.value - (viewH.value - CTA_HEIGHT - pinOffset);
-    return { opacity: interpolate(gap, [-CTA_FADE, 0], [0, 1], Extrapolation.CLAMP) };
-  });
 
   useAnimatedReaction(
     () => slotTop.value - scrollY.value >= viewH.value - CTA_HEIGHT - pinOffset,
@@ -407,7 +419,11 @@ const ProductDetailContent = ({ product, navigation }) => {
 
   const handleAddressChange = () => {
     haptics.selection();
-    navigation && navigation.navigate('SavedAddresses');
+    navigation && navigation.navigate('SavedAddresses', {
+        selectMode: true,
+        returnScreen: 'ProductDetail',
+        returnParams: { productId: product.id }, // the product page needs its id back, whichever way navigation restores it
+      });
   };
 
   const handleViewReviews = () => {
@@ -717,14 +733,15 @@ const ProductDetailContent = ({ product, navigation }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Invisible placeholder reserving the in-page spot; the real buttons are the overlay below */}
+          {/* The in-page buttons; the pinned bar below stands in for them until this spot scrolls into view */}
           <View
-            style={[styles.ctaRow, styles.padded, styles.ctaHidden]}
-            pointerEvents="none"
+            style={[styles.ctaRow, styles.padded]}
             onLayout={e => {
               slotTop.value = e.nativeEvent.layout.y;
             }}
-          />
+          >
+            {ctaButtons}
+          </View>
 
           {/* Delivery & Services */}
           <Section title="Delivery & Services" style={styles.padded}>
@@ -735,10 +752,12 @@ const ProductDetailContent = ({ product, navigation }) => {
             >
               <Icon name="map-pin" size={20} color={COLORS.textPrimary} />
               <Text style={styles.addressText} numberOfLines={1}>
-                {product.address ? (
+                {deliveryAddress ? (
                   <>
-                    <Text style={styles.addressBold}>{product.address.split(' - ')[0]} - </Text>
-                    {product.address.split(' - ').slice(1).join(' - ')}
+                    <Text style={styles.addressBold}>
+                      {deliveryAddress.name}, {deliveryAddress.pincode} -{' '}
+                    </Text>
+                    {deliveryAddress.address}
                   </>
                 ) : (
                   'Select a delivery address'
@@ -756,8 +775,8 @@ const ProductDetailContent = ({ product, navigation }) => {
                   <Icon name="package" size={16} color={COLORS.textSecondary} />
                   <Text style={styles.standardText}>STANDARD</Text>
                 </View>
-                {product.deliveryDate ? (
-                  <Text style={styles.deliveryBy}>Delivery by {product.deliveryDate}</Text>
+                {deliveryDate ? (
+                  <Text style={styles.deliveryBy}>Delivery by {deliveryDate}</Text>
                 ) : null}
               </View>
               <View style={{ alignItems: 'flex-end' }}>
@@ -1075,12 +1094,8 @@ const ProductDetailContent = ({ product, navigation }) => {
 
         {/* The single CTA pair: rides the bottom edge until it meets the in-page slot, then scrolls with the page */}
         <Animated.View style={[styles.ctaOverlay, ctaStyle]} pointerEvents="box-none">
-          <Animated.View
-            style={[
-              styles.ctaBackdrop,
-              { height: CTA_HEIGHT + SPACING.s + pinOffset },
-              backdropStyle,
-            ]}
+          <View
+            style={[styles.ctaBackdrop, { height: CTA_HEIGHT + SPACING.s + pinOffset }]}
             pointerEvents="none"
           />
           <View style={[styles.ctaRowFixed, styles.padded]}>{ctaButtons}</View>
@@ -1178,7 +1193,7 @@ const ProductDetailScreen = ({ route, navigation }) => {
       />
     );
   }
-  return <ProductDetailContent product={product} navigation={navigation} />;
+  return <ProductDetailContent product={product} navigation={navigation} route={route} />;
 };
 
 const styles = StyleSheet.create({
@@ -1423,7 +1438,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.l,
     paddingBottom: SPACING.s,
   },
-  ctaHidden: { opacity: 0 },
   sheetContent: {
     padding: SPACING.l,
     paddingBottom: SPACING.xxxl,

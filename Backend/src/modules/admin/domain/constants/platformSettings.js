@@ -42,8 +42,9 @@ export const SETTINGS_SECTIONS = [
   {
     id: 'fees',
     label: 'Fees',
-    // deliveryFeePaise is the flat delivery charge the cart shows until checkout has a real shipping quote.
-    values: { platformFeePaise: 500, deliveryFeePaise: 4000, deliveryFeeFreeThresholdPaise: 49_900, codConvenienceFeePaise: 1500 },
+    // deliveryFeePaise is the flat delivery charge the cart shows until checkout has a real shipping quote (and charges if Shiprocket cannot be reached);
+    // with flatDeliveryEnabled off the cart shows no delivery fee and a failed shipping quote fails checkout instead.
+    values: { platformFeePaise: 500, flatDeliveryEnabled: true, deliveryFeePaise: 4000, deliveryFeeFreeThresholdPaise: 49_900, codConvenienceFeePaise: 1500 },
   },
   {
     id: 'payments',
@@ -54,7 +55,7 @@ export const SETTINGS_SECTIONS = [
     id: 'homeHeader',
     label: 'Home header',
     // The colour the app's home header fades from when the "For You" tab is selected.
-    values: { forYouColor: '#FFCB9D', forYouImage: '', forYouImageOpacity: 100 }, // forYouImage: a CMS upload shown behind the header, '' for none
+    values: { forYouColor: '#FFCB9D', forYouImage: '', forYouImageOpacity: 100, recentlyViewedTopColor: '#CFE3FF', recentlyViewedBottomColor: '#FFD9EC' }, // the last two: the "Still looking for these?" rail's gradient, top to bottom; // forYouImage: a CMS upload shown behind the header, '' for none
   },
   {
     id: 'referral',

@@ -5,9 +5,11 @@ import { SPACING, RADIUS } from '../../../constants/spacing';
 import { GradientBackground } from '../../../shared/components';
 
 /** "Still looking for these?" recently-viewed rail — square image + 2-line label. */
-const RecentlyViewedRail = ({ items, onPressItem, onSeeAll }) => (
-  <View style={styles.wrapper}>
-    <GradientBackground colors={['#CFE3FF', '#FFD9EC']} id="recently_viewed_grad" />
+const DEFAULT_GRADIENT = ['#CFE3FF', '#FFD9EC'];
+
+const RecentlyViewedRail = ({ items, gradient = DEFAULT_GRADIENT, onPressItem, onSeeAll }) => (
+  <View style={[styles.wrapper, { backgroundColor: gradient[1] }]}>
+    <GradientBackground colors={gradient} id="recently_viewed_grad" />
     <View style={styles.titleRow}>
       <Text style={styles.title}>Still looking for these?</Text>
       {onSeeAll ? (

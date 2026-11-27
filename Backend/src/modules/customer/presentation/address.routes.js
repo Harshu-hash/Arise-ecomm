@@ -46,7 +46,7 @@ export function createCustomerAddressRouter() {
 
   router.get('/addresses', ...customerOnly, route(async (req, res) => sendData(res, await listAddresses(req.auth.userId))));
   router.post('/addresses/validate', ...customerOnly, validate({ body: addressBody }), route(async (req, res) =>
-    sendCommand(res, validateAddress(req.body))));
+    sendCommand(res, await validateAddress(req.body))));
   router.post('/addresses', ...customerOnly, validate({ body: addressBody }), route(async (req, res) =>
     sendCommand(res, await createAddress(req.auth.userId, req.body), { status: 201 })));
   router.patch('/addresses/:addressId', ...customerOnly, validate({ params: addressParams, body: addressPatch }), route(async (req, res) =>
@@ -56,7 +56,7 @@ export function createCustomerAddressRouter() {
   router.post('/addresses/:addressId/default', ...customerOnly, validate({ params: addressParams }), route(async (req, res) =>
     sendCommand(res, await makeDefaultAddress(req.auth.userId, req.params.addressId))));
   router.get('/serviceability', ...customerOnly, validate({ query: serviceabilityQuery }), route(async (req, res) =>
-    sendData(res, getServiceability(req.query.pincode))));
+    sendData(res, await getServiceability(req.query.pincode))));
 
   return router;
 }

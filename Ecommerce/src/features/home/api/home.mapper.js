@@ -76,7 +76,7 @@ export const mapHomeResponse = payload => {
     if (section.type === HOME_SECTION_TYPES.topValueDeals && previous?.type === section.type) {
       previous.items.push(...items);
     } else {
-      sections.push({ id: section.id, type: section.type, items });
+      sections.push({ id: section.id, type: section.type, items, gradient: section.metadata?.gradient });
     }
   }
 

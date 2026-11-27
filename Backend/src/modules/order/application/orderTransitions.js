@@ -12,7 +12,7 @@ import { issueCreditNotes } from './invoice.service.js';
 import { accrueDelivered } from '../../settlement/public/index.js';
 import { qualifyOnDelivered } from '../../referral/public/index.js';
 import { grantCashback } from '../../wallet/public/index.js';
-import { notifyCancelled, notifySubOrderMoved } from './orderNotifications.js';
+import { notifyCancelled, notifyRefundProcessed, notifySubOrderMoved } from './orderNotifications.js';
 import { stockReference } from './checkout.service.js';
 
 // The only places an order's or a parcel's status changes after it is placed. The order's own status is never set by hand:
@@ -113,8 +113,9 @@ export async function cancelParcels(orderId, { pick, actor, note = null }) {
 
   if (outcome.refundPaise > 0) {
     try {
-      await refundPayment(outcome.order.paymentId, { key: outcome.key, amountPaise: outcome.refundPaise, reason: note ?? 'Order cancelled' });
+      const paid = await refundPayment(outcome.order.paymentId, { key: outcome.key, amountPaise: outcome.refundPaise, reason: note ?? 'Order cancelled' });
       await Order.updateOne({ _id: orderId }, { $inc: { refundedPaise: outcome.refundPaise } });
+      await notifyRefundProcessed(outcome.order, paid.refunds.find((refund) => refund.key === outcome.key));
     } catch (err) {
       logger.error({ err, orderId: String(orderId), key: outcome.key }, 'Refund for a cancellation failed; it is recorded on the payment for retry');
     }

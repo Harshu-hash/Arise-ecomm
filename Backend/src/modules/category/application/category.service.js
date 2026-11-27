@@ -411,6 +411,7 @@ export async function listCustomerCategories() {
     name: node.name,
     imageUrl: deviceUrl(node.imageUrl),
     icon: node.icon ?? null,
+    color: node.color ?? DEFAULT_TAB_COLOR, // the same admin-chosen colour as the home header tab
   }));
 }
 

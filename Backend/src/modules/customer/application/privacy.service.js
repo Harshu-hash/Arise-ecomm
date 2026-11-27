@@ -1,6 +1,7 @@
 import { rm } from 'node:fs/promises';
 import { resolveKey } from '../../../infrastructure/storage/local.storage.js';
 import { anonymizeCustomerIdentity, assertActiveCustomer } from '../../identity/public/index.js';
+import { CATEGORY, notify } from '../../notification/public/index.js';
 import { deleteCustomerProductHistory } from '../../product/public/index.js';
 import { deleteCustomerCart } from '../../cart/public/index.js';
 import { deleteCustomerReviews } from '../../review/public/index.js';
@@ -50,6 +51,10 @@ export async function createDeletionRequest(customerId, { reasonCode }, now = ne
     },
     { upsert: true, new: true, setDefaultsOnInsert: true },
   );
+  await notify({
+    to: { type: 'CUSTOMER', id: customerId }, category: CATEGORY.ACCOUNT, key: `deletion-requested:${request._id}`,
+    title: 'Account deletion scheduled', body: `Your account will be deleted on ${request.scheduledDeletionAt.toLocaleDateString('en-IN')}. Cancel it before then if you changed your mind.`,
+  });
   return { ...eligibility, existingRequest: serializeRequest(request) };
 }
 

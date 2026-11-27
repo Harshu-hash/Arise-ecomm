@@ -9,8 +9,8 @@ const mapTotals = totals =>
 
 // What the order will really cost to this address (the server's delivery quote and fees), before a checkout is created.
 export const mapCheckoutPreview = payload => {
-  const { totals, blockers, warnings } = payload.data;
-  return { totals: mapTotals(totals), blockers, warnings };
+  const { totals, blockers, warnings, deliveries = [] } = payload.data;
+  return { totals: mapTotals(totals), blockers, warnings, deliveries };
 };
 
 export const mapCheckoutSession = payload => {

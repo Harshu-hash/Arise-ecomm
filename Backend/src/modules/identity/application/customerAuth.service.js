@@ -8,7 +8,11 @@ import { hashPassword, sha256 } from '../../../shared/utils/crypto.js';
 import { attachReferral, checkSignupCode } from '../../referral/public/index.js';
 import { AuthChallenge } from '../infrastructure/persistence/authChallenge.model.js';
 import { User } from '../infrastructure/persistence/user.model.js';
-import { createSession, revokeAllSessions } from './session.service.js';
+import { createSession, listSessions, revokeAllSessions } from './session.service.js';
+
+// Loaded on use: the notification module imports identity, so a top-level import here would be circular.
+const tell = async (message) => (await import('../../notification/public/index.js')).notify(message);
+const account = (id) => ({ type: 'CUSTOMER', id: String(id) });
 
 const OTP_TTL_MS = 5 * 60 * 1000;
 const RESEND_DELAY_MS = 30 * 1000;
@@ -153,8 +157,17 @@ export async function verifyCustomerOtp({ challengeId, otp, device, requiredStag
   assertCustomerIsActive(user);
   challenge.consumedAt = new Date();
   await challenge.save();
+  // a sign-in from a device this account has not used before (it has other sessions, none from this browser/app) is worth an alert
+  const known = await listSessions(user._id);
+  const newDevice = challenge.stage !== STAGES.SIGNUP && known.length > 0 && !known.some((session) => session.device?.userAgent === (device?.userAgent ?? null));
   const tokens = await createSession({ userId: user._id, role: user.role, device });
   await User.updateOne({ _id: user._id }, { $set: { lastLoginAt: new Date() } });
+  if (newDevice) {
+    await tell({
+      to: account(user._id), category: (await import('../../notification/public/index.js')).CATEGORY.ACCOUNT, key: `new-login:${tokens.sessionId ?? Date.now()}:${user._id}`,
+      title: 'New sign-in to your account', body: `Your account was signed in on ${device?.label ?? 'a new device'}. If this was not you, reset your password and contact support.`,
+    });
+  }
   return { user, tokens };
 }
 
@@ -186,5 +199,9 @@ export async function resetCustomerPassword({ resetToken, password }) {
   user.passwordHash = await hashPassword(password);
   challenge.consumedAt = new Date();
   await Promise.all([user.save(), challenge.save(), revokeAllSessions(user._id)]);
+  await tell({
+    to: account(user._id), category: (await import('../../notification/public/index.js')).CATEGORY.ACCOUNT, key: `password-reset:${challenge._id}`,
+    title: 'Your password was changed', body: 'You were signed out everywhere. If you did not do this, contact support right away.',
+  });
   return { success: true };
 }

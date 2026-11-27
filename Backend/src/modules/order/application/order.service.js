@@ -232,14 +232,31 @@ export async function getShipmentTracking(customerId, shipmentId) {
   const order = shipment && await Order.findOne({ _id: shipment.orderId, customerId: String(customerId) });
   if (!order) throw new NotFoundError('This shipment does not exist.');
   const sub = order.subOrders.id(shipment.subOrderId);
+  const label = (status) => status.charAt(0) + status.slice(1).toLowerCase().replaceAll('_', ' ');
+  const events = shipment.events.filter((event) => event.status);
+  const days = sub?.etaDays ?? null;
+  const shipped = events.map((event, index) => ({
+    id: String(index), label: label(event.status), status: event.status, description: event.providerStatus || label(event.status),
+    location: event.location, occurredAt: event.at.toISOString(), completed: true, active: index === events.length - 1,
+  }));
+  // the app's tracking screen reads shipmentId, statusLabel, eta, courier, attempts and pollingIntervalSeconds; no agent or delivery code exists yet
   return {
     id: String(shipment._id),
+    shipmentId: String(shipment._id),
     orderId: String(order._id),
     status: shipment.status,
+    statusLabel: label(shipment.status),
+    updatedAt: (events.at(-1)?.at ?? shipment.updatedAt).toISOString(),
     awb: shipment.awb,
     courierName: shipment.courierName,
-    estimatedDeliveryDays: sub?.etaDays ?? null,
-    events: shipment.events.filter((event) => event.status).map((event) => ({ status: event.status, description: event.providerStatus, location: event.location, occurredAt: event.at.toISOString() })),
+    courier: { name: shipment.courierName ?? 'Courier', trackingNumber: shipment.awb ?? 'Not assigned yet', supportPhone: null },
+    estimatedDeliveryDays: days,
+    eta: { label: shipment.status === 'DELIVERED' ? 'Delivered' : days ? `Arrives in about ${days} days` : 'Delivery date will be updated soon', estimatedAt: null, delayed: false },
+    deliveryAgent: null,
+    deliveryCode: null,
+    attempts: [],
+    pollingIntervalSeconds: 30,
+    events: shipped,
   };
 }
 

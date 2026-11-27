@@ -1,5 +1,6 @@
 import { shippingGateway } from '../../../infrastructure/external/shipping/index.js';
 import { logger } from '../../../config/logger.js';
+import { AppError } from '../../../shared/errors/AppError.js';
 import { getSettingsSection } from '../../admin/public/index.js';
 
 /**
@@ -18,6 +19,7 @@ export async function quoteShipping({ pickupPincode, deliveryPincode, weightG, c
 }
 
 async function fallback() {
-  const { deliveryFeePaise } = await getSettingsSection('fees');
+  const { deliveryFeePaise, flatDeliveryEnabled } = await getSettingsSection('fees');
+  if (flatDeliveryEnabled === false) throw new AppError({ code: 'SHIPPING_PROVIDER_ERROR', message: 'Delivery rates are unavailable right now.', status: 502, retryable: true });
   return { serviceable: true, feePaise: deliveryFeePaise, etaDays: null, source: 'FALLBACK' };
 }

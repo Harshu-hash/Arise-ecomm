@@ -27,7 +27,7 @@ import { getPage, listPages, publishPage } from '../application/staticPage.servi
 import { HOME_SECTION_TYPES, MAX_HOME_SECTIONS, MAX_PAGE_BODY } from '../domain/constants/cms.js';
 
 const cmsImageUrl = z.url().max(500).refine((url) => url.startsWith(`${env.PUBLIC_ORIGIN}/uploads/cms/`), 'Upload the image first.');
-const forYouBody = z.object({ forYouColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFCB9D.'), forYouImage: z.union([z.literal(''), cmsImageUrl]), forYouImageOpacity: z.number().int().min(0).max(100) }).strict();
+const forYouBody = z.object({ forYouColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFCB9D.'), forYouImage: z.union([z.literal(''), cmsImageUrl]), forYouImageOpacity: z.number().int().min(0).max(100), recentlyViewedTopColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #CFE3FF.'), recentlyViewedBottomColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFD9EC.') }).strict();
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFE11B.');
 const section = z.object({
   type: z.enum(HOME_SECTION_TYPES),

@@ -9,7 +9,7 @@ export const notificationDtoSchema = z.object({
   createdAt: z.string().datetime(),
   readAt: z.string().datetime().nullable(),
   target: z.object({
-    type: z.enum(['NONE', 'PRODUCT', 'ORDER', 'SHIPMENT', 'CHAT']),
+    type: z.enum(['NONE', 'PRODUCT', 'ORDER', 'SHIPMENT', 'CHAT', 'CART']),
     entityId: z.string().min(1).nullable(),
   }),
 });

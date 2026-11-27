@@ -13,6 +13,7 @@ export const MAINTENANCE_JOBS = Object.freeze({
   RATING_REBUILD: 'reviews.rebuild-ratings',
   REVIEW_REMINDERS: 'reviews.reminders',
   BROADCAST_DISPATCH: 'notifications.broadcasts',
+  CUSTOMER_REMINDERS: 'notifications.customer-reminders',
 });
 
 export function createMaintenanceQueue() {
@@ -34,6 +35,7 @@ export async function registerMaintenanceSchedules(queue) {
   await queue.upsertJobScheduler('return-decision-deadline', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.RETURN_DECISION_DEADLINE });
   await queue.upsertJobScheduler('rating-rebuild', { pattern: '30 3 * * *' }, { name: MAINTENANCE_JOBS.RATING_REBUILD });
   await queue.upsertJobScheduler('review-reminders', { every: 60 * 60_000 }, { name: MAINTENANCE_JOBS.REVIEW_REMINDERS });
+  await queue.upsertJobScheduler('customer-reminders', { every: 60 * 60_000 }, { name: MAINTENANCE_JOBS.CUSTOMER_REMINDERS });
   await queue.upsertJobScheduler('broadcast-dispatch', { every: 60_000 }, { name: MAINTENANCE_JOBS.BROADCAST_DISPATCH });
   await queue.upsertJobScheduler('wallet-release', { every: 15 * 60_000 }, { name: MAINTENANCE_JOBS.WALLET_RELEASE });
 }

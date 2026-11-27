@@ -27,6 +27,7 @@ const orderItemSchema = z.object({
   mrpPaise: z.number().int().positive(),
   canCancel: z.boolean(),
   canReturn: z.boolean(),
+  shipmentId: z.string().nullable().optional(),
   returnId: z.string().nullable().optional(),
   returnStatus: z.string().nullable().optional(),
 });

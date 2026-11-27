@@ -36,8 +36,10 @@ import CouponSection, { CouponSheet } from '../components/CouponSection';
 import { useGetRelatedProductsQuery } from '@features/product/api/product.query';
 import { useGetAddressesQuery } from '@features/address';
 import { selectIsAuthenticated } from '@features/auth';
+import { useGetCheckoutPreviewQuery } from '@features/checkout/api/checkout.query';
+import { skipToken } from '@reduxjs/toolkit/query';
 
-const CartScreen = ({ navigation }) => {
+const CartScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [couponSheetOpen, setCouponSheetOpen] = useState(false);
   const toast = useToast();
@@ -57,7 +59,23 @@ const CartScreen = ({ navigation }) => {
   const savedForLater = cart?.savedForLater ?? [];
   const appliedCoupon = cart?.appliedCoupon ?? null;
   const deliveryAddress =
-    addressBook?.items.find(address => address.isDefault) ?? addressBook?.items[0];
+    addressBook?.items.find(address => address.id === route?.params?.selectedAddressId) ??
+    addressBook?.items.find(address => address.isDefault) ??
+    addressBook?.items[0];
+  // the same server quote checkout uses (Shiprocket's price for this address), so the cart total matches what checkout charges
+  const { data: preview } = useGetCheckoutPreviewQuery(
+    deliveryAddress && cart?.items.length
+      ? { source: 'CART', addressId: deliveryAddress.id, cartVersion: cart.version }
+      : skipToken,
+  );
+  const quoted = preview?.totals;
+  // shortcut: counts the courier's transit days from today, with no seller handling time; add that to the estimate if sellers dispatch late
+  const deliveryDateOf = item => {
+    const days = preview?.deliveries.find(delivery => delivery.offerId === item.offerId)?.etaDays;
+    if (!days) return null;
+    const date = new Date(Date.now() + days * 86400000);
+    return date.toLocaleDateString('en-IN', { weekday: 'short', day: 'numeric', month: 'short' });
+  };
 
   const runMutation = async (request, fallbackMessage) => {
     try {
@@ -80,11 +98,11 @@ const CartScreen = ({ navigation }) => {
 
   const mrpTotal = cart?.totals.mrp ?? 0;
   const itemTotal = cart?.totals.subtotal ?? 0;
-  const fees = (cart?.totals.deliveryFee ?? 0) + (cart?.totals.platformFee ?? 0);
+  const platformFee = cart?.totals.platformFee ?? 0;
   const productDiscount = cart?.totals.productDiscount ?? 0;
   const couponDiscount = cart?.totals.couponDiscount ?? 0;
   const discounts = productDiscount + couponDiscount;
-  const finalTotal = cart?.totals.payable ?? 0;
+  const finalTotal = quoted ? quoted.payable : (cart?.totals.payable ?? 0);
 
   if (isLoading) return <FullScreenLoader message="Loading cart..." />;
   if (error && !cart) return <ErrorState message={error.message} onRetry={refetch} />;
@@ -154,9 +172,12 @@ const CartScreen = ({ navigation }) => {
                 activeOpacity={0.8}
                 style={styles.changeBtn}
                 onPress={() =>
-                  navigation?.navigate(isAuthenticated ? 'SavedAddresses' : 'Login', {
-                    returnTo: 'Cart',
-                  })
+                  navigation?.navigate(
+                    isAuthenticated ? 'SavedAddresses' : 'Login',
+                    isAuthenticated
+                      ? { selectMode: true, returnScreen: 'Cart' }
+                      : { returnTo: 'Cart' },
+                  )
                 }
               >
                 <Text style={styles.changeBtnText}>Change</Text>
@@ -234,10 +255,12 @@ const CartScreen = ({ navigation }) => {
                       />
                     </PressableScale>
                   </View>
-                  <View style={styles.deliveryChip}>
-                    <Icon name="truck" size={11} color={COLORS.textSecondary} />
-                    <Text style={styles.deliveryText}>{`Delivery by ${item.deliveryDate}`}</Text>
-                  </View>
+                  {deliveryDateOf(item) ? (
+                    <View style={styles.deliveryChip}>
+                      <Icon name="truck" size={11} color={COLORS.textSecondary} />
+                      <Text style={styles.deliveryText}>{`Delivery by ${deliveryDateOf(item)}`}</Text>
+                    </View>
+                  ) : null}
                 </View>
 
                 <View style={styles.actionsRow}>
@@ -340,7 +363,11 @@ const CartScreen = ({ navigation }) => {
               ) : null}
               <View style={styles.priceRow}>
                 <Text style={styles.priceLabel}>Delivery Fee</Text>
-                <Text style={styles.priceValue}>{`₹${fees}`}</Text>
+                <Text style={styles.priceValue}>{!quoted ? '—' : quoted.deliveryFee ? `₹${quoted.deliveryFee}` : 'FREE'}</Text>
+              </View>
+              <View style={styles.priceRow}>
+                <Text style={styles.priceLabel}>Platform Fee</Text>
+                <Text style={styles.priceValue}>{`₹${platformFee}`}</Text>
               </View>
               <View style={styles.priceDivider} />
               <View style={styles.priceRow}>

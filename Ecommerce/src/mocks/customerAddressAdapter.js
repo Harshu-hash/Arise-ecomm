@@ -1,11 +1,6 @@
 import { AxiosError } from 'axios';
 
 const LATENCY_MS = 250;
-const serviceablePincodes = {
-  380015: { city: 'Ahmedabad', state: 'Gujarat', estimatedDeliveryDays: 3 },
-  380054: { city: 'Ahmedabad', state: 'Gujarat', estimatedDeliveryDays: 4 },
-  457001: { city: 'Ratlam', state: 'Madhya Pradesh', estimatedDeliveryDays: 5 },
-};
 let nextAddressId = 3;
 let addresses = [];
 
@@ -108,47 +103,24 @@ export const customerAddressFixtureAdapter = async config => {
     if (!/^[1-9][0-9]{5}$/.test(pincode)) {
       return reject(config, 422, 'PINCODE_INVALID', 'Enter a valid 6-digit pincode.');
     }
-    const location = serviceablePincodes[pincode];
+    // Mock accepts any valid pincode; the real backend asks Shiprocket.
     return response(config, {
-      data: location
-        ? {
-            pincode,
-            serviceable: true,
-            ...location,
-            message: `Delivery is available in ${location.estimatedDeliveryDays} days.`,
-          }
-        : {
-            pincode,
-            serviceable: false,
-            city: null,
-            state: null,
-            estimatedDeliveryDays: null,
-            message: 'Delivery is not available for this pincode yet.',
-          },
+      data: {
+        pincode,
+        serviceable: true,
+        city: null,
+        state: null,
+        estimatedDeliveryDays: 5,
+        message: 'Delivery is available in 5 days.',
+      },
     });
   }
   if (config.url === '/addresses/validate' && config.method === 'post') {
     const value = validateInput(config, config.data);
-    if (!serviceablePincodes[value.pincode]) {
-      return reject(
-        config,
-        409,
-        'ADDRESS_UNSERVICEABLE',
-        'Delivery is not available at this address.',
-      );
-    }
     return response(config, { data: { valid: true, normalizedAddress: value } });
   }
   if (config.url === '/addresses' && config.method === 'post') {
     const value = validateInput(config, config.data);
-    if (!serviceablePincodes[value.pincode]) {
-      return reject(
-        config,
-        409,
-        'ADDRESS_UNSERVICEABLE',
-        'Delivery is not available at this address.',
-      );
-    }
     const isFirst = addresses.length === 0;
     const created = {
       ...value,
@@ -175,14 +147,6 @@ export const customerAddressFixtureAdapter = async config => {
     if (index < 0)
       return reject(config, 404, 'ADDRESS_NOT_FOUND', 'This address no longer exists.');
     const value = validateInput(config, { ...addresses[index], ...config.data });
-    if (!serviceablePincodes[value.pincode]) {
-      return reject(
-        config,
-        409,
-        'ADDRESS_UNSERVICEABLE',
-        'Delivery is not available at this address.',
-      );
-    }
     const updated = { ...value, id: addressId };
     if (updated.isDefault) addresses = addresses.map(address => ({ ...address, isDefault: false }));
     addresses[index] = updated;

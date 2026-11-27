@@ -49,7 +49,9 @@ export async function attachReferral({ code, refereeId }) {
   try {
     const owner = await ReferralCode.findOne({ code: normalise(code) }).lean();
     if (!owner || owner.userId === String(refereeId)) return null;
-    return await Referral.create({ referrerId: owner.userId, refereeId: String(refereeId), code: owner.code });
+    const referral = await Referral.create({ referrerId: owner.userId, refereeId: String(refereeId), code: owner.code });
+    await notify({ to: { type: 'CUSTOMER', id: owner.userId }, category: CATEGORY.ACCOUNT, key: `referral-joined:${referral._id}`, title: 'A friend joined with your code', body: 'You earn your reward once their first order is delivered.' });
+    return referral;
   } catch (err) {
     if (err?.code !== 11000) logger.error({ err }, 'Could not record the referral');
     return null;

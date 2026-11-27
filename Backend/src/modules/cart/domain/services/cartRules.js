@@ -18,7 +18,7 @@ export function computeTotals(lines, { coupon = null, fees }) {
   }
   const subtotalPaise = lines.reduce((sum, line) => sum + line.unitPricePaise * line.quantity, 0);
   const mrpPaise = lines.reduce((sum, line) => sum + Math.max(line.mrpPaise, line.unitPricePaise) * line.quantity, 0);
-  const deliveryFeePaise = subtotalPaise >= fees.deliveryFeeFreeThresholdPaise ? 0 : fees.deliveryFeePaise;
+  const deliveryFeePaise = fees.flatDeliveryEnabled === false || subtotalPaise >= fees.deliveryFeeFreeThresholdPaise ? 0 : fees.deliveryFeePaise;
   const couponDiscountPaise = couponSaving(coupon, { subtotalPaise, deliveryFeePaise });
   return {
     mrpPaise,

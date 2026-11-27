@@ -3,6 +3,7 @@ import { recordAudit } from '../../../infrastructure/audit/audit.js';
 import { AppError, ConflictError, NotFoundError } from '../../../shared/errors/AppError.js';
 import { sha256 } from '../../../shared/utils/crypto.js';
 import { GIFT_CARD_STATUS, GiftCard } from '../infrastructure/persistence/giftCard.model.js';
+import { CATEGORY, notify } from '../../notification/public/index.js';
 import { creditWallet, getWalletSummary, listWalletTransactions } from './wallet.service.js';
 
 const ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'; // no 0/O/1/I
@@ -26,6 +27,7 @@ export async function redeemGiftCard(userId, { code, pin }) {
   if (!claimed) throw new ConflictError('GIFT_CARD_REDEEMED', 'This gift card has already been redeemed.');
   try {
     const entry = await creditWallet({ userId, type: 'GIFT_CARD', title: 'Gift card redeemed', reference: claimed.code, amountPaise: claimed.amountPaise, key: `giftcard:${claimed._id}` });
+    await notify({ to: { type: 'CUSTOMER', id: userId }, category: CATEGORY.ACCOUNT, key: `giftcard-redeemed:${claimed._id}`, title: 'Gift card redeemed', body: `₹${(claimed.amountPaise / 100).toLocaleString('en-IN')} was added to your wallet.` });
     const [wallet, { items }] = await Promise.all([getWalletSummary(userId), listWalletTransactions(userId, { limit: 1 })]);
     return { transaction: items.find((item) => item.id === String(entry._id)) ?? items[0], wallet };
   } catch (error) {

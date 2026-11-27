@@ -3,6 +3,7 @@ import { paymentGateway } from '../../../infrastructure/external/payment/index.j
 import { AppError, ConflictError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
 import { PAYMENT_STATUS, Payment, REFUND_STATUS } from '../infrastructure/persistence/payment.model.js';
 import { creditWallet } from '../../wallet/public/index.js';
+import { CATEGORY, notify } from '../../notification/public/index.js';
 
 // Payments for checkouts. Money moves only through Razorpay; this module records what happened and never trusts a client
 // that says "paid": a payment is SUCCEEDED only after a signed checkout result or a signed webhook for the exact amount.
@@ -93,11 +94,19 @@ export async function recordCapture({ providerOrderId, providerPaymentId, amount
 
 /** A failed attempt. Never overrides a payment that has succeeded. */
 export async function recordFailure({ providerOrderId, reason }) {
-  return Payment.findOneAndUpdate(
+  const failed = await Payment.findOneAndUpdate(
     { providerOrderId, status: { $ne: PAYMENT_STATUS.SUCCEEDED } },
     { $set: { status: PAYMENT_STATUS.FAILED, failureReason: String(reason ?? 'Payment failed').slice(0, 300) } },
     { new: true },
   );
+  if (failed) {
+    await notify({
+      to: { type: 'CUSTOMER', id: failed.customerId }, category: CATEGORY.ORDER, key: `payment-failed:${failed._id}`,
+      title: 'Payment failed',
+      body: `Your payment of ₹${(failed.amountPaise / 100).toLocaleString('en-IN')} did not go through. If any money was debited it is refunded automatically. Your items are still in your cart: try again.`,
+    });
+  }
+  return failed;
 }
 
 /**

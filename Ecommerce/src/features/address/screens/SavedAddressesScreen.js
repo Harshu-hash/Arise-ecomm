@@ -29,7 +29,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
     if (!navigation) return;
     navigation.navigate({
       name: returnScreen,
-      params: { selectedAddressId: address.id },
+      params: { ...route?.params?.returnParams, selectedAddressId: address.id },
       merge: true,
     });
   };

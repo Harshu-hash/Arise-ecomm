@@ -4,12 +4,12 @@ import CategoryIcon from '../../../shared/components/CategoryIcon';
 import { COLORS } from '../../../constants/colors';
 import { SPACING, RADIUS } from '../../../constants/spacing';
 
-/** Left sidebar row on "All Categories" — circular image/icon + label, blue accent when selected. */
+/** One row of the "All Categories" sidebar: image/icon + label. The white selection backdrop is drawn (and animated) by CategorySidebar. */
 const CategorySidebarRow = ({ item, isSelected, onPress }) => (
   <TouchableOpacity
     activeOpacity={0.8}
     onPress={onPress}
-    style={[styles.row, isSelected && styles.rowSelected]}
+    style={styles.row}
   >
     <View style={styles.imageBox}>
       {item.image ? (
@@ -29,12 +29,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: SPACING.s + 2,
     paddingHorizontal: SPACING.xs,
-    borderLeftWidth: 3,
-    borderLeftColor: 'transparent',
-  },
-  rowSelected: {
-    backgroundColor: COLORS.primaryLight,
-    borderLeftColor: COLORS.primary,
   },
   imageBox: {
     width: 44,

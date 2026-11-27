@@ -1,8 +1,7 @@
 import { apiClient } from '@core/api';
 import { pushTokenStorage } from '../storage/pushTokenStorage';
 export const registerPushToken = async ({ deviceId, token, platform }) => {
-  const current = pushTokenStorage.get();
-  if (current?.token === token && current?.deviceId === deviceId) return current;
+  // always tell the server: a cached "already registered" survives a reset database or a failed earlier sign-in and would leave this phone unreachable
   await apiClient.post('/devices/push-tokens', { deviceId, token, platform });
   const registration = { deviceId, token, platform };
   pushTokenStorage.set(registration);

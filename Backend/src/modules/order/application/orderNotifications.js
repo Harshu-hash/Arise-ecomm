@@ -94,6 +94,14 @@ export const notifyCancelled = ({ order, subs, actor, refundPaise }) => quietly(
   }
 }, 'cancellation');
 
+/** A cancellation's refund was issued: says where the money went (card/UPI/bank and/or the wallet), which the cancellation message could only promise. */
+export const notifyRefundProcessed = (order, refund) => quietly(async () => {
+  if (!refund) return;
+  const parts = [refund.amountPaise > 0 && `${rupees(refund.amountPaise)} to your original payment method (it can take 5-7 working days to show up)`, refund.walletPaise > 0 && `${rupees(refund.walletPaise)} to your Arise wallet`].filter(Boolean);
+  if (!parts.length) return;
+  await toCustomer(order, { category: CATEGORY.ORDER, key: `refund-processed:${order._id}:${refund.key}`, title: 'Refund processed', body: `We refunded ${parts.join(' and ')} for your cancelled order ${order.number}.` });
+}, 'refund-processed');
+
 /** Paid, but the stock sold out before the order could be placed: the payment is being refunded. */
 export const notifyUnfulfillable = ({ customerId, sessionId, amountPaise }) => quietly(async () => {
   const contact = await getCustomerContact(customerId);

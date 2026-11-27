@@ -169,10 +169,10 @@ const OrderDetailScreen = ({ navigation, route }) => {
               );
             })}
 
-            {order.statusCode !== 'DELIVERED' ? (
+            {order.shipmentId && order.statusCode !== 'DELIVERED' ? (
               <Bouncy
                 style={styles.trackBtn}
-                onPress={() => navigation && navigation.navigate('Tracking', { orderId: order.id })}
+                onPress={() => navigation && navigation.navigate('Tracking', { shipmentId: order.shipmentId })}
               >
                 <Icon name="map-pin" size={15} color={COLORS.white} />
                 <Text style={styles.trackBtnText}>Track Shipment</Text>

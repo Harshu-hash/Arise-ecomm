@@ -45,7 +45,7 @@ describe('customerAddressFixtureAdapter', () => {
     expect(list.data.data.defaultAddressId).toBe('addr-2');
   });
 
-  it('reports serviceable and unsupported pincodes', async () => {
+  it('reports any valid pincode as serviceable', async () => {
     const supported = await customerAddressFixtureAdapter({
       url: '/serviceability',
       method: 'get',
@@ -58,7 +58,7 @@ describe('customerAddressFixtureAdapter', () => {
     });
 
     expect(supported.data.data.serviceable).toBe(true);
-    expect(unsupported.data.data.serviceable).toBe(false);
+    expect(unsupported.data.data.serviceable).toBe(true);
   });
 
   it('returns field-level validation errors', async () => {

@@ -16,14 +16,22 @@ function ForYouCard() {
   });
   if (query.isLoading) return <Skeleton active paragraph={{ rows: 2 }} />;
   if (query.error) return <ErrorState error={query.error} onRetry={query.refetch} />;
-  const { forYouColor, forYouImage, forYouImageOpacity } = query.data.data;
-  const current = { forYouColor, forYouImage, forYouImageOpacity };
+  const { forYouColor, forYouImage, forYouImageOpacity, recentlyViewedTopColor, recentlyViewedBottomColor } = query.data.data;
+  const current = { forYouColor, forYouImage, forYouImageOpacity, recentlyViewedTopColor, recentlyViewedBottomColor };
+  const hex = (c) => c.toHexString().slice(0, 7).toUpperCase();
   return (
     <Card size="small" title="For You tab" style={{ maxWidth: 520 }}>
       <Flex vertical gap={12}>
         <Flex gap={8} align="center">
           <Typography.Text style={{ fontSize: 12, width: 110 }}>Header colour</Typography.Text>
           <ColorPicker showText value={forYouColor} onChangeComplete={(c) => save.mutate({ ...current, forYouColor: c.toHexString().slice(0, 7).toUpperCase() })} />
+        </Flex>
+        <Flex gap={8} align="center">
+          <Typography.Text style={{ fontSize: 12, width: 110 }}>Recently viewed rail</Typography.Text>
+          <ColorPicker showText value={recentlyViewedTopColor} onChangeComplete={(c) => save.mutate({ ...current, recentlyViewedTopColor: hex(c) })} />
+          <ColorPicker showText value={recentlyViewedBottomColor} onChangeComplete={(c) => save.mutate({ ...current, recentlyViewedBottomColor: hex(c) })} />
+          {/* top and bottom colours of the "Still looking for these?" strip on Home */}
+          <div aria-label="Preview" style={{ width: 40, height: 40, borderRadius: 6, background: `linear-gradient(${recentlyViewedTopColor}, ${recentlyViewedBottomColor})`, flexShrink: 0 }} />
         </Flex>
         <Flex gap={8} align="flex-start">
           <Typography.Text style={{ fontSize: 12, width: 110 }}>Background image</Typography.Text>

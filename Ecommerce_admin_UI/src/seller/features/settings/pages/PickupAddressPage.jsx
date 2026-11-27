@@ -31,12 +31,13 @@ export default function PickupAddressPage() {
 
   if (query.isLoading) return <FullPageSpinner label="Loading pickup address…" />;
   if (query.isError) return <ErrorState error={query.error} onRetry={query.refetch} />;
-  const { contact, registeredWithCourier } = query.data;
+  const { contact, registeredWithCourier, courierVerified } = query.data;
   const missingContact = [!contact.phone && 'phone number', !contact.email && 'email'].filter(Boolean);
 
   return <Flex vertical gap={16}>
     <PageHeader title="Pickup address" breadcrumbs={[{ label: 'Settings' }, { label: 'Pickup address' }]} subtitle="Where the courier collects your parcels when you mark an order ready to ship." />
     {missingContact.length > 0 && <Alert type="warning" showIcon message={`Your account has no ${missingContact.join(' or ')}`} description="The courier needs a contact number and email for pickups. Add them to your account, otherwise shipping will be refused." />}
+    {registeredWithCourier && courierVerified === false && <Alert type="warning" showIcon message="Pickup address not verified by the courier" description="Shiprocket has not verified your pickup phone number yet, so pickups may be refused. Contact Arise support to get it verified; you may be asked for a code sent to your phone." />}
     <Card title="Store pickup address" extra={<Tag color={registeredWithCourier ? 'green' : 'default'}>{registeredWithCourier ? 'Registered with courier' : 'Registered on your first shipment'}</Tag>}>
       <Form form={form} layout="vertical" onFinish={save.mutate} style={{ maxWidth: 560 }}>
         <Form.Item name="address" label="Address line" extra="House or flat number, building and road. The courier rejects short or number-less addresses." rules={addressRules}><Input maxLength={200} /></Form.Item>

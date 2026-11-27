@@ -7,9 +7,12 @@ import { TMP_DIR } from '../infrastructure/storage/local.storage.js';
 import { enqueueWebhookReceipt } from '../infrastructure/queue/webhook.queue.js';
 import { RECEIPT_STATUS, WebhookReceipt } from '../infrastructure/webhooks/webhookReceipt.model.js';
 import { processDueAccountDeletions } from '../modules/customer/application/privacy.service.js';
-import { autoApproveOverdueReturns, autoPassOverdueQc, chasePickups } from '../modules/order/public/index.js';
+import { autoApproveOverdueReturns, autoPassOverdueQc, chasePickups, sendCheckoutExpiryNotices, sendReturnWindowReminders } from '../modules/order/public/index.js';
 import { dispatchDueBroadcasts } from '../modules/notification/public/index.js';
 import { expireStaleReservations } from '../modules/product/public/index.js';
+import { sendCartReminders } from '../modules/cart/public/index.js';
+import { sendCouponExpiryReminders } from '../modules/coupon/public/index.js';
+import { sendWishlistAlerts } from '../modules/wishlist/public/index.js';
 import { rebuildRatingSummaries, sendReviewReminders } from '../modules/review/public/index.js';
 import { accrueMissing, releaseDue } from '../modules/settlement/public/index.js';
 
@@ -77,6 +80,16 @@ async function remindToReview() {
   if (sent) logger.info({ sent }, 'Sent rate-your-purchase reminders');
 }
 
+// Hourly nudges to customers; each runs on its own so one failing never hides the others.
+async function remindCustomers() {
+  const jobs = { carts: sendCartReminders, wishlist: sendWishlistAlerts, coupons: sendCouponExpiryReminders, checkouts: sendCheckoutExpiryNotices, returnWindows: sendReturnWindowReminders };
+  const sent = {};
+  for (const [name, run] of Object.entries(jobs)) {
+    try { sent[name] = await run(); } catch (err) { logger.error({ err, job: name }, 'Customer reminder job failed'); }
+  }
+  logger.info(sent, 'Sent customer reminders');
+}
+
 async function sendDueBroadcasts() {
   const sent = await dispatchDueBroadcasts();
   if (sent) logger.info({ sent }, 'Sent scheduled push broadcasts');
@@ -95,6 +108,7 @@ export async function maintenanceJobProcessor(job) {
   if (job.name === MAINTENANCE_JOBS.OUTBOX_CLEANUP) return cleanOutbox();
   if (job.name === MAINTENANCE_JOBS.UPLOAD_TMP_CLEANUP) return cleanUploadTmp();
   if (job.name === MAINTENANCE_JOBS.ACCOUNT_DELETION) return processDueAccountDeletions();
+  if (job.name === MAINTENANCE_JOBS.CUSTOMER_REMINDERS) return remindCustomers();
   if (job.name === MAINTENANCE_JOBS.REVIEW_REMINDERS) return remindToReview();
   if (job.name === MAINTENANCE_JOBS.RATING_REBUILD) return rebuildRatings();
   if (job.name === MAINTENANCE_JOBS.BROADCAST_DISPATCH) return sendDueBroadcasts();

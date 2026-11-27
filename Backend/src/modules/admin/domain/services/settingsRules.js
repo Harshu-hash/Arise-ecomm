@@ -42,6 +42,7 @@ export const SECTION_SCHEMAS = {
 
   fees: z.object({
     platformFeePaise: paiseSchema,
+    flatDeliveryEnabled: z.boolean(),
     deliveryFeePaise: paiseSchema,
     deliveryFeeFreeThresholdPaise: paiseSchema,
     codConvenienceFeePaise: paiseSchema,
@@ -57,6 +58,8 @@ export const SECTION_SCHEMAS = {
     forYouColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFCB9D.'),
     forYouImage: z.union([z.literal(''), z.url().max(500)]),
     forYouImageOpacity: z.number().int().min(0).max(100),
+    recentlyViewedTopColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #CFE3FF.'),
+    recentlyViewedBottomColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Use a colour like #FFD9EC.'),
   }).strict(),
 
   referral: z.object({

@@ -68,7 +68,7 @@ async function priceSession({ customerId, items, couponCode, address, method = n
     if (codOn && !(cod.serviceable && cod.source === 'SHIPROCKET')) codProblem = `Cash on delivery is not available to ${address.pincode}.`;
     const quote = cash && cod ? cod : prepaid;
     if (!quote.serviceable) blockers.push(`${sellers.get(sellerId)?.name ?? 'This seller'} cannot deliver to ${address.pincode}.`);
-    shipping.set(sellerId, quote.serviceable ? quote.feePaise : 0);
+    shipping.set(sellerId, quote.serviceable ? Math.ceil(quote.feePaise / 100) * 100 : 0); // whole rupees, rounded up so the courier cost is always covered
     parcels.set(sellerId, { etaDays: quote.etaDays, shippingSource: quote.source });
   }));
 
@@ -218,7 +218,8 @@ export async function previewCheckout(customerId, body) {
   const { items, couponCode, address } = await prepare(customerId, { ...body, cartVersion: undefined });
   const quote = await priceSession({ customerId, items, couponCode, address });
   if (!quote.lines.length) throw noLines(quote);
-  return { totals: quote.totals, couponCode: quote.couponCode, blockers: quote.blockers, warnings: quote.warnings };
+  const deliveries = quote.lines.map((line) => ({ offerId: String(line.offerId), etaDays: quote.sellers.find((seller) => seller.sellerId === line.sellerId)?.etaDays ?? null }));
+  return { totals: quote.totals, deliveries, couponCode: quote.couponCode, blockers: quote.blockers, warnings: quote.warnings };
 }
 
 export async function createSession(customerId, body) {

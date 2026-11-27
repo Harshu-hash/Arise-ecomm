@@ -16,8 +16,9 @@ import {
 const destination = {
   PRODUCT: item => ['ProductDetail', { productId: item.target.entityId }],
   ORDER: item => ['OrderDetail', { orderId: item.target.entityId }],
-  SHIPMENT: item => ['Tracking', { orderId: item.target.entityId }],
+  SHIPMENT: item => ['Tracking', { shipmentId: item.target.entityId }],
   CHAT: () => ['Chat'],
+  CART: () => ['Cart'],
 };
 const NotificationsScreen = ({ navigation }) => {
   const insets = useSafeAreaInsets(),
@@ -37,7 +38,7 @@ const NotificationsScreen = ({ navigation }) => {
   const open = async item => {
     if (!item.read) await markRead(item.id);
     const target = destination[item.target.type]?.(item);
-    if (target && item.target.entityId) navigation.navigate(...target);
+    if (target && (item.target.entityId || ['CHAT', 'CART'].includes(item.target.type))) navigation.navigate(...target);
   };
   return (
     <View style={styles.container}>

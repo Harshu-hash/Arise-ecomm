@@ -21,11 +21,11 @@ const OrderIssueScreen = ({ navigation, route }) => {
   }
 
   const ISSUES = [
-    order.status !== 'Delivered' && {
+    order.shipmentId && order.status !== 'Delivered' && {
       id: 'track',
       icon: 'map-pin',
       label: 'Track my order',
-      onPress: () => navigation && navigation.navigate('Tracking', { orderId: order.id }),
+      onPress: () => navigation && navigation.navigate('Tracking', { shipmentId: order.shipmentId }),
     },
     order.canCancel && {
       id: 'cancel',

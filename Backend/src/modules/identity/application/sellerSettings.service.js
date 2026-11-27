@@ -1,4 +1,5 @@
 import { recordAudit } from '../../../infrastructure/audit/audit.js';
+import { shippingGateway } from '../../../infrastructure/external/shipping/index.js';
 import { catalogChanged } from '../../../infrastructure/realtime/catalogEvents.js';
 import { publicUrl } from '../../../infrastructure/storage/local.storage.js';
 import { ForbiddenError, NotFoundError, ValidationError } from '../../../shared/errors/AppError.js';
@@ -55,6 +56,12 @@ export async function setGstin(sellerId, gstin, actor) {
   return { gstin };
 }
 
+/** Whether Shiprocket has verified the pickup phone: true/false, or null when not registered yet or Shiprocket cannot be asked (never blocks the page). */
+async function courierVerified(name) {
+  if (!name) return null;
+  try { return await shippingGateway.isPickupVerified(name); } catch { return null; }
+}
+
 /** The store's one pickup address (where couriers collect parcels), plus the contact the courier is given and whether it is registered. */
 export async function getPickupAddress(sellerId) {
   const [seller, owner] = await Promise.all([
@@ -63,7 +70,7 @@ export async function getPickupAddress(sellerId) {
   ]);
   if (!seller) throw new NotFoundError('Seller account not found.');
   const { address = null, locality = null, city = null, state = null, pincode = null } = seller.location ?? {};
-  return { address, locality, city, state, pincode, contact: { name: owner?.name ?? null, phone: owner?.phone ?? null, email: owner?.email ?? null }, registeredWithCourier: Boolean(seller.pickupLocationName) };
+  return { address, locality, city, state, pincode, contact: { name: owner?.name ?? null, phone: owner?.phone ?? null, email: owner?.email ?? null }, registeredWithCourier: Boolean(seller.pickupLocationName), courierVerified: await courierVerified(seller.pickupLocationName) };
 }
 
 /** Saves the pickup address. A changed address is registered with the courier afresh the next time a parcel is made ready to ship. */

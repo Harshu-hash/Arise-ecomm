@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Image,
   RefreshControl,
   ScrollView,
@@ -17,7 +16,7 @@ import { RADIUS, SPACING } from '../../../constants/spacing';
 import { StatusBarManager } from '../../../shared/components';
 import EmptyState from '../../../shared/EmptyState/EmptyState';
 import ErrorState from '../../../shared/ErrorState/ErrorState';
-import CategorySidebarRow from '../components/CategorySidebarRow';
+import CategorySidebar from '../components/CategorySidebar';
 import CategorySpotlightTile from '../components/CategorySpotlightTile';
 import { useGetCategoryQuery, useGetCategoryTreeQuery } from '../api/category.query';
 
@@ -99,20 +98,11 @@ const CategoryScreen = ({ route, navigation }) => {
       </View>
 
       <View style={styles.body}>
-        <View style={styles.sidebar}>
-          <FlatList
-            data={categories}
-            keyExtractor={item => item.id}
-            showsVerticalScrollIndicator={false}
-            renderItem={({ item }) => (
-              <CategorySidebarRow
-                item={item}
-                isSelected={item.id === selectedCategoryId}
-                onPress={() => setSelectedCategoryId(item.id)}
-              />
-            )}
-          />
-        </View>
+        <CategorySidebar
+          categories={categories}
+          selectedId={selectedCategoryId}
+          onSelect={setSelectedCategoryId}
+        />
 
         {contentLoading ? (
           <View style={styles.contentState}>
@@ -225,7 +215,6 @@ const styles = StyleSheet.create({
   headerIcons: { flexDirection: 'row', gap: SPACING.l },
   headerIconBtn: { padding: 2 },
   body: { flex: 1, flexDirection: 'row' },
-  sidebar: { width: 84, backgroundColor: COLORS.mutedBg },
   content: { flex: 1, backgroundColor: COLORS.white },
   contentState: { flex: 1, paddingHorizontal: SPACING.m },
   contentInner: { padding: SPACING.l, paddingBottom: 100 },

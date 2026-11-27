@@ -6,6 +6,7 @@ export const categorySummarySchema = z.object({
   name: z.string().min(1),
   imageUrl: z.string().url().nullable().optional(),
   icon: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
 });
 
 export const categoryTreeResponseSchema = apiEnvelope(z.array(categorySummarySchema));

@@ -333,7 +333,7 @@ const CheckoutScreen = ({ navigation, route }) => {
           <View style={styles.priceRow}>
             <Text style={styles.priceLabel}>Delivery Fee</Text>
             <Text style={[styles.priceValue, deliveryFee === 0 && styles.discountValue]}>
-              {deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
+              {!quoted ? 'Calculating…' : deliveryFee === 0 ? 'FREE' : `₹${deliveryFee}`}
             </Text>
           </View>
           <View style={styles.priceRow}>

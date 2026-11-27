@@ -1,16 +1,11 @@
 import mongoose from 'mongoose';
 import { AppError, ConflictError } from '../../../shared/errors/AppError.js';
+import { env } from '../../../config/env.js';
+import { quoteShipping } from '../../shipping/public/index.js';
 import { AddressBook } from '../infrastructure/persistence/addressBook.model.js';
 
 const MAX_ADDRESSES = 20;
 const MAX_WRITE_ATTEMPTS = 3;
-
-// shortcut: static launch-area catalog, replace with the logistics provider when delivery coverage becomes dynamic.
-const SERVICEABLE_PINCODES = Object.freeze({
-  380015: { city: 'Ahmedabad', state: 'Gujarat', estimatedDeliveryDays: 3 },
-  380054: { city: 'Ahmedabad', state: 'Gujarat', estimatedDeliveryDays: 4 },
-  457001: { city: 'Ratlam', state: 'Madhya Pradesh', estimatedDeliveryDays: 5 },
-});
 
 const addressNotFound = () =>
   new AppError({ code: 'ADDRESS_NOT_FOUND', status: 404, message: 'This address no longer exists.' });
@@ -29,27 +24,26 @@ const serialize = (address) => ({
   pincode: address.pincode,
 });
 
-export function getServiceability(pincode) {
-  const location = SERVICEABLE_PINCODES[pincode];
-  return location
-    ? {
-        pincode,
-        serviceable: true,
-        ...location,
-        message: `Delivery is available in ${location.estimatedDeliveryDays} days.`,
-      }
-    : {
-        pincode,
-        serviceable: false,
-        city: null,
-        state: null,
-        estimatedDeliveryDays: null,
-        message: 'Delivery is not available for this pincode yet.',
-      };
+/** Live courier coverage from Shiprocket (via quoteShipping, which stays open if Shiprocket is down so saving an address is never blocked by an outage). */
+export async function getServiceability(pincode) {
+  // an address is never refused because rates cannot be fetched (the flat-fee switch makes quoteShipping throw then); checkout still prices it
+  const quote = await quoteShipping({ pickupPincode: env.SHIPROCKET_PICKUP_PINCODE, deliveryPincode: pincode, weightG: 500 })
+    .catch(() => ({ serviceable: true, etaDays: null }));
+  const days = quote.etaDays;
+  return {
+    pincode,
+    serviceable: quote.serviceable,
+    city: null,
+    state: null,
+    estimatedDeliveryDays: quote.serviceable ? days : null,
+    message: !quote.serviceable
+      ? 'Delivery is not available for this pincode yet.'
+      : days ? `Delivery is available in ${days} days.` : 'Delivery is available.',
+  };
 }
 
-export function validateAddress(address) {
-  if (!getServiceability(address.pincode).serviceable) throw unserviceable();
+export async function validateAddress(address) {
+  if (!(await getServiceability(address.pincode)).serviceable) throw unserviceable();
   return { valid: true, normalizedAddress: address };
 }
 
@@ -74,7 +68,7 @@ export async function listAddresses(customerId) {
 }
 
 export async function createAddress(customerId, input) {
-  validateAddress(input);
+  await validateAddress(input);
   const address = await changeBook(customerId, (book) => {
     if (book.addresses.length >= MAX_ADDRESSES) {
       throw new ConflictError('ADDRESS_LIMIT_REACHED', `You can save up to ${MAX_ADDRESSES} addresses.`);
@@ -88,12 +82,12 @@ export async function createAddress(customerId, input) {
 }
 
 export async function updateAddress(customerId, addressId, patch) {
+  if (patch.pincode) await validateAddress({ pincode: patch.pincode });
   return serialize(await changeBook(customerId, (book) => {
     const address = book.addresses.id(addressId);
     if (!address) throw addressNotFound();
     const wasDefault = address.isDefault;
     Object.assign(address, patch);
-    validateAddress({ ...address.toObject(), ...patch });
     if (patch.isDefault) book.addresses.forEach((item) => { item.isDefault = item.id === address.id; });
     else if (wasDefault) address.isDefault = true;
     return address;
@@ -101,10 +95,12 @@ export async function updateAddress(customerId, addressId, patch) {
 }
 
 export async function makeDefaultAddress(customerId, addressId) {
+  const current = await getAddress(customerId, addressId);
+  if (!current) throw addressNotFound();
+  await validateAddress(current);
   return serialize(await changeBook(customerId, (book) => {
     const selected = book.addresses.id(addressId);
     if (!selected) throw addressNotFound();
-    if (!getServiceability(selected.pincode).serviceable) throw unserviceable();
     book.addresses.forEach((address) => { address.isDefault = address.id === selected.id; });
     return selected;
   }));

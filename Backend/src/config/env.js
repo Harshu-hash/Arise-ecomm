@@ -70,6 +70,7 @@ const schema = z.object({
   // Shiprocket (API-user login; the token is fetched and cached by the adapter)
   SHIPROCKET_EMAIL: optionalString,
   SHIPROCKET_PASSWORD: optionalString,
+  SHIPROCKET_PICKUP_PINCODE: optionalString, // origin used for customer pincode checks; without it every pincode is accepted
   SHIPROCKET_API_URL: z.string().default('https://apiv2.shiprocket.in/v1/external'),
   SHIPROCKET_WEBHOOK_TOKEN: optionalString, // Shiprocket sends it as the x-api-key header on tracking webhooks
 

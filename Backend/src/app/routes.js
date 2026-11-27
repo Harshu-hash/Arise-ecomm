@@ -120,6 +120,10 @@ const homeForYou = ttlMemo(async () => {
   const { forYouColor, forYouImage, forYouImageOpacity } = await getSettingsSection('homeHeader');
   return { ...HOME_TAB, gradient: [forYouColor, '#FFFFFF'], backgroundImageUrl: forYouImage || null, backgroundImageOpacity: forYouImageOpacity / 100 };
 }, 15_000);
+const homeRecentlyViewedGradient = ttlMemo(async () => {
+  const { recentlyViewedTopColor, recentlyViewedBottomColor } = await getSettingsSection('homeHeader');
+  return [recentlyViewedTopColor, recentlyViewedBottomColor];
+}, 15_000);
 const homeCampaigns = ttlMemo(() => listHomeCampaignSections(), 15_000);
 const homePage = ttlMemo(async (categoryId) => {
   const [hero, feed, ads, tabs] = await Promise.all([
@@ -131,7 +135,7 @@ const homePage = ttlMemo(async (categoryId) => {
   ]);
   return { hero, feed, ads, tabs };
 }, 15_000);
-for (const memo of [homeForYou, homeTabs, homeBrandTabs, homeLayout, homePage, homeCampaigns]) onCatalogChange(memo.clear);
+for (const memo of [homeRecentlyViewedGradient, homeForYou, homeTabs, homeBrandTabs, homeLayout, homePage, homeCampaigns]) onCatalogChange(memo.clear);
 
 export function createRoutes() {
   const root = Router();
@@ -189,7 +193,7 @@ export function createRoutes() {
       ]);
       const built = [
         ...(hero.length ? [{ id: 'hero', type: 'HERO', status: 'READY', items: hero }] : []),
-        ...(extras.recentlyViewed.length ? [{ id: 'recently-viewed', type: 'RECENTLY_VIEWED', status: 'READY', items: extras.recentlyViewed }] : []),
+        ...(extras.recentlyViewed.length ? [{ id: 'recently-viewed', type: 'RECENTLY_VIEWED', status: 'READY', metadata: { gradient: await homeRecentlyViewedGradient() }, items: extras.recentlyViewed }] : []),
         ...(ads.length ? [{ id: 'promo-carousel', type: 'PROMO_CAROUSEL', status: 'READY', items: ads }] : []),
         ...(extras.suggested.length ? [{ id: 'suggested', type: 'SUGGESTED_PRODUCTS', status: 'READY', items: extras.suggested }] : []),
         // One section per campaign, so the published layout can place each flash sale / deal on its own.

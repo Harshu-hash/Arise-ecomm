@@ -80,6 +80,14 @@ export const shiprocketGateway = {
     if (result.status >= 400 && !exists) throw new AppError({ code: 'PICKUP_ADDRESS_REJECTED', status: 409, message: `The courier would not accept your pickup address: ${reason(result)} Update your store address in settings and try again.` });
   }, 'Could not register the pickup address.'),
 
+  /** Whether a registered pickup location's phone is verified on Shiprocket: true or false, or null when it is not on the account. */
+  isPickupVerified: (name) => call(async () => {
+    const { status, payload } = await authorized('/settings/company/pickup');
+    if (status !== 200) throw new Error(`Shiprocket answered ${status}`);
+    const found = (payload?.data?.shipping_address ?? []).find((place) => place.pickup_location === name);
+    return found ? found.phone_verified === 1 : null;
+  }, 'Could not check the pickup address.'),
+
   /** Creates the order on Shiprocket: { shiprocketOrderId, shipmentId }. */
   createShipment: ({ reference, placedAt, pickupName, customer, items, weightG, dimsCm, collectPaise = null }) => call(async () => {
     const subTotal = items.reduce((sum, item) => sum + item.pricePaise * item.units, 0);
